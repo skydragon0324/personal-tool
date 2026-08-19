@@ -1,27 +1,16 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import get_settings
-from app.database import create_db_and_tables
-from app.routers import tasks
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    create_db_and_tables()
-    yield
-
+from app.api.v1.router import api_router
+from app.core.config import get_settings
 
 settings = get_settings()
 
 app = FastAPI(
     title="Daily To-Do API",
-    description="Simple personal productivity API for daily tasks",
-    version="1.0.0",
-    lifespan=lifespan,
+    description="Kanban board API for daily tasks",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -32,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(tasks.router)
+app.include_router(api_router)
 
 
 @app.exception_handler(Exception)
@@ -43,8 +32,3 @@ async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONRespons
         status_code=500,
         content={"detail": "Internal server error", "error": str(exc)},
     )
-
-
-@app.get("/health")
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}

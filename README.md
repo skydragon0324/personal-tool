@@ -1,49 +1,26 @@
 # Daily To-Do
 
-A simple full-stack personal productivity app for managing daily tasks.
+Kanban board for managing daily tasks.
 
-**Stack:** FastAPI · Next.js (App Router) · PostgreSQL · SQLModel · Tailwind CSS
-
-## Folder structure
-
-```
-daily-todo/
-├── docker-compose.yml          # PostgreSQL
-├── README.md
-├── backend/
-│   ├── .env.example
-│   ├── requirements.txt
-│   ├── alembic.ini
-│   ├── alembic/                # Database migrations
-│   └── app/
-│       ├── main.py             # FastAPI entrypoint
-│       ├── config.py           # Settings from env
-│       ├── database.py         # Engine + session
-│       ├── models.py           # SQLModel tables
-│       ├── schemas.py          # Pydantic request/response models
-│       ├── crud.py             # Database operations
-│       └── routers/tasks.py    # REST API routes
-└── frontend/
-    ├── .env.example
-    ├── src/
-    │   ├── app/                # Next.js App Router pages
-    │   ├── components/         # UI components
-    │   └── lib/                # API client + types
-    └── package.json
-```
-
-## Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- Docker (for PostgreSQL)
+**Stack:** FastAPI · Next.js (App Router) · PostgreSQL · SQLAlchemy · TanStack Query · `@dnd-kit/react`
 
 ## Quick start
 
-### 1. Start PostgreSQL
+### 1. Database
+
+**Option A — Docker**
 
 ```bash
 docker compose up -d
+# DATABASE_URL=postgresql://todo:todo@localhost:5432/daily_todo
+```
+
+**Option B — Project-local Postgres** (already used if `.pgdata` exists on port 5433)
+
+```bash
+# Start (Windows example)
+& "C:\Program Files\PostgreSQL\14\bin\pg_ctl.exe" -D ".pgdata" -l ".pgdata/logfile" start
+# DATABASE_URL=postgresql://todo:todo@127.0.0.1:5433/daily_todo
 ```
 
 ### 2. Backend
@@ -51,80 +28,55 @@ docker compose up -d
 ```bash
 cd backend
 python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-
+.venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-copy .env.example .env   # Windows
-# cp .env.example .env   # macOS / Linux
-
-# Optional: run migrations (tables are also created on API startup)
+copy .env.example .env          # then set DATABASE_URL / CORS_ORIGINS
 alembic upgrade head
-
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+API docs: http://localhost:8000/docs  
+Health: http://localhost:8000/api/v1/health
+
+Default seeded board id: `a0000000-0000-4000-8000-000000000001`
 
 ### 3. Frontend
 
-In a second terminal:
-
 ```bash
 cd frontend
-copy .env.example .env.local   # Windows
-# cp .env.example .env.local   # macOS / Linux
-
+copy .env.example .env.local
 npm install
 npm run dev
 ```
 
-App: [http://localhost:3000](http://localhost:3000)
+App: http://localhost:3000
 
-## API overview
+## API (`/api/v1`)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/tasks` | List tasks (`due_date`, `completed`, `priority` query filters) |
-| `GET` | `/tasks/summary` | Dashboard counts for a day (defaults to today) |
-| `GET` | `/tasks/{id}` | Get one task |
-| `POST` | `/tasks` | Create a task |
-| `PATCH` | `/tasks/{id}` | Update a task |
-| `DELETE` | `/tasks/{id}` | Delete a task |
+| `GET` | `/boards/{board_id}/view?date=` | Board columns + tasks for a day |
+| `POST` | `/tasks` | Create task |
+| `PATCH` | `/tasks/{id}` | Update task fields |
+| `PATCH` | `/tasks/{id}/move` | Transactional reorder / column move |
+| `DELETE` | `/tasks/{id}` | Delete task |
 | `GET` | `/health` | Health check |
 
-### Task fields
+Move body:
 
-- `title` (required)
-- `description` (optional)
-- `due_date` (YYYY-MM-DD)
-- `priority` (`low` \| `medium` \| `high`)
-- `completed` (boolean)
-- `created_at` (set automatically)
+```json
+{
+  "target_column_id": "uuid",
+  "target_position": 2,
+  "expected_version": 4
+}
+```
 
-## Environment variables
+Returns `409` when `expected_version` is stale.
 
-**Backend (`backend/.env`)**
+## Tests
 
-| Variable | Example | Purpose |
-|----------|---------|---------|
-| `DATABASE_URL` | `postgresql://todo:todo@localhost:5432/daily_todo` | PostgreSQL connection |
-| `CORS_ORIGINS` | `http://localhost:3000` | Allowed frontend origins (comma-separated) |
-
-**Frontend (`frontend/.env.local`)**
-
-| Variable | Example | Purpose |
-|----------|---------|---------|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI base URL |
-
-## Features
-
-- Create, edit, delete, and complete daily tasks
-- Default view shows today’s tasks
-- Filter by date, status, and priority
-- Dashboard summary: total / completed / remaining for today
-- Loading and empty states in the UI
+```bash
+cd backend
+pytest app/tests -v
+```
