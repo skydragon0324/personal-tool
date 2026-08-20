@@ -9,9 +9,9 @@ export function TaskDragOverlay({ task }: { task: TaskSummary | null }) {
   return (
     <DragOverlay>
       {task ? (
-        <div className="w-72 rounded-2xl border border-teal-200 bg-white p-3 shadow-xl">
+        <div className="w-72 cursor-grabbing rounded-2xl border border-[var(--app-primary)] bg-[var(--app-surface)] p-3 shadow-2xl scale-[1.03]">
           <div className="flex items-start justify-between gap-2">
-            <p className="font-medium text-ink">{task.title}</p>
+            <p className="line-clamp-2 font-medium text-[var(--app-text)]">{task.title}</p>
             <PriorityBadge priority={task.priority} />
           </div>
         </div>

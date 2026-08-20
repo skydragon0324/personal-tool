@@ -47,10 +47,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const apiClient = {
-  getBoardView: (boardId: string, startDate: string, endDate: string) =>
-    request<import("@/features/board/types").BoardView>(
-      `/api/v1/boards/${boardId}/view?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`,
-    ),
+  getBoardView: (params: import("@/features/board/types").BoardQueryParams) => {
+    const search = new URLSearchParams();
+    search.set("date_field", params.dateField);
+    search.set("limit", "500");
+    if (params.unbounded) {
+      search.set("unbounded", "true");
+    } else {
+      search.set("start_date", params.startDate);
+      search.set("end_date", params.endDate);
+    }
+    return request<import("@/features/board/types").BoardView>(
+      `/api/v1/boards/${params.boardId}/view?${search.toString()}`,
+    );
+  },
 
   getTask: (taskId: string) =>
     request<import("@/features/board/types").TaskDetail>(`/api/v1/tasks/${taskId}`),
@@ -90,5 +100,206 @@ export const apiClient = {
       method: "DELETE",
     }),
 
+  listCategories: (boardId: string) =>
+    request<import("@/features/board/types").CategoryDetail[]>(
+      `/api/v1/boards/${boardId}/categories`,
+    ),
+
+  createCategory: (
+    boardId: string,
+    payload: { name: string; color: string },
+  ) =>
+    request<import("@/features/board/types").CategoryDetail>(
+      `/api/v1/boards/${boardId}/categories`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+
   health: () => request<{ status: string }>("/api/v1/health"),
+
+  listColumns: (boardId: string, includeArchived = true) =>
+    request<import("@/features/board/types").ColumnDetail[]>(
+      `/api/v1/boards/${boardId}/columns?include_archived=${includeArchived ? "true" : "false"}`,
+    ),
+
+  createColumn: (
+    boardId: string,
+    payload: { name: string; color?: string; icon_name?: string | null; is_done?: boolean },
+  ) =>
+    request<import("@/features/board/types").ColumnDetail>(
+      `/api/v1/boards/${boardId}/columns`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+
+  updateColumn: (
+    columnId: string,
+    payload: { name?: string; color?: string; icon_name?: string | null; is_done?: boolean },
+  ) =>
+    request<import("@/features/board/types").ColumnDetail>(
+      `/api/v1/columns/${columnId}`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+
+  reorderColumn: (columnId: string, targetPosition: number) =>
+    request<import("@/features/board/types").ColumnDetail>(
+      `/api/v1/columns/${columnId}/reorder`,
+      { method: "PATCH", body: JSON.stringify({ target_position: targetPosition }) },
+    ),
+
+  archiveColumn: (columnId: string, moveToColumnId?: string | null) =>
+    request<import("@/features/board/types").ColumnDetail>(
+      `/api/v1/columns/${columnId}/archive`,
+      {
+        method: "POST",
+        body: JSON.stringify({ move_to_column_id: moveToColumnId ?? null }),
+      },
+    ),
+
+  restoreColumn: (columnId: string) =>
+    request<import("@/features/board/types").ColumnDetail>(
+      `/api/v1/columns/${columnId}/restore`,
+      { method: "POST" },
+    ),
+
+  deleteColumn: (columnId: string) =>
+    request<void>(`/api/v1/columns/${columnId}`, { method: "DELETE" }),
+
+  listBoards: (includeArchived = true) =>
+    request<import("@/features/board/types").BoardListItem[]>(
+      `/api/v1/boards?include_archived=${includeArchived ? "true" : "false"}`,
+    ),
+
+  getBoard: (boardId: string) =>
+    request<import("@/features/board/types").BoardListItem>(`/api/v1/boards/${boardId}`),
+
+  createBoard: (payload: import("@/features/board/types").BoardCreate) =>
+    request<import("@/features/board/types").BoardListItem>(`/api/v1/boards`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateBoard: (
+    boardId: string,
+    payload: {
+      name?: string;
+      color?: string;
+      icon_name?: string | null;
+      timezone?: string;
+    },
+  ) =>
+    request<import("@/features/board/types").BoardListItem>(`/api/v1/boards/${boardId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  reorderBoard: (boardId: string, targetPosition: number) =>
+    request<import("@/features/board/types").BoardListItem>(
+      `/api/v1/boards/${boardId}/reorder`,
+      { method: "PATCH", body: JSON.stringify({ target_position: targetPosition }) },
+    ),
+
+  archiveBoard: (boardId: string) =>
+    request<import("@/features/board/types").BoardListItem>(
+      `/api/v1/boards/${boardId}/archive`,
+      { method: "POST" },
+    ),
+
+  restoreBoard: (boardId: string) =>
+    request<import("@/features/board/types").BoardListItem>(
+      `/api/v1/boards/${boardId}/restore`,
+      { method: "POST" },
+    ),
+
+  deleteBoard: (boardId: string) =>
+    request<void>(`/api/v1/boards/${boardId}`, { method: "DELETE" }),
+
+  listNotes: (params: import("@/features/notepad/types").NoteListParams = {}) => {
+    const search = new URLSearchParams();
+    if (params.query) search.set("query", params.query);
+    if (params.priority) search.set("priority", params.priority);
+    if (params.pinned !== undefined) search.set("pinned", String(params.pinned));
+    const query = search.toString();
+    return request<import("@/features/notepad/types").Note[]>(
+      `/api/v1/notes${query ? `?${query}` : ""}`,
+    );
+  },
+
+  getDashboardSummary: (today: string) =>
+    request<import("@/features/dashboard/types").DashboardSummary>(
+      `/api/v1/dashboard/summary?today=${encodeURIComponent(today)}`,
+    ),
+
+  listSchedule: (weekStart: string, today: string) =>
+    request<import("@/features/schedule/types").ScheduleEntry[]>(
+      `/api/v1/schedule?week_start=${encodeURIComponent(weekStart)}&today=${encodeURIComponent(today)}`,
+    ),
+
+  createSchedule: (payload: import("@/features/schedule/types").ScheduleEntryCreate) =>
+    request<import("@/features/schedule/types").ScheduleEntry>(`/api/v1/schedule`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateSchedule: (
+    entryId: string,
+    payload: import("@/features/schedule/types").ScheduleEntryUpdate,
+  ) =>
+    request<import("@/features/schedule/types").ScheduleEntry>(`/api/v1/schedule/${entryId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteSchedule: (entryId: string) =>
+    request<void>(`/api/v1/schedule/${entryId}`, { method: "DELETE" }),
+
+  getNote: (noteId: string) =>
+    request<import("@/features/notepad/types").Note>(`/api/v1/notes/${noteId}`),
+
+  createNote: (payload: import("@/features/notepad/types").NoteCreate) =>
+    request<import("@/features/notepad/types").Note>(`/api/v1/notes`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateNote: (noteId: string, payload: import("@/features/notepad/types").NoteUpdate) =>
+    request<import("@/features/notepad/types").Note>(`/api/v1/notes/${noteId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteNote: (noteId: string) =>
+    request<void>(`/api/v1/notes/${noteId}`, { method: "DELETE" }),
+
+  createSubtask: (taskId: string, payload: { title: string }) =>
+    request<import("@/features/board/types").TaskSubtask>(
+      `/api/v1/tasks/${taskId}/subtasks`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+
+  updateSubtask: (
+    taskId: string,
+    subtaskId: string,
+    payload: { title?: string; is_completed?: boolean },
+  ) =>
+    request<import("@/features/board/types").TaskSubtask>(
+      `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+
+  deleteSubtask: (taskId: string, subtaskId: string) =>
+    request<void>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, {
+      method: "DELETE",
+    }),
+
+  reorderSubtasks: (
+    taskId: string,
+    payload: {
+      subtask_id: string;
+      before_subtask_id?: string | null;
+      after_subtask_id?: string | null;
+    },
+  ) =>
+    request<import("@/features/board/types").TaskSubtask[]>(
+      `/api/v1/tasks/${taskId}/subtasks/reorder`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
 };

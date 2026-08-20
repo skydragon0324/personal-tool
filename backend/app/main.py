@@ -8,8 +8,8 @@ from app.core.config import get_settings
 settings = get_settings()
 
 app = FastAPI(
-    title="Daily To-Do API",
-    description="Kanban board API for daily tasks",
+    title="Life Management API",
+    description="Personal workspace API for tasks, statuses, and daily planning.",
     version="2.0.0",
 )
 

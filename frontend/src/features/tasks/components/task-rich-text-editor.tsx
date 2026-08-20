@@ -1,7 +1,7 @@
 "use client";
 
 import { RichTextEditor } from "@mantine/tiptap";
-import { Select, Group } from "@mantine/core";
+import { Group, Select } from "@mantine/core";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -12,8 +12,11 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Image from "@tiptap/extension-image";
+import { Color } from "@tiptap/extension-color";
+import Highlight from "@tiptap/extension-highlight";
+import TextAlign from "@tiptap/extension-text-align";
 import { Extension } from "@tiptap/core";
-import { useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import type { Editor } from "@tiptap/react";
 
 import type { TiptapJSON } from "@/features/board/types";
@@ -24,6 +27,23 @@ const FONTS = [
   { value: "Georgia, serif", label: "Georgia" },
   { value: "Courier New, monospace", label: "Courier" },
   { value: "Trebuchet MS, sans-serif", label: "Trebuchet" },
+];
+
+const TEXT_COLORS = [
+  "#25262b",
+  "#868e96",
+  "#fa5252",
+  "#e64980",
+  "#be4bdb",
+  "#7950f2",
+  "#4c6ef5",
+  "#228be6",
+  "#15aabf",
+  "#12b886",
+  "#40c057",
+  "#82c91e",
+  "#fab005",
+  "#fd7e14",
 ];
 
 const FontSize = Extension.create({
@@ -48,11 +68,31 @@ const FontSize = Extension.create({
   },
 });
 
+const TaskImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      alt: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("alt"),
+        renderHTML: (attributes) => (attributes.alt ? { alt: attributes.alt } : {}),
+      },
+      pendingId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-pending-id"),
+        renderHTML: (attributes) =>
+          attributes.pendingId ? { "data-pending-id": attributes.pendingId } : {},
+      },
+    };
+  },
+});
+
 interface TaskRichTextEditorProps {
   value: TiptapJSON | null;
   onChange: (value: TiptapJSON) => void;
   placeholder?: string;
   onEditorReady?: (editor: Editor | null) => void;
+  extraToolbar?: ReactNode;
 }
 
 export function TaskRichTextEditor({
@@ -60,6 +100,7 @@ export function TaskRichTextEditor({
   onChange,
   placeholder = "Write task details…",
   onEditorReady,
+  extraToolbar,
 }: TaskRichTextEditorProps) {
   const extensions = useMemo(
     () => [
@@ -69,10 +110,13 @@ export function TaskRichTextEditor({
       TextStyle,
       FontSize,
       FontFamily,
+      Color,
+      Highlight.configure({ multicolor: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Image.configure({ inline: false, allowBase64: false }),
+      TaskImage.configure({ inline: false, allowBase64: false }),
     ],
     [placeholder],
   );
@@ -105,7 +149,7 @@ export function TaskRichTextEditor({
 
   if (!editor || editor.isDestroyed) {
     return (
-      <div className="min-h-[220px] rounded-md border border-slate-200 bg-slate-50" />
+      <div className="min-h-[220px] rounded-md border border-[var(--app-border)] bg-[var(--app-surface-muted)]" />
     );
   }
 
@@ -114,7 +158,7 @@ export function TaskRichTextEditor({
 
   return (
     <RichTextEditor editor={editor}>
-      <RichTextEditor.Toolbar sticky stickyOffset={0}>
+      <RichTextEditor.Toolbar sticky stickyOffset={0} className="flex flex-wrap gap-y-1">
         <RichTextEditor.ControlsGroup>
           <RichTextEditor.Undo />
           <RichTextEditor.Redo />
@@ -134,7 +178,7 @@ export function TaskRichTextEditor({
           <RichTextEditor.H3 />
         </RichTextEditor.ControlsGroup>
 
-        <Group gap={6} wrap="nowrap">
+        <Group gap={6} wrap="wrap">
           <Select
             size="xs"
             w={90}
@@ -177,9 +221,34 @@ export function TaskRichTextEditor({
         </RichTextEditor.ControlsGroup>
 
         <RichTextEditor.ControlsGroup>
+          <RichTextEditor.Blockquote />
+          <RichTextEditor.Code />
+          <RichTextEditor.CodeBlock />
+          <RichTextEditor.Hr />
+        </RichTextEditor.ControlsGroup>
+
+        <RichTextEditor.ControlsGroup>
+          <RichTextEditor.AlignLeft />
+          <RichTextEditor.AlignCenter />
+          <RichTextEditor.AlignRight />
+        </RichTextEditor.ControlsGroup>
+
+        <RichTextEditor.ControlsGroup>
+          <RichTextEditor.ColorPicker colors={TEXT_COLORS} />
+          <RichTextEditor.UnsetColor />
+          <RichTextEditor.Highlight />
+        </RichTextEditor.ControlsGroup>
+
+        <RichTextEditor.ControlsGroup>
           <RichTextEditor.Link />
           <RichTextEditor.Unlink />
         </RichTextEditor.ControlsGroup>
+
+        {extraToolbar ? (
+          <Group gap={6} wrap="wrap">
+            {extraToolbar}
+          </Group>
+        ) : null}
       </RichTextEditor.Toolbar>
 
       <RichTextEditor.Content mih={220} />

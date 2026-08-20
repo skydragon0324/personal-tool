@@ -24,12 +24,24 @@ export function formatRangeLabel(start: string, end: string): string {
   return `${startLabel} – ${formatLongDate(end)}`;
 }
 
-function formatLongDate(isoDate: string): string {
+export function formatLongDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(year, month - 1, day);
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }

@@ -28,14 +28,17 @@ def test_board_view_single_day(db: Session, seed_tasks: list[Task], today: date)
     assert view.summary.total == 3
 
 
-def test_board_view_inclusive_range(db: Session, seed_tasks: list[Task], today: date) -> None:
+def test_board_view_inclusive_range(
+    db: Session, seed_tasks: list[Task], today: date, uncategorized_id
+) -> None:
     extra = Task(
         id=uuid4(),
         column_id=COLUMN_TODO_ID,
+        category_id=uncategorized_id,
         title="Tomorrow",
         due_date=today + timedelta(days=1),
         priority="low",
-        position=0,
+        position=3,
         version=1,
     )
     db.add(extra)
@@ -69,9 +72,89 @@ def test_board_view_range_too_long(db: Session, today: date) -> None:
             db,
             DEFAULT_BOARD_ID,
             start_date=today,
-            end_date=today + timedelta(days=91),
+            end_date=today + timedelta(days=3654),
         )
     assert exc.value.status_code == 422
+
+
+def test_board_view_full_leap_year(db: Session, today: date, uncategorized_id) -> None:
+    leap = Task(
+        id=uuid4(),
+        column_id=COLUMN_TODO_ID,
+        category_id=uncategorized_id,
+        title="Leap day",
+        due_date=date(2024, 2, 29),
+        priority="low",
+        position=40,
+        version=1,
+    )
+    db.add(leap)
+    db.commit()
+    view = board_service.get_board_view(
+        db,
+        DEFAULT_BOARD_ID,
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 12, 31),
+    )
+    titles = [task.title for column in view.columns for task in column.tasks]
+    assert "Leap day" in titles
+
+
+def test_board_view_month_end_and_year_spanning_week(
+    db: Session, uncategorized_id
+) -> None:
+    jan = Task(
+        id=uuid4(),
+        column_id=COLUMN_TODO_ID,
+        category_id=uncategorized_id,
+        title="January last",
+        due_date=date(2026, 1, 31),
+        priority="low",
+        position=41,
+        version=1,
+    )
+    new_year = Task(
+        id=uuid4(),
+        column_id=COLUMN_TODO_ID,
+        category_id=uncategorized_id,
+        title="New year",
+        due_date=date(2026, 1, 1),
+        priority="low",
+        position=42,
+        version=1,
+    )
+    db.add_all([jan, new_year])
+    db.commit()
+
+    january = board_service.get_board_view(
+        db,
+        DEFAULT_BOARD_ID,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+    )
+    jan_titles = [task.title for column in january.columns for task in column.tasks]
+    assert "January last" in jan_titles
+    assert "New year" in jan_titles
+
+    week = board_service.get_board_view(
+        db,
+        DEFAULT_BOARD_ID,
+        start_date=date(2025, 12, 29),
+        end_date=date(2026, 1, 4),
+    )
+    week_titles = [task.title for column in week.columns for task in column.tasks]
+    assert "New year" in week_titles
+
+
+def test_board_view_custom_ten_years_allowed(db: Session, today: date) -> None:
+    view = board_service.get_board_view(
+        db,
+        DEFAULT_BOARD_ID,
+        start_date=date(2016, 1, 1),
+        end_date=date(2026, 1, 1),
+    )
+    assert view.start_date == "2016-01-01"
+    assert view.end_date == "2026-01-01"
 
 
 def test_board_view_legacy_date_param(client: TestClient, seed_tasks: list[Task], today: date) -> None:
@@ -83,7 +166,9 @@ def test_board_view_legacy_date_param(client: TestClient, seed_tasks: list[Task]
     body = response.json()
     assert body["start_date"] == today.isoformat()
     assert body["summary"]["total"] == 3
-    assert "content_preview" in body["columns"][0]["tasks"][0]
+    tasks = [task for column in body["columns"] for task in column["tasks"]]
+    assert tasks
+    assert "content_preview" in tasks[0]
 
 
 def test_due_date_change_repositions(db: Session, seed_tasks: list[Task], today: date) -> None:
@@ -95,7 +180,7 @@ def test_due_date_change_repositions(db: Session, seed_tasks: list[Task], today:
         TaskUpdate(due_date=new_due),
     )
     assert result.due_date == new_due
-    assert result.position == 0
+    assert result.position == moving.position
 
     remaining = list(
         db.scalars(
@@ -105,10 +190,10 @@ def test_due_date_change_repositions(db: Session, seed_tasks: list[Task], today:
         ).all()
     )
     assert [t.title for t in remaining] == ["Alpha", "Charlie"]
-    assert [t.position for t in remaining] == [0, 1]
+    assert [t.position for t in remaining] == [0, 2]
 
 
-def test_rich_content_create_update(db: Session, today: date) -> None:
+def test_rich_content_create_update(db: Session, today: date, uncategorized_id) -> None:
     content = {
         "type": "doc",
         "content": [
@@ -147,6 +232,7 @@ def test_rich_content_create_update(db: Session, today: date) -> None:
         db,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
+            category_id=uncategorized_id,
             title="Rich",
             due_date=today,
             content=content,
@@ -178,6 +264,7 @@ def test_attachment_upload_download_delete(
     client: TestClient,
     db: Session,
     today: date,
+    uncategorized_id,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -186,7 +273,7 @@ def test_attachment_upload_download_delete(
 
     created = task_service.create_task(
         db,
-        TaskCreate(column_id=COLUMN_TODO_ID, title="Files", due_date=today),
+        TaskCreate(column_id=COLUMN_TODO_ID, category_id=uncategorized_id, title="Files", due_date=today),
     )
     files = {"file": ("note.txt", BytesIO(b"hello attachment"), "text/plain")}
     response = client.post(f"/api/v1/tasks/{created.id}/attachments", files=files)
@@ -208,6 +295,7 @@ def test_attachment_rejects_path_traversal_name(
     client: TestClient,
     db: Session,
     today: date,
+    uncategorized_id,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -216,7 +304,7 @@ def test_attachment_rejects_path_traversal_name(
 
     created = task_service.create_task(
         db,
-        TaskCreate(column_id=COLUMN_TODO_ID, title="Safe", due_date=today),
+        TaskCreate(column_id=COLUMN_TODO_ID, category_id=uncategorized_id, title="Safe", due_date=today),
     )
     files = {"file": ("../../etc/passwd.txt", BytesIO(b"nope"), "text/plain")}
     response = client.post(f"/api/v1/tasks/{created.id}/attachments", files=files)
@@ -231,6 +319,7 @@ def test_delete_task_cleans_attachments(
     client: TestClient,
     db: Session,
     today: date,
+    uncategorized_id,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -239,7 +328,7 @@ def test_delete_task_cleans_attachments(
 
     created = task_service.create_task(
         db,
-        TaskCreate(column_id=COLUMN_TODO_ID, title="Cleanup", due_date=today),
+        TaskCreate(column_id=COLUMN_TODO_ID, category_id=uncategorized_id, title="Cleanup", due_date=today),
     )
     files = {"file": ("a.txt", BytesIO(b"x"), "text/plain")}
     client.post(f"/api/v1/tasks/{created.id}/attachments", files=files).json()

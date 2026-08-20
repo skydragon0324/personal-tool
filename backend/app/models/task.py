@@ -24,8 +24,10 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.board_column import BoardColumn
+    from app.models.category import Category
     from app.models.task_attachment import TaskAttachment
     from app.models.task_link import TaskLink
+    from app.models.task_subtask import TaskSubtask
 
 
 class Task(Base):
@@ -34,13 +36,12 @@ class Task(Base):
         CheckConstraint("priority IN ('low', 'medium', 'high')", name="ck_tasks_priority"),
         UniqueConstraint(
             "column_id",
-            "due_date",
             "position",
-            name="uq_tasks_column_due_position",
+            name="uq_tasks_column_position",
             deferrable=True,
             initially="DEFERRED",
         ),
-        Index("ix_tasks_column_due_position", "column_id", "due_date", "position"),
+        Index("ix_tasks_column_position", "column_id", "position"),
         Index("ix_tasks_due_priority", "due_date", "priority"),
         Index("ix_tasks_content_text", "content_text"),
     )
@@ -48,6 +49,12 @@ class Task(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     column_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("board_columns.id", ondelete="CASCADE"), nullable=False
+    )
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("categories.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -69,6 +76,7 @@ class Task(Base):
     )
 
     column: Mapped[BoardColumn] = relationship("BoardColumn", back_populates="tasks")
+    category: Mapped[Category] = relationship("Category", back_populates="tasks")
     links: Mapped[list[TaskLink]] = relationship(
         "TaskLink",
         back_populates="task",
@@ -80,4 +88,10 @@ class Task(Base):
         back_populates="task",
         cascade="all, delete-orphan",
         order_by="TaskAttachment.created_at",
+    )
+    subtasks: Mapped[list[TaskSubtask]] = relationship(
+        "TaskSubtask",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="TaskSubtask.position",
     )

@@ -16,6 +16,7 @@ import {
   FileButton,
   Group,
   Image,
+  Modal,
   Paper,
   SimpleGrid,
   Stack,
@@ -34,8 +35,16 @@ import type {
   TaskLinkInput,
   TiptapJSON,
 } from "@/features/board/types";
+import { useCategories, useCreateCategory } from "@/features/board/hooks/use-categories";
 import { todayISO } from "@/lib/dates";
+import { CategoryCombobox } from "./category-combobox";
 import { descriptionToDoc } from "../utils/description-to-doc";
+import {
+  createPendingImageId,
+  type PendingInlineImage,
+  replacePendingImageSrc,
+  sanitizeContentForPersist,
+} from "../utils/pending-images";
 import { TaskRichTextEditor } from "./task-rich-text-editor";
 
 interface PendingFile {
@@ -47,41 +56,55 @@ interface PendingFile {
 
 interface TaskFormProps {
   initial?: TaskDetail | null;
+  boardId: string;
   columnId: string;
   dueDate: string;
   submitting?: boolean;
-  onSubmit: (payload: TaskCreate, pendingFiles: File[]) => Promise<void>;
+  onSubmit: (payload: TaskCreate, pendingFiles: File[], existingId?: string) => Promise<TaskDetail>;
   onCancel?: () => void;
-  onUploadExisting?: (file: File) => Promise<{ download_url: string | null }>;
+  onUploadFile?: (taskId: string, file: File) => Promise<{ download_url: string | null }>;
+  onPatchContent?: (taskId: string, content: TiptapJSON) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
   uploading?: boolean;
 }
 
 export function TaskForm({
   initial,
+  boardId,
   columnId,
   dueDate,
   submitting = false,
   onSubmit,
   onCancel,
-  onUploadExisting,
+  onUploadFile,
+  onPatchContent,
   onDeleteAttachment,
   uploading,
 }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
-  const [taskDueDate, setTaskDueDate] = useState(dueDate || todayISO());
+  const [taskDueDate, setTaskDueDate] = useState(initial?.due_date ?? todayISO());
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [content, setContent] = useState<TiptapJSON | null>(null);
   const [links, setLinks] = useState<TaskLinkInput[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [pendingImages, setPendingImages] = useState<PendingInlineImage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [savedTaskId, setSavedTaskId] = useState<string | null>(initial?.id ?? null);
+  const [altDraft, setAltDraft] = useState("");
+  const [altFile, setAltFile] = useState<File | null>(null);
   const editorRef = useRef<Editor | null>(null);
+
+  const categoriesQuery = useCategories(boardId);
+  const createCategory = useCreateCategory(boardId);
+  const categories = categoriesQuery.data ?? [];
 
   useEffect(() => {
     if (initial) {
       setTitle(initial.title);
       setPriority(initial.priority);
       setTaskDueDate(initial.due_date);
+      setCategoryId(initial.category.id);
       setContent(
         initial.content ??
           (initial.description ? descriptionToDoc(initial.description) : null),
@@ -94,14 +117,18 @@ export function TaskForm({
           position: link.position,
         })),
       );
+      setSavedTaskId(initial.id);
     } else {
       setTitle("");
       setPriority("medium");
-      setTaskDueDate(dueDate || todayISO());
+      setTaskDueDate(todayISO());
+      setCategoryId(null);
       setContent(null);
       setLinks([]);
+      setSavedTaskId(null);
     }
     setPendingFiles([]);
+    setPendingImages([]);
     setError(null);
   }, [initial, dueDate]);
 
@@ -114,20 +141,136 @@ export function TaskForm({
     [initial],
   );
 
+  function insertLocalImage(file: File, alt: string) {
+    const pendingId = createPendingImageId();
+    const blobUrl = URL.createObjectURL(file);
+    const image: PendingInlineImage = { pendingId, file, alt, blobUrl };
+    setPendingImages((current) => [...current, image]);
+    if (editorRef.current && !editorRef.current.isDestroyed) {
+            editorRef.current
+              .chain()
+              .focus()
+              .insertContent({
+                type: "image",
+                attrs: { src: blobUrl, alt, pendingId },
+              })
+              .run();
+    }
+  }
+
+  async function insertUploadedImage(file: File, alt: string) {
+    const taskId = savedTaskId ?? initial?.id;
+    if (!onUploadFile || !taskId) {
+      insertLocalImage(file, alt);
+      return;
+    }
+    try {
+      const uploaded = await onUploadFile(taskId, file);
+      if (
+        uploaded.download_url &&
+        editorRef.current &&
+        !editorRef.current.isDestroyed
+      ) {
+        editorRef.current
+          .chain()
+          .focus()
+          .setImage({ src: uploaded.download_url, alt })
+          .run();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed");
+    }
+  }
+
+  function handleImageFile(file: File | null) {
+    if (!file) return;
+    setAltFile(file);
+    setAltDraft(file.name.replace(/\.[^.]+$/, ""));
+  }
+
+  function confirmImageAlt() {
+    if (!altFile) return;
+    const alt = altDraft.trim() || altFile.name;
+    const file = altFile;
+    setAltFile(null);
+    const taskId = savedTaskId ?? initial?.id;
+    if (taskId && onUploadFile) {
+      void insertUploadedImage(file, alt);
+    } else {
+      insertLocalImage(file, alt);
+    }
+  }
+
+  async function uploadInlineImages(
+    taskId: string,
+    currentContent: TiptapJSON | null,
+    images: PendingInlineImage[],
+  ): Promise<{ content: TiptapJSON | null; failed: PendingInlineImage[] }> {
+    const replacements: { pendingId: string; src: string }[] = [];
+    const failed: PendingInlineImage[] = [];
+    for (const image of images) {
+      try {
+        if (!onUploadFile) throw new Error("Uploads are not available");
+        const uploaded = await onUploadFile(taskId, image.file);
+        if (!uploaded.download_url) throw new Error("Upload URL was not returned");
+        replacements.push({ pendingId: image.pendingId, src: uploaded.download_url });
+      } catch (err) {
+        failed.push({
+          ...image,
+          error: err instanceof Error ? err.message : "Image upload failed",
+        });
+      }
+    }
+    let nextLocal = currentContent;
+    for (const item of replacements) {
+      nextLocal = replacePendingImageSrc(nextLocal, item.pendingId, item.src);
+    }
+    const persistable = sanitizeContentForPersist(nextLocal);
+    if (onPatchContent && (replacements.length > 0 || images.length > 0)) {
+      await onPatchContent(taskId, persistable ?? { type: "doc", content: [] });
+    }
+    return { content: nextLocal, failed };
+  }
+
+  async function retryInlineImage(pendingId: string) {
+    const image = pendingImages.find((item) => item.pendingId === pendingId);
+    const taskId = savedTaskId ?? initial?.id;
+    if (!image || !taskId) return;
+    setError(null);
+    try {
+      const { content: nextContent, failed } = await uploadInlineImages(taskId, content, [
+        image,
+      ]);
+      setContent(nextContent);
+      setPendingImages((current) => {
+        const remaining = current.filter((item) => item.pendingId !== pendingId);
+        return failed.length ? [...remaining, ...failed] : remaining;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image retry failed");
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     if (!title.trim()) {
-      setError("Title is required.");
+      setError("Enter a title.");
+      return;
+    }
+    if (!categoryId) {
+      setError("Choose a category.");
       return;
     }
     try {
-      await onSubmit(
+      const persistableContent = sanitizeContentForPersist(content);
+      const created = await onSubmit(
         {
           column_id: initial?.column_id ?? columnId,
+          category_id: categoryId,
           title: title.trim(),
           description: null,
-          content,
+          content: persistableContent,
           due_date: taskDueDate,
           priority,
           links: links.map((link, index) => ({
@@ -136,9 +279,27 @@ export function TaskForm({
           })),
         },
         pendingFiles.map((item) => item.file),
+        savedTaskId ?? initial?.id ?? undefined,
       );
+      setSavedTaskId(created.id);
+      setPendingFiles([]);
+
+      if (pendingImages.length) {
+        const { content: nextContent, failed } = await uploadInlineImages(
+          created.id,
+          content,
+          pendingImages,
+        );
+        setContent(nextContent);
+        setPendingImages(failed);
+        if (failed.length) {
+          setError("The task was saved, but some inline images failed to upload.");
+          return;
+        }
+      }
+      onCancel?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save task");
+      setError(err instanceof Error ? err.message : "Could not save the task");
     }
   }
 
@@ -155,25 +316,6 @@ export function TaskForm({
     ]);
   }
 
-  async function insertUploadedImage(file: File) {
-    if (!onUploadExisting || !initial) {
-      addPendingFiles([file]);
-      return;
-    }
-    try {
-      const uploaded = await onUploadExisting(file);
-      if (
-        uploaded.download_url &&
-        editorRef.current &&
-        !editorRef.current.isDestroyed
-      ) {
-        editorRef.current.chain().focus().setImage({ src: uploaded.download_url }).run();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Image upload failed");
-    }
-  }
-
   return (
     <form onSubmit={handleSubmit} className="flex max-h-[min(85vh,900px)] flex-col">
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
@@ -185,6 +327,14 @@ export function TaskForm({
             onChange={(e) => setTitle(e.currentTarget.value)}
             maxLength={160}
             required
+          />
+          <CategoryCombobox
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+            creating={createCategory.isPending}
+            required
+            onCreate={async (input) => createCategory.mutateAsync(input)}
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <DatePickerInput
@@ -218,7 +368,51 @@ export function TaskForm({
             value={content}
             onChange={setContent}
             onEditorReady={handleEditorReady}
+            extraToolbar={
+              <FileButton
+                accept="image/*"
+                onChange={(file) => {
+                  if (file && !Array.isArray(file)) handleImageFile(file);
+                }}
+              >
+                {(props) => (
+                  <Button
+                    {...props}
+                    size="xs"
+                    variant="default"
+                    type="button"
+                    loading={uploading}
+                  >
+                    Insert image
+                  </Button>
+                )}
+              </FileButton>
+            }
           />
+          {pendingImages.length > 0 ? (
+            <Stack gap="xs">
+              {pendingImages.map((image) => (
+                <Alert
+                  key={image.pendingId}
+                  color={image.error ? "red" : "yellow"}
+                  title={image.error ? "Inline image failed" : "Will upload after save"}
+                >
+                  <Group justify="space-between">
+                    <Text size="sm">{image.alt || image.file.name}</Text>
+                    {image.error ? (
+                      <Button
+                        size="xs"
+                        type="button"
+                        onClick={() => void retryInlineImage(image.pendingId)}
+                      >
+                        Retry
+                      </Button>
+                    ) : null}
+                  </Group>
+                </Alert>
+              ))}
+            </Stack>
+          ) : null}
         </section>
 
         <Divider />
@@ -245,7 +439,7 @@ export function TaskForm({
               <Paper key={link.id ?? index} withBorder p="sm" radius="md">
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <TextInput
-                    label="Label"
+                    label="Name"
                     value={link.label}
                     onChange={(e) => {
                       const label = e.currentTarget.value;
@@ -286,7 +480,7 @@ export function TaskForm({
             ))}
             {links.length === 0 ? (
               <Text size="sm" c="dimmed">
-                No reference links yet.
+                No reference links.
               </Text>
             ) : null}
           </Stack>
@@ -297,48 +491,26 @@ export function TaskForm({
         <section className="space-y-3">
           <Group justify="space-between">
             <Title order={5}>Attachments</Title>
-            <Group gap="xs">
-              <FileButton
-                multiple
-                onChange={(files) => {
-                  if (!files) return;
-                  const list = Array.isArray(files) ? files : [files];
-                  addPendingFiles(list);
-                }}
-              >
-                {(props) => (
-                  <Button {...props} size="xs" variant="light" type="button">
-                    Add files
-                  </Button>
-                )}
-              </FileButton>
-              {initial ? (
-                <FileButton
-                  accept="image/*"
-                  onChange={(file) => {
-                    if (file && !Array.isArray(file)) void insertUploadedImage(file);
-                  }}
-                >
-                  {(props) => (
-                    <Button
-                      {...props}
-                      size="xs"
-                      variant="default"
-                      type="button"
-                      loading={uploading}
-                    >
-                      Insert image
-                    </Button>
-                  )}
-                </FileButton>
-              ) : null}
-            </Group>
+            <FileButton
+              multiple
+              onChange={(files) => {
+                if (!files) return;
+                const list = Array.isArray(files) ? files : [files];
+                addPendingFiles(list);
+              }}
+            >
+              {(props) => (
+                <Button {...props} size="xs" variant="light" type="button">
+                  Add files
+                </Button>
+              )}
+            </FileButton>
           </Group>
 
           {pendingFiles.length > 0 ? (
             <Stack gap="xs">
               <Text size="sm" fw={500}>
-                Waiting to upload after save
+                Will upload after save
               </Text>
               {pendingFiles.map((item) => (
                 <Paper key={item.id} withBorder p="xs" radius="md">
@@ -401,7 +573,7 @@ export function TaskForm({
                         variant="subtle"
                         color="red"
                         onClick={() => void onDeleteAttachment(attachment.id)}
-                        aria-label="Delete attachment"
+                        aria-label="Remove attachment"
                       >
                         ×
                       </ActionIcon>
@@ -442,9 +614,9 @@ export function TaskForm({
         </Alert>
       ) : null}
 
-      <div className="sticky bottom-0 mt-4 flex flex-wrap gap-2 border-t border-slate-200 bg-white pt-3">
-        <Button type="submit" loading={submitting}>
-          {initial ? "Save changes" : "Add task"}
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--app-border)] pt-3">
+        <Button type="submit" loading={submitting || createCategory.isPending}>
+          {initial || savedTaskId ? "Save changes" : "Add task"}
         </Button>
         {onCancel ? (
           <Button type="button" variant="default" onClick={onCancel}>
@@ -452,6 +624,30 @@ export function TaskForm({
           </Button>
         ) : null}
       </div>
+
+      <Modal
+        opened={altFile !== null}
+        onClose={() => setAltFile(null)}
+        title="Image alt text"
+        size="sm"
+      >
+        <Stack>
+          <TextInput
+            label="Alt text"
+            value={altDraft}
+            onChange={(event) => setAltDraft(event.currentTarget.value)}
+            description="Describe the image for accessibility."
+          />
+          <Group justify="flex-end">
+            <Button variant="default" type="button" onClick={() => setAltFile(null)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmImageAlt}>
+              Insert
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </form>
   );
 }

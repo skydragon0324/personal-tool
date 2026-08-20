@@ -19,7 +19,7 @@ export function DeleteTaskDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
       role="alertdialog"
       aria-modal="true"
       aria-label="Delete task"
@@ -27,12 +27,12 @@ export function DeleteTaskDialog({
       <button
         type="button"
         className="absolute inset-0 cursor-default"
-        aria-label="Close dialog"
+        aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-        <h2 className="font-display text-xl text-ink">Delete task?</h2>
-        <p className="mt-2 text-sm text-slate-600">
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-xl">
+        <h2 className="font-display text-xl text-[var(--app-text)]">Delete this task?</h2>
+        <p className="mt-2 text-sm text-[var(--app-text-muted)]">
           “{taskTitle}” will be permanently removed.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
@@ -47,7 +47,7 @@ export function DeleteTaskDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-2 text-sm font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"
           >
             Cancel
           </button>

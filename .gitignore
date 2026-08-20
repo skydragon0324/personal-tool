@@ -11,6 +11,9 @@ venv/
 # Local project Postgres data directory
 .pgdata/
 
+# Cursor / package manager caches (never commit)
+.pnpm-store/
+
 # Uploaded task attachments
 uploads/
 backend/uploads/
@@ -18,6 +21,8 @@ backend/uploads/
 # Node / Next.js
 node_modules/
 .next/
+.next-dev/
+.next-stale/
 out/
 dist/
 .env.local

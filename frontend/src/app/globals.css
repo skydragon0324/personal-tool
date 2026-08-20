@@ -3,20 +3,31 @@
 @tailwind utilities;
 
 :root {
-  --ink: #1c2430;
-  --mist: #e8eef3;
-  --paper: #f4f7f9;
-  --teal: #0f766e;
+  --app-bg: #f6f7fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f0f3f7;
+  --app-text: #172033;
+  --app-text-muted: #65738b;
+  --app-border: #e1e7ef;
+  --app-primary: #0f766e;
 }
 
+[data-mantine-color-scheme="dark"] {
+  --app-bg: #0b1220;
+  --app-surface: #111a2b;
+  --app-surface-muted: #172236;
+  --app-text: #eaf0f7;
+  --app-text-muted: #9aa8bd;
+  --app-border: #29374d;
+  --app-primary: #2dd4bf;
+}
+
+html,
 body {
-  color: var(--ink);
+  min-height: 100%;
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  background:
-    radial-gradient(1200px 600px at 10% -10%, #d7ebe7 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #d9e4f2 0%, transparent 50%),
-    linear-gradient(180deg, var(--paper) 0%, var(--mist) 100%);
-  min-height: 100vh;
 }
 
 .font-display {
@@ -24,5 +35,5 @@ body {
 }
 
 .text-ink {
-  color: var(--ink);
+  color: var(--app-text);
 }

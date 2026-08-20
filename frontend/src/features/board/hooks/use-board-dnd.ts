@@ -1,76 +1,77 @@
 "use client";
 
 import { move } from "@dnd-kit/helpers";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
-import type { TaskSummary, TasksByColumn } from "../types";
-import { reindexColumnTasks } from "../utils/reorder-tasks";
+import { ApiError } from "@/lib/api-client";
+import { notifyApiError, notifyConflict } from "@/lib/notify";
+import type { BoardQueryParams, TaskSummary, TasksByColumn } from "../types";
+import { moveAnchors } from "../utils/move-anchors";
+import { itemsByColumnIds, reindexColumnTasks } from "../utils/reorder-tasks";
 import { useMoveTask } from "./use-move-task";
 
 interface UseBoardDndArgs {
-  boardId: string;
-  startDate: string;
-  endDate: string;
+  query: BoardQueryParams;
+  columnIds: string[];
   initialTasksByColumn: TasksByColumn;
-  enabled: boolean;
 }
 
 export function useBoardDnd({
-  boardId,
-  startDate,
-  endDate,
+  query,
+  columnIds,
   initialTasksByColumn,
-  enabled,
 }: UseBoardDndArgs) {
-  const [items, setItems] = useState<TasksByColumn>(initialTasksByColumn);
-  const itemsRef = useRef(items);
-  const snapshot = useRef<TasksByColumn>(initialTasksByColumn);
-  const moveTask = useMoveTask(boardId, startDate, endDate);
+  const syncedInitial = itemsByColumnIds(initialTasksByColumn, columnIds);
+  const [items, setItems] = useState<TasksByColumn>(syncedInitial);
+  const itemsRef = useRef(syncedInitial);
+  const snapshot = useRef(syncedInitial);
+  const moveTask = useMoveTask(query);
+  const columnKey = columnIds.join(",");
 
-  useEffect(() => {
-    setItems(initialTasksByColumn);
-    itemsRef.current = initialTasksByColumn;
-  }, [initialTasksByColumn]);
+  useLayoutEffect(() => {
+    const next = itemsByColumnIds(initialTasksByColumn, columnIds);
+    setItems(next);
+    itemsRef.current = next;
+    snapshot.current = next;
+  }, [initialTasksByColumn, columnKey, columnIds]);
 
   const onDragStart = useCallback(() => {
-    if (!enabled) return;
     snapshot.current = itemsRef.current;
-  }, [enabled]);
+  }, []);
 
   const onDragOver = useCallback(
     (event: Parameters<typeof move>[1]) => {
-      if (!enabled) return;
       setItems((current) => {
+        const source = itemsByColumnIds(current, columnIds);
         const idMap: Record<string, string[]> = {};
         const taskLookup = new Map<string, TaskSummary>();
-        for (const [columnId, tasks] of Object.entries(current)) {
-          idMap[columnId] = tasks.map((t) => t.id);
+        for (const [columnId, tasks] of Object.entries(source)) {
+          idMap[columnId] = tasks.map((task) => task.id);
           for (const task of tasks) taskLookup.set(task.id, task);
         }
-
         const nextIds = move(idMap, event) as Record<string, string[]>;
         const next: TasksByColumn = {};
-        for (const [columnId, ids] of Object.entries(nextIds)) {
+        for (const columnId of columnIds) {
+          const ids = nextIds[columnId] ?? [];
           next[columnId] = reindexColumnTasks(
             ids
               .map((id) => {
                 const task = taskLookup.get(id);
                 return task ? { ...task, column_id: columnId } : null;
               })
-              .filter((t): t is TaskSummary => t !== null),
+              .filter((task): task is TaskSummary => task !== null),
           );
         }
         itemsRef.current = next;
         return next;
       });
     },
-    [enabled],
+    [columnIds],
   );
 
   const onDragEnd = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (event: any) => {
-      if (!enabled) return;
       if (event.canceled) {
         setItems(snapshot.current);
         itemsRef.current = snapshot.current;
@@ -81,39 +82,37 @@ export function useBoardDnd({
       const sourceId = source?.id != null ? String(source.id) : "";
       if (!sourceId || source?.type === "column") return;
 
-      const current = itemsRef.current;
-      let targetColumnId: string | null = null;
-      let targetPosition = 0;
       let expectedVersion = 1;
-
       for (const list of Object.values(snapshot.current)) {
-        const original = list.find((t) => t.id === sourceId);
+        const original = list.find((task) => task.id === sourceId);
         if (original) {
           expectedVersion = original.version;
           break;
         }
       }
 
-      for (const [columnId, tasks] of Object.entries(current)) {
-        const index = tasks.findIndex((t) => t.id === sourceId);
-        if (index >= 0) {
+      let targetColumnId: string | null = null;
+      let targetList: TaskSummary[] = [];
+      for (const [columnId, tasks] of Object.entries(itemsRef.current)) {
+        if (tasks.some((task) => task.id === sourceId)) {
           targetColumnId = columnId;
-          targetPosition = index;
+          targetList = tasks;
           break;
         }
       }
-
       if (!targetColumnId) {
         setItems(snapshot.current);
         itemsRef.current = snapshot.current;
         return;
       }
 
+      const anchors = moveAnchors(targetList, sourceId);
       let unchanged = false;
       for (const [columnId, tasks] of Object.entries(snapshot.current)) {
-        const index = tasks.findIndex((t) => t.id === sourceId);
+        const index = tasks.findIndex((task) => task.id === sourceId);
         if (index >= 0) {
-          unchanged = columnId === targetColumnId && index === targetPosition;
+          const currentIndex = targetList.findIndex((task) => task.id === sourceId);
+          unchanged = columnId === targetColumnId && index === currentIndex;
           break;
         }
       }
@@ -124,24 +123,30 @@ export function useBoardDnd({
           taskId: sourceId,
           payload: {
             target_column_id: targetColumnId,
-            target_position: targetPosition,
             expected_version: expectedVersion,
+            after_task_id: anchors.after_task_id,
+            before_task_id: anchors.before_task_id,
           },
         });
-      } catch {
+      } catch (error) {
         setItems(snapshot.current);
         itemsRef.current = snapshot.current;
+        if (error instanceof ApiError && error.status === 409) {
+          notifyConflict();
+          return;
+        }
+        notifyApiError(error, "Could not move the task");
       }
     },
-    [enabled, moveTask],
+    [moveTask],
   );
 
   return {
     items,
-    setItems,
     onDragStart,
     onDragOver,
     onDragEnd,
     isPersisting: moveTask.isPending,
+    moveTask,
   };
 }

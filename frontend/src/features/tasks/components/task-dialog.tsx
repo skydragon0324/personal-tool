@@ -2,12 +2,13 @@
 
 import { Modal, Loader, Alert, Center } from "@mantine/core";
 
-import type { TaskCreate, TaskDetail } from "@/features/board/types";
+import type { TaskCreate, TaskDetail, TiptapJSON } from "@/features/board/types";
 import { TaskForm } from "./task-form";
 
 interface TaskDialogProps {
   open: boolean;
   title: string;
+  boardId: string;
   initial?: TaskDetail | null;
   columnId: string;
   dueDate: string;
@@ -15,8 +16,9 @@ interface TaskDialogProps {
   loadingDetail?: boolean;
   detailError?: string | null;
   onClose: () => void;
-  onSubmit: (payload: TaskCreate, pendingFiles: File[]) => Promise<void>;
-  onUploadExisting?: (file: File) => Promise<{ download_url: string | null }>;
+  onSubmit: (payload: TaskCreate, pendingFiles: File[], existingId?: string) => Promise<TaskDetail>;
+  onUploadFile?: (taskId: string, file: File) => Promise<{ download_url: string | null }>;
+  onPatchContent?: (taskId: string, content: TiptapJSON) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
   uploading?: boolean;
 }
@@ -24,6 +26,7 @@ interface TaskDialogProps {
 export function TaskDialog({
   open,
   title,
+  boardId,
   initial,
   columnId,
   dueDate,
@@ -32,7 +35,8 @@ export function TaskDialog({
   detailError,
   onClose,
   onSubmit,
-  onUploadExisting,
+  onUploadFile,
+  onPatchContent,
   onDeleteAttachment,
   uploading,
 }: TaskDialogProps) {
@@ -48,7 +52,6 @@ export function TaskDialog({
       lockScroll
       closeOnClickOutside
       closeOnEscape
-      // Avoid focus restore into a destroyed TipTap/ProseMirror view.
       trapFocus={false}
       transitionProps={{ duration: 120 }}
       classNames={{
@@ -73,12 +76,14 @@ export function TaskDialog({
               <TaskForm
                 key={`${initial?.id ?? "new"}-${columnId}-${dueDate}`}
                 initial={initial}
+                boardId={boardId}
                 columnId={columnId}
                 dueDate={dueDate}
                 submitting={submitting}
                 onSubmit={onSubmit}
                 onCancel={onClose}
-                onUploadExisting={onUploadExisting}
+                onUploadFile={onUploadFile}
+                onPatchContent={onPatchContent}
                 onDeleteAttachment={onDeleteAttachment}
                 uploading={uploading}
               />

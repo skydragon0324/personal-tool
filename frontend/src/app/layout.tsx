@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { ColorSchemeScript, mantineHtmlProps } from "@mantine/core";
 import { Fraunces, Manrope } from "next/font/google";
 
+import { NORMALIZE_COLOR_SCHEME_SCRIPT } from "@/features/board/utils/color-scheme";
+import { LifeManagementShell } from "@/features/shell/components/life-management-shell";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -15,8 +18,8 @@ const sans = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Daily To-Do",
-  description: "A Kanban board for daily tasks",
+  title: "Life Management",
+  description: "A personal workspace for managing tasks, statuses, and daily life.",
 };
 
 export default function RootLayout({
@@ -25,9 +28,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" {...mantineHtmlProps}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: NORMALIZE_COLOR_SCHEME_SCRIPT }} />
+        <ColorSchemeScript defaultColorScheme="light" />
+      </head>
       <body className={`${display.variable} ${sans.variable} antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <LifeManagementShell>{children}</LifeManagementShell>
+        </Providers>
       </body>
     </html>
   );

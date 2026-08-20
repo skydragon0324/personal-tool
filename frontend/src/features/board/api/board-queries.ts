@@ -1,9 +1,25 @@
-import type { BoardView, TaskDetail, TaskSummary, TasksByColumn } from "../types";
+import type { BoardQueryParams, BoardView, TaskDetail, TaskSummary, TasksByColumn } from "../types";
 
 export const boardKeys = {
   all: ["board"] as const,
-  view: (boardId: string, startDate: string, endDate: string) =>
-    [...boardKeys.all, boardId, startDate, endDate] as const,
+  list: ["boards"] as const,
+  detail: (boardId: string) => ["boards", boardId] as const,
+  views: (boardId: string) => ["board", boardId] as const,
+  view: (params: BoardQueryParams) =>
+    [
+      ...boardKeys.all,
+      params.boardId,
+      params.unbounded ? "all" : `${params.startDate}:${params.endDate}`,
+      params.dateField,
+    ] as const,
+};
+
+export const categoryKeys = {
+  list: (boardId: string) => ["categories", boardId] as const,
+};
+
+export const columnKeys = {
+  list: (boardId: string) => ["columns", boardId] as const,
 };
 
 export const taskKeys = {
@@ -13,10 +29,7 @@ export const taskKeys = {
 export function tasksByColumnFromView(view: BoardView): TasksByColumn {
   const map: TasksByColumn = {};
   for (const column of view.columns) {
-    map[column.id] = [...column.tasks].sort((a, b) => {
-      if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
-      return a.position - b.position;
-    });
+    map[column.id] = [...column.tasks].sort((a, b) => a.position - b.position);
   }
   return map;
 }
@@ -38,16 +51,16 @@ export function applyDetailToView(view: BoardView, task: TaskDetail): BoardView 
     checklist_total: 0,
     link_count: task.links.length,
     attachment_count: task.attachments.length,
+    subtask_total: task.subtasks?.length ?? 0,
+    subtask_completed: task.subtasks?.filter((item) => item.is_completed).length ?? 0,
+    category: task.category,
   };
 
   // Counts will refresh on invalidate; approximate from detail when possible
   const columns = view.columns.map((column) => {
     const without = column.tasks.filter((t) => t.id !== task.id);
     if (column.id === task.column_id) {
-      const next = [...without, summary].sort((a, b) => {
-        if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
-        return a.position - b.position;
-      });
+      const next = [...without, summary].sort((a, b) => a.position - b.position);
       return { ...column, tasks: next };
     }
     return { ...column, tasks: without };

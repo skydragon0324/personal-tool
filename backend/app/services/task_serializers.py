@@ -2,17 +2,27 @@ from __future__ import annotations
 
 from app.core.config import get_settings
 from app.models import Task, TaskAttachment
+from app.schemas.category import CategorySummary
 from app.schemas.task import (
     TaskAttachmentRead,
     TaskDetailRead,
     TaskLinkRead,
     TaskSummaryRead,
+    SubtaskRead,
 )
 from app.services.content_utils import content_preview, count_checklist_items
 
 
+def _subtask_progress(task: Task) -> tuple[int, int]:
+    subtasks = list(task.subtasks or [])
+    total = len(subtasks)
+    completed = sum(1 for item in subtasks if item.is_completed)
+    return completed, total
+
+
 def to_summary(task: Task) -> TaskSummaryRead:
     completed, total = count_checklist_items(task.content)
+    subtask_completed, subtask_total = _subtask_progress(task)
     return TaskSummaryRead(
         id=task.id,
         column_id=task.column_id,
@@ -29,6 +39,9 @@ def to_summary(task: Task) -> TaskSummaryRead:
         checklist_total=total,
         link_count=len(task.links) if task.links is not None else 0,
         attachment_count=len(task.attachments) if task.attachments is not None else 0,
+        subtask_completed=subtask_completed,
+        subtask_total=subtask_total,
+        category=CategorySummary.model_validate(task.category),
     )
 
 
@@ -66,4 +79,9 @@ def to_detail(task: Task) -> TaskDetailRead:
         updated_at=task.updated_at,
         links=[TaskLinkRead.model_validate(link) for link in sorted(task.links, key=lambda l: l.position)],
         attachments=[to_attachment_read(a) for a in task.attachments],
+        subtasks=[
+            SubtaskRead.model_validate(item)
+            for item in sorted(task.subtasks or [], key=lambda subtask: subtask.position)
+        ],
+        category=CategorySummary.model_validate(task.category),
     )

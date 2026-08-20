@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Task, TaskLink
 from app.schemas.task import TaskCreate, TaskDetailRead, TaskLinkInput, TaskUpdate
 from app.services.board_service import get_column_or_404
-from app.services.content_utils import extract_text_from_content
+from app.services.category_service import ensure_category_on_board
+from app.services.content_utils import extract_text_from_content, validate_content_urls
 from app.services.storage import get_storage
 from app.services.task_serializers import to_detail
 
@@ -19,7 +20,12 @@ def _load_task(db: Session, task_id: uuid.UUID) -> Task:
     task = db.scalar(
         select(Task)
         .where(Task.id == task_id)
-        .options(selectinload(Task.links), selectinload(Task.attachments))
+        .options(
+            selectinload(Task.links),
+            selectinload(Task.attachments),
+            selectinload(Task.category),
+            selectinload(Task.subtasks),
+        )
     )
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
@@ -27,6 +33,7 @@ def _load_task(db: Session, task_id: uuid.UUID) -> Task:
 
 
 def _apply_content(task: Task, content: dict | None) -> None:
+    validate_content_urls(content)
     task.content = content
     task.content_text = extract_text_from_content(content) if content else None
     task.content_schema_version = 1
@@ -48,11 +55,11 @@ def _replace_links(db: Session, task: Task, links: list[TaskLinkInput]) -> None:
 
 def create_task(db: Session, payload: TaskCreate) -> TaskDetailRead:
     column = get_column_or_404(db, payload.column_id)
+    ensure_category_on_board(db, payload.category_id, column.board_id)
 
     max_pos = db.scalar(
         select(func.coalesce(func.max(Task.position), -1)).where(
             Task.column_id == payload.column_id,
-            Task.due_date == payload.due_date,
         )
     )
     assert max_pos is not None
@@ -60,6 +67,7 @@ def create_task(db: Session, payload: TaskCreate) -> TaskDetailRead:
     now = datetime.now(UTC)
     task = Task(
         column_id=payload.column_id,
+        category_id=payload.category_id,
         title=payload.title.strip(),
         description=payload.description,
         due_date=payload.due_date,
@@ -91,6 +99,7 @@ def update_task(db: Session, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDet
     new_due = data.pop("due_date", None)
     content_provided = "content" in data
     content = data.pop("content", None) if content_provided else None
+    new_category_id = data.pop("category_id", None) if "category_id" in data else None
 
     if "title" in data and data["title"] is not None:
         data["title"] = data["title"].strip()
@@ -98,42 +107,19 @@ def update_task(db: Session, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDet
         priority = data["priority"]
         data["priority"] = priority.value if hasattr(priority, "value") else priority
 
-    # Safe due_date change with position rebalance
+    if new_category_id is None and "category_id" in payload.model_fields_set:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="category_id cannot be null",
+        )
+    if new_category_id is not None:
+        column = get_column_or_404(db, task.column_id)
+        ensure_category_on_board(db, new_category_id, column.board_id)
+        task.category_id = new_category_id
+
+    # Due date no longer owns position; keep the column-wide slot.
     if new_due is not None and new_due != task.due_date:
-        old_column_id = task.column_id
-        old_due = task.due_date
-        old_position = task.position
-
-        db.scalars(
-            select(Task)
-            .where(
-                Task.column_id == old_column_id,
-                Task.due_date.in_([old_due, new_due]),
-            )
-            .order_by(Task.due_date, Task.position)
-            .with_for_update()
-        ).all()
-
-        db.execute(
-            update(Task)
-            .where(
-                Task.column_id == old_column_id,
-                Task.due_date == old_due,
-                Task.position > old_position,
-            )
-            .values(position=Task.position - 1)
-        )
-
-        max_pos = db.scalar(
-            select(func.coalesce(func.max(Task.position), -1)).where(
-                Task.column_id == old_column_id,
-                Task.due_date == new_due,
-                Task.id != task.id,
-            )
-        )
-        assert max_pos is not None
         task.due_date = new_due
-        task.position = max_pos + 1
 
     for key, value in data.items():
         setattr(task, key, value)
@@ -157,7 +143,6 @@ def update_task(db: Session, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDet
 def delete_task(db: Session, task_id: uuid.UUID) -> None:
     task = _load_task(db, task_id)
     column_id = task.column_id
-    due_date = task.due_date
     old_position = task.position
     storage_keys = [attachment.storage_key for attachment in task.attachments]
 
@@ -168,7 +153,6 @@ def delete_task(db: Session, task_id: uuid.UUID) -> None:
         update(Task)
         .where(
             Task.column_id == column_id,
-            Task.due_date == due_date,
             Task.position > old_position,
         )
         .values(position=Task.position - 1)

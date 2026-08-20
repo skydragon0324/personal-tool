@@ -5,22 +5,24 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
-import type { BoardView, TaskCreate, TaskUpdate } from "../types";
+import type { BoardQueryParams, BoardView, TaskCreate, TaskDetail, TaskUpdate } from "../types";
 
 export function useTaskMutations(
-  boardId: string,
-  startDate: string,
-  endDate: string,
+  params: BoardQueryParams,
+  options?: { shouldApplyToView?: (task: TaskDetail) => boolean },
 ) {
   const queryClient = useQueryClient();
-  const key = boardKeys.view(boardId, startDate, endDate);
+  const key = boardKeys.view(params);
 
   const create = useMutation({
     mutationFn: (payload: TaskCreate) => taskMutations.create(payload),
     onSuccess: (task) => {
-      queryClient.setQueryData<BoardView>(key, (current) =>
-        current ? applyDetailToView(current, task) : current,
-      );
+      const apply = options?.shouldApplyToView?.(task) ?? true;
+      if (apply) {
+        queryClient.setQueryData<BoardView>(key, (current) =>
+          current ? applyDetailToView(current, task) : current,
+        );
+      }
       void queryClient.invalidateQueries({ queryKey: key });
     },
   });
@@ -35,6 +37,12 @@ export function useTaskMutations(
     }) => taskMutations.update(taskId, payload),
     onSuccess: (task) => {
       queryClient.setQueryData(taskKeys.detail(task.id), task);
+      const apply = options?.shouldApplyToView?.(task) ?? true;
+      if (apply) {
+        queryClient.setQueryData<BoardView>(key, (current) =>
+          current ? applyDetailToView(current, task) : current,
+        );
+      }
       void queryClient.invalidateQueries({ queryKey: key });
     },
   });

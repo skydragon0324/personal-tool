@@ -11,8 +11,12 @@ from app.schemas.task import (
     TaskDetailRead,
     TaskMove,
     TaskUpdate,
+    SubtaskCreate,
+    SubtaskRead,
+    SubtaskReorder,
+    SubtaskUpdate,
 )
-from app.services import attachment_service, task_ordering_service, task_service
+from app.services import attachment_service, subtask_service, task_ordering_service, task_service
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -75,4 +79,49 @@ def delete_attachment(
     db: Session = Depends(get_db),
 ) -> Response:
     attachment_service.delete_attachment(db, task_id, attachment_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{task_id}/subtasks",
+    response_model=SubtaskRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_subtask(
+    task_id: UUID,
+    payload: SubtaskCreate,
+    db: Session = Depends(get_db),
+) -> SubtaskRead:
+    return subtask_service.create_subtask(db, task_id, payload)
+
+
+@router.patch("/{task_id}/subtasks/reorder", response_model=list[SubtaskRead])
+def reorder_subtasks(
+    task_id: UUID,
+    payload: SubtaskReorder,
+    db: Session = Depends(get_db),
+) -> list[SubtaskRead]:
+    return subtask_service.reorder_subtasks(db, task_id, payload)
+
+
+@router.patch("/{task_id}/subtasks/{subtask_id}", response_model=SubtaskRead)
+def update_subtask(
+    task_id: UUID,
+    subtask_id: UUID,
+    payload: SubtaskUpdate,
+    db: Session = Depends(get_db),
+) -> SubtaskRead:
+    return subtask_service.update_subtask(db, task_id, subtask_id, payload)
+
+
+@router.delete(
+    "/{task_id}/subtasks/{subtask_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_subtask(
+    task_id: UUID,
+    subtask_id: UUID,
+    db: Session = Depends(get_db),
+) -> Response:
+    subtask_service.delete_subtask(db, task_id, subtask_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

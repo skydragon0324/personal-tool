@@ -1,5 +1,23 @@
 export type Priority = "low" | "medium" | "high";
 
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface CategoryDetail extends Category {
+  board_id: string;
+  position: number;
+  created_at: string;
+}
+
+export interface BoardFilters {
+  priority: Priority | "";
+  query: string;
+  categoryId: string;
+}
+
 export type TiptapJSON = Record<string, unknown>;
 
 export interface TaskLink {
@@ -44,6 +62,19 @@ export interface TaskSummary {
   checklist_total: number;
   link_count: number;
   attachment_count: number;
+  subtask_total: number;
+  subtask_completed: number;
+  category: Category;
+}
+
+export interface TaskSubtask {
+  id: string;
+  task_id: string;
+  title: string;
+  is_completed: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TaskDetail {
@@ -63,14 +94,64 @@ export interface TaskDetail {
   updated_at: string;
   links: TaskLink[];
   attachments: TaskAttachment[];
+  subtasks: TaskSubtask[];
+  category: Category;
 }
 
 export interface BoardColumn {
   id: string;
   name: string;
+  color: string;
+  icon_name: string | null;
   position: number;
   is_done: boolean;
+  archived_at: string | null;
   tasks: TaskSummary[];
+}
+
+export interface ColumnDetail {
+  id: string;
+  board_id: string;
+  name: string;
+  color: string;
+  icon_name: string | null;
+  position: number;
+  is_done: boolean;
+  archived_at: string | null;
+  created_at: string;
+  task_count: number;
+}
+
+export interface BoardListItem {
+  id: string;
+  name: string;
+  color: string;
+  icon_name: string | null;
+  timezone: string;
+  position: number;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  total_tasks: number;
+  completed_tasks: number;
+  status_count: number;
+  attachment_count: number;
+}
+
+export interface BoardStatusSeed {
+  name: string;
+  color: string;
+  icon_name?: string | null;
+  is_done: boolean;
+  position: number;
+}
+
+export interface BoardCreate {
+  name: string;
+  color?: string;
+  icon_name?: string | null;
+  timezone?: string;
+  statuses?: BoardStatusSeed[];
 }
 
 export interface BoardSummary {
@@ -82,17 +163,24 @@ export interface BoardSummary {
 export interface BoardView {
   id: string;
   name: string;
+  color?: string;
+  icon_name?: string | null;
   timezone: string;
   created_at: string;
   updated_at: string;
   start_date: string;
   end_date: string;
+  date_field: "due_date" | "created_at";
+  unbounded: boolean;
+  truncated: boolean;
+  task_limit: number;
   summary: BoardSummary;
   columns: BoardColumn[];
 }
 
 export interface TaskCreate {
   column_id: string;
+  category_id: string;
   title: string;
   description?: string | null;
   content?: TiptapJSON | null;
@@ -107,16 +195,27 @@ export interface TaskUpdate {
   content?: TiptapJSON | null;
   due_date?: string;
   priority?: Priority;
+  category_id?: string;
   links?: TaskLinkInput[];
 }
 
 export interface TaskMove {
   target_column_id: string;
-  target_position: number;
   expected_version: number;
+  before_task_id?: string | null;
+  after_task_id?: string | null;
+  target_position?: number | null;
 }
 
 export type TasksByColumn = Record<string, TaskSummary[]>;
+
+export interface BoardQueryParams {
+  boardId: string;
+  startDate: string;
+  endDate: string;
+  dateField: "due_date" | "created_at";
+  unbounded: boolean;
+}
 
 /** @deprecated use TaskSummary */
 export type Task = TaskSummary;

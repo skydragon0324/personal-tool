@@ -1,103 +1,155 @@
 "use client";
 
+import { useRef } from "react";
+import { ActionIcon, Menu } from "@mantine/core";
 import { useSortable } from "@dnd-kit/react/sortable";
 
+import { CategoryBadge } from "@/features/tasks/components/category-badge";
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
-import { formatDisplayDate } from "@/lib/dates";
-import type { TaskSummary } from "../types";
+import { formatDisplayDate, todayISO } from "@/lib/dates";
+import type { BoardColumn, TaskSummary } from "../types";
+import { POINTER_ACTIVATION_DISTANCE, wasShortClick } from "../utils/pointer-activation";
 
 interface TaskCardProps {
   task: TaskSummary;
   index: number;
   columnId: string;
-  showDueDate: boolean;
-  dragEnabled: boolean;
-  onEdit: (task: TaskSummary) => void;
+  columns: BoardColumn[];
+  onOpenDetail: (task: TaskSummary, mode?: "view" | "edit") => void;
   onDelete: (task: TaskSummary) => void;
+  onMoveStatus: (task: TaskSummary, columnId: string) => void;
 }
 
 export function TaskCard({
   task,
   index,
   columnId,
-  showDueDate,
-  dragEnabled,
-  onEdit,
+  columns,
+  onOpenDetail,
   onDelete,
+  onMoveStatus,
 }: TaskCardProps) {
-  const { ref, handleRef, isDragging } = useSortable({
+  const { ref, isDragging } = useSortable({
     id: task.id,
     index,
     type: "item",
     accept: "item",
     group: columnId,
-    disabled: !dragEnabled,
   });
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+
+  const today = todayISO();
+  const overdue = !task.completed_at && task.due_date < today;
+  const dueToday = task.due_date === today;
 
   return (
     <article
       ref={ref}
       data-dragging={isDragging || undefined}
-      className={`rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm transition ${
-        isDragging ? "opacity-40" : "opacity-100"
+      className={`cursor-grab rounded-2xl border bg-[var(--app-surface)] p-3 shadow-sm transition ${
+        isDragging
+          ? "cursor-grabbing scale-[1.02] opacity-40 shadow-xl"
+          : "hover:shadow-md"
+      } ${
+        overdue
+          ? "border-rose-400 dark:border-rose-500/70"
+          : dueToday
+            ? "border-[var(--app-primary)]"
+            : "border-[var(--app-border)]"
       }`}
     >
-      <div className="flex items-start gap-2">
-        {dragEnabled ? (
-          <button
-            type="button"
-            ref={handleRef}
-            aria-label={`Drag ${task.title}`}
-            className="mt-0.5 shrink-0 cursor-grab rounded-md border border-slate-200 px-1.5 py-1 text-slate-500 hover:bg-slate-50 active:cursor-grabbing"
-          >
-            <span aria-hidden className="block leading-none">
-              ⋮⋮
-            </span>
-          </button>
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-medium text-ink">{task.title}</h3>
-            <PriorityBadge priority={task.priority} />
-          </div>
-          {showDueDate ? (
-            <p className="mt-1 text-xs font-medium text-teal-800">
-              Due {formatDisplayDate(task.due_date)}
-            </p>
-          ) : null}
-          {task.content_preview ? (
-            <p className="mt-1 line-clamp-2 text-sm text-slate-600">
-              {task.content_preview}
-            </p>
-          ) : null}
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-            {task.checklist_total > 0 ? (
-              <span>
-                Checklist {task.checklist_completed}/{task.checklist_total}
-              </span>
-            ) : null}
-            {task.link_count > 0 ? <span>Links {task.link_count}</span> : null}
-            {task.attachment_count > 0 ? (
-              <span>Files {task.attachment_count}</span>
-            ) : null}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(task)}
-              className="text-sm font-medium text-slate-600 hover:text-ink"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(task)}
-              className="text-sm font-medium text-rose-600 hover:text-rose-800"
-            >
-              Delete
-            </button>
-          </div>
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onPointerDown={(event) => {
+            pointerStart.current = { x: event.clientX, y: event.clientY };
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (
+              !wasShortClick(pointerStart.current, { x: event.clientX, y: event.clientY }, POINTER_ACTIVATION_DISTANCE)
+            ) {
+              return;
+            }
+            onOpenDetail(task, "view");
+          }}
+          className="min-w-0 flex-1 rounded-sm text-left font-medium text-[var(--app-text)] hover:text-[var(--app-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-primary)]"
+        >
+          <span className="line-clamp-2">{task.title}</span>
+        </button>
+        <div data-no-dnd="true">
+          <Menu shadow="md" position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" aria-label="Task menu">
+                ⋯
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={() => onOpenDetail(task, "edit")}>Edit</Menu.Item>
+              <Menu.Item color="red" onClick={() => onDelete(task)}>
+                Delete
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {task.category ? <CategoryBadge category={task.category} /> : null}
+        <PriorityBadge priority={task.priority} />
+      </div>
+      <p
+        className={`mt-2 text-xs font-medium ${
+          overdue
+            ? "text-rose-600 dark:text-rose-300"
+            : dueToday
+              ? "text-[var(--app-primary)]"
+              : "text-[var(--app-text-muted)]"
+        }`}
+      >
+        {overdue ? "Overdue · " : dueToday ? "Due today · " : "Due "}
+        {formatDisplayDate(task.due_date)}
+      </p>
+      {task.content_preview ? (
+        <p className="mt-1 line-clamp-2 text-sm text-[var(--app-text-muted)]">
+          {task.content_preview}
+        </p>
+      ) : null}
+      <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--app-text-muted)]">
+        {task.checklist_total > 0 ? (
+          <span>
+            Checklist {task.checklist_completed}/{task.checklist_total}
+          </span>
+        ) : null}
+        {task.subtask_total > 0 ? (
+          <span>
+            Subtasks {task.subtask_completed}/{task.subtask_total}
+          </span>
+        ) : null}
+        {task.link_count > 0 ? <span>Links {task.link_count}</span> : null}
+        {task.attachment_count > 0 ? <span>Files {task.attachment_count}</span> : null}
+      </div>
+      <div data-no-dnd="true">
+        <Menu shadow="md" position="bottom-start" withinPortal>
+          <Menu.Target>
+            <button
+              type="button"
+              className="mt-3 text-sm font-medium text-[var(--app-primary)] hover:underline"
+            >
+              Change status
+            </button>
+          </Menu.Target>
+          <Menu.Dropdown>
+            {columns.map((column) => (
+              <Menu.Item
+                key={column.id}
+                disabled={column.id === task.column_id}
+                onClick={() => onMoveStatus(task, column.id)}
+              >
+                {column.name}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
       </div>
     </article>
   );

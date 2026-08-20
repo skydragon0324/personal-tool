@@ -24,8 +24,11 @@ class BoardColumn(Base):
         UUID(as_uuid=True), ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
+    color: Mapped[str] = mapped_column(String(32), nullable=False, default="slate")
+    icon_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     is_done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
