@@ -16,6 +16,7 @@ function column(partial: Partial<BoardColumn> & Pick<BoardColumn, "id" | "name" 
 
 function task(partial: Partial<TaskSummary> & Pick<TaskSummary, "id" | "column_id" | "title" | "due_date">): TaskSummary {
   return {
+    start_date: partial.start_date ?? partial.due_date,
     priority: "medium",
     position: 0,
     version: 1,

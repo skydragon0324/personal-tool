@@ -1,8 +1,8 @@
-export type AppSection = "boards" | "notepad" | "schedule";
+export type AppSection = "today" | "boards" | "notepad" | "schedule";
 
 export function isBoardsPath(pathname: string | null): boolean {
   if (!pathname) return false;
-  return pathname === "/" || pathname === "/boards" || pathname.startsWith("/boards/");
+  return pathname === "/boards" || pathname.startsWith("/boards/");
 }
 
 export function isBoardDetailPath(pathname: string | null): boolean {
@@ -11,6 +11,7 @@ export function isBoardDetailPath(pathname: string | null): boolean {
 }
 
 export function sectionFromPath(pathname: string | null): AppSection {
+  if (pathname === "/today" || pathname?.startsWith("/today/")) return "today";
   if (pathname === "/notepad" || pathname?.startsWith("/notepad/")) return "notepad";
   if (pathname === "/schedule" || pathname?.startsWith("/schedule/")) return "schedule";
   return "boards";

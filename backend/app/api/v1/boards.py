@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import CurrentUser
 from app.db.session import get_db
 from app.schemas.board import BoardCreate, BoardRead, BoardReorder, BoardUpdate, BoardView
 from app.schemas.category import CategoryCreate, CategoryRead
@@ -16,59 +17,63 @@ router = APIRouter(prefix="/boards", tags=["boards"])
 
 @router.get("", response_model=list[BoardRead])
 def list_boards(
+    user: CurrentUser,
     include_archived: bool = Query(default=True),
     db: Session = Depends(get_db),
 ) -> list[BoardRead]:
-    return board_service.list_boards(db, include_archived=include_archived)
+    return board_service.list_boards(db, user.id, include_archived=include_archived)
 
 
 @router.post("", response_model=BoardRead, status_code=status.HTTP_201_CREATED)
-def create_board(payload: BoardCreate, db: Session = Depends(get_db)) -> BoardRead:
-    return board_service.create_board(db, payload)
+def create_board(payload: BoardCreate, user: CurrentUser, db: Session = Depends(get_db)) -> BoardRead:
+    return board_service.create_board(db, user.id, payload)
 
 
 @router.get("/{board_id}", response_model=BoardRead)
-def get_board(board_id: UUID, db: Session = Depends(get_db)) -> BoardRead:
-    return board_service.get_board(db, board_id)
+def get_board(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> BoardRead:
+    return board_service.get_board(db, user.id, board_id)
 
 
 @router.patch("/{board_id}", response_model=BoardRead)
 def update_board(
     board_id: UUID,
     payload: BoardUpdate,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> BoardRead:
-    return board_service.update_board(db, board_id, payload)
+    return board_service.update_board(db, user.id, board_id, payload)
 
 
 @router.patch("/{board_id}/reorder", response_model=BoardRead)
 def reorder_board(
     board_id: UUID,
     payload: BoardReorder,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> BoardRead:
-    return board_service.reorder_board(db, board_id, payload)
+    return board_service.reorder_board(db, user.id, board_id, payload)
 
 
 @router.post("/{board_id}/archive", response_model=BoardRead)
-def archive_board(board_id: UUID, db: Session = Depends(get_db)) -> BoardRead:
-    return board_service.archive_board(db, board_id)
+def archive_board(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> BoardRead:
+    return board_service.archive_board(db, user.id, board_id)
 
 
 @router.post("/{board_id}/restore", response_model=BoardRead)
-def restore_board(board_id: UUID, db: Session = Depends(get_db)) -> BoardRead:
-    return board_service.restore_board(db, board_id)
+def restore_board(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> BoardRead:
+    return board_service.restore_board(db, user.id, board_id)
 
 
 @router.delete("/{board_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_board(board_id: UUID, db: Session = Depends(get_db)) -> Response:
-    board_service.delete_board(db, board_id)
+def delete_board(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> Response:
+    board_service.delete_board(db, user.id, board_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{board_id}/view", response_model=BoardView)
 def get_board_view(
     board_id: UUID,
+    user: CurrentUser,
     date: date_type | None = Query(default=None, description="Legacy single day (YYYY-MM-DD)"),
     start_date: date_type | None = Query(default=None),
     end_date: date_type | None = Query(default=None),
@@ -79,6 +84,7 @@ def get_board_view(
 ) -> BoardView:
     return board_service.get_board_view(
         db,
+        user.id,
         board_id,
         start_date=start_date,
         end_date=end_date,
@@ -90,8 +96,8 @@ def get_board_view(
 
 
 @router.get("/{board_id}/categories", response_model=list[CategoryRead])
-def list_categories(board_id: UUID, db: Session = Depends(get_db)) -> list[CategoryRead]:
-    return category_service.list_categories(db, board_id)
+def list_categories(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> list[CategoryRead]:
+    return category_service.list_categories(db, user.id, board_id)
 
 
 @router.post(
@@ -102,18 +108,20 @@ def list_categories(board_id: UUID, db: Session = Depends(get_db)) -> list[Categ
 def create_category(
     board_id: UUID,
     payload: CategoryCreate,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> CategoryRead:
-    return category_service.create_category(db, board_id, payload)
+    return category_service.create_category(db, user.id, board_id, payload)
 
 
 @router.get("/{board_id}/columns", response_model=list[ColumnRead])
 def list_columns(
     board_id: UUID,
+    user: CurrentUser,
     include_archived: bool = Query(default=True),
     db: Session = Depends(get_db),
 ) -> list[ColumnRead]:
-    return column_service.list_columns(db, board_id, include_archived=include_archived)
+    return column_service.list_columns(db, user.id, board_id, include_archived=include_archived)
 
 
 @router.post(
@@ -124,6 +132,7 @@ def list_columns(
 def create_column(
     board_id: UUID,
     payload: ColumnCreate,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> ColumnRead:
-    return column_service.create_column(db, board_id, payload)
+    return column_service.create_column(db, user.id, board_id, payload)

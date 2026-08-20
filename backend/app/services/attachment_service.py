@@ -5,28 +5,27 @@ import uuid
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import Task, TaskAttachment
 from app.schemas.task import TaskAttachmentRead
+from app.services.ownership import get_task_for_user
 from app.services.storage import get_storage, read_upload_limited
 from app.services.task_serializers import to_attachment_read
 
 
-def _get_task_or_404(db: Session, task_id: uuid.UUID) -> Task:
-    task = db.get(Task, task_id)
-    if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    return task
+def _get_task_or_404(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> Task:
+    return get_task_for_user(db, user_id, task_id)
 
 
 async def upload_attachment(
     db: Session,
+    user_id: uuid.UUID,
     task_id: uuid.UUID,
     upload: UploadFile,
 ) -> TaskAttachmentRead:
-    _get_task_or_404(db, task_id)
+    _get_task_or_404(db, user_id, task_id)
     settings = get_settings()
     data = await read_upload_limited(upload, settings.max_upload_bytes)
     storage = get_storage()
@@ -53,7 +52,13 @@ async def upload_attachment(
     return to_attachment_read(attachment)
 
 
-def download_attachment(db: Session, task_id: uuid.UUID, attachment_id: uuid.UUID) -> FileResponse:
+def download_attachment(
+    db: Session,
+    user_id: uuid.UUID,
+    task_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+) -> FileResponse:
+    _get_task_or_404(db, user_id, task_id)
     attachment = db.scalar(
         select(TaskAttachment).where(
             TaskAttachment.id == attachment_id,
@@ -70,7 +75,13 @@ def download_attachment(db: Session, task_id: uuid.UUID, attachment_id: uuid.UUI
     )
 
 
-def delete_attachment(db: Session, task_id: uuid.UUID, attachment_id: uuid.UUID) -> None:
+def delete_attachment(
+    db: Session,
+    user_id: uuid.UUID,
+    task_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+) -> None:
+    _get_task_or_404(db, user_id, task_id)
     attachment = db.scalar(
         select(TaskAttachment).where(
             TaskAttachment.id == attachment_id,

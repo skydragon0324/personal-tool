@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.constants import (
+    DEFAULT_BOARD_COLOR,
     DEFAULT_BOARD_COLUMNS,
     DEFAULT_BOARD_ICON,
     UNCATEGORIZED_COLOR,
@@ -26,6 +27,7 @@ from app.schemas.board import (
     BoardUpdate,
     BoardView,
 )
+from app.services.ownership import get_board_for_user, get_column_for_user
 from app.services.storage import get_storage
 from app.services.task_serializers import to_summary
 
@@ -77,6 +79,7 @@ def _created_at_window(start: date, end: date, timezone_name: str) -> tuple[date
 
 def get_board_view(
     db: Session,
+    user_id: uuid.UUID,
     board_id: uuid.UUID,
     *,
     start_date: date | None = None,
@@ -100,7 +103,9 @@ def get_board_view(
     )
 
     board = db.scalar(
-        select(Board).where(Board.id == board_id).options(selectinload(Board.columns))
+        select(Board)
+        .where(Board.id == board_id, Board.user_id == user_id)
+        .options(selectinload(Board.columns))
     )
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
@@ -178,19 +183,17 @@ def get_board_view(
     )
 
 
-def get_column_or_404(db: Session, column_id: uuid.UUID) -> BoardColumn:
-    column = db.get(BoardColumn, column_id)
-    if column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Column not found")
+def get_column_or_404(db: Session, user_id: uuid.UUID, column_id: uuid.UUID) -> BoardColumn:
+    column = get_column_for_user(db, user_id, column_id)
     if column.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Cannot place a task in an archived status")
     return column
 
 
-def _unused_board_position(db: Session, *, start_from: int) -> int:
+def _unused_board_position(db: Session, user_id: uuid.UUID, *, start_from: int) -> int:
     used = {
         int(value)
-        for value in db.scalars(select(Board.position)).all()
+        for value in db.scalars(select(Board.position).where(Board.user_id == user_id)).all()
         if value is not None
     }
     position = start_from
@@ -199,8 +202,14 @@ def _unused_board_position(db: Session, *, start_from: int) -> int:
     return position
 
 
-def _ensure_unique_name(db: Session, name: str, *, exclude_id: uuid.UUID | None = None) -> None:
-    query = select(Board).where(func.lower(Board.name) == name.lower())
+def _ensure_unique_name(
+    db: Session,
+    user_id: uuid.UUID,
+    name: str,
+    *,
+    exclude_id: uuid.UUID | None = None,
+) -> None:
+    query = select(Board).where(Board.user_id == user_id, func.lower(Board.name) == name.lower())
     if exclude_id is not None:
         query = query.where(Board.id != exclude_id)
     existing = db.scalar(query)
@@ -211,7 +220,7 @@ def _ensure_unique_name(db: Session, name: str, *, exclude_id: uuid.UUID | None 
         )
 
 
-def _task_counts(db: Session) -> dict[uuid.UUID, tuple[int, int]]:
+def _task_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, tuple[int, int]]:
     rows = db.execute(
         select(
             Board.id,
@@ -221,28 +230,31 @@ def _task_counts(db: Session) -> dict[uuid.UUID, tuple[int, int]]:
         .select_from(Board)
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
         .outerjoin(Task, Task.column_id == BoardColumn.id)
+        .where(Board.user_id == user_id)
         .group_by(Board.id)
     ).all()
     return {board_id: (int(total), int(completed)) for board_id, total, completed in rows}
 
 
-def _status_counts(db: Session) -> dict[uuid.UUID, int]:
+def _status_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, int]:
     rows = db.execute(
         select(Board.id, func.count(BoardColumn.id))
         .select_from(Board)
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
+        .where(Board.user_id == user_id)
         .group_by(Board.id)
     ).all()
     return {board_id: int(count) for board_id, count in rows}
 
 
-def _attachment_counts(db: Session) -> dict[uuid.UUID, int]:
+def _attachment_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, int]:
     rows = db.execute(
         select(Board.id, func.count(TaskAttachment.id))
         .select_from(Board)
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
         .outerjoin(Task, Task.column_id == BoardColumn.id)
         .outerjoin(TaskAttachment, TaskAttachment.task_id == Task.id)
+        .where(Board.user_id == user_id)
         .group_by(Board.id)
     ).all()
     return {board_id: int(count) for board_id, count in rows}
@@ -250,12 +262,13 @@ def _attachment_counts(db: Session) -> dict[uuid.UUID, int]:
 
 def _board_stats(
     db: Session,
+    user_id: uuid.UUID,
 ) -> tuple[dict[uuid.UUID, tuple[int, int]], dict[uuid.UUID, int], dict[uuid.UUID, int]]:
-    return _task_counts(db), _status_counts(db), _attachment_counts(db)
+    return _task_counts(db, user_id), _status_counts(db, user_id), _attachment_counts(db, user_id)
 
 
-def _read_board(db: Session, board: Board) -> BoardRead:
-    counts, statuses, attachments = _board_stats(db)
+def _read_board(db: Session, user_id: uuid.UUID, board: Board) -> BoardRead:
+    counts, statuses, attachments = _board_stats(db, user_id)
     return _to_read(board, counts, statuses, attachments)
 
 
@@ -283,35 +296,80 @@ def _to_read(
     )
 
 
-def list_boards(db: Session, *, include_archived: bool = True) -> list[BoardRead]:
-    query = select(Board)
+def list_boards(db: Session, user_id: uuid.UUID, *, include_archived: bool = True) -> list[BoardRead]:
+    query = select(Board).where(Board.user_id == user_id)
     if not include_archived:
         query = query.where(Board.archived_at.is_(None))
     boards = list(
         db.scalars(query.order_by(Board.archived_at.is_not(None), Board.position, Board.name)).all()
     )
-    counts, statuses, attachments = _board_stats(db)
+    counts, statuses, attachments = _board_stats(db, user_id)
     return [_to_read(board, counts, statuses, attachments) for board in boards]
 
 
-def get_board(db: Session, board_id: uuid.UUID) -> BoardRead:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
-    return _read_board(db, board)
+def get_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> BoardRead:
+    board = get_board_for_user(db, user_id, board_id)
+    return _read_board(db, user_id, board)
 
 
-def create_board(db: Session, payload: BoardCreate) -> BoardRead:
-    _ensure_unique_name(db, payload.name)
+def _add_default_columns_and_category(db: Session, board: Board) -> None:
+    for index, (name, color, is_done) in enumerate(DEFAULT_BOARD_COLUMNS):
+        db.add(
+            BoardColumn(
+                board_id=board.id,
+                name=name,
+                color=color,
+                is_done=is_done,
+                position=index,
+            )
+        )
+    db.add(
+        Category(
+            board_id=board.id,
+            name=UNCATEGORIZED_NAME,
+            color=UNCATEGORIZED_COLOR,
+            position=0,
+        )
+    )
+
+
+def seed_personal_board(db: Session, user_id: uuid.UUID, timezone: str = "UTC") -> Board:
     max_active = db.scalar(
-        select(func.coalesce(func.max(Board.position), -1)).where(Board.archived_at.is_(None))
+        select(func.coalesce(func.max(Board.position), -1)).where(
+            Board.user_id == user_id,
+            Board.archived_at.is_(None),
+        )
     )
     board = Board(
+        user_id=user_id,
+        name="Personal",
+        color=DEFAULT_BOARD_COLOR,
+        icon_name=DEFAULT_BOARD_ICON,
+        timezone=timezone,
+        position=_unused_board_position(db, user_id, start_from=int(max_active) + 1),
+    )
+    db.add(board)
+    db.flush()
+    _add_default_columns_and_category(db, board)
+    db.flush()
+    return board
+
+
+def create_board(db: Session, user_id: uuid.UUID, payload: BoardCreate) -> BoardRead:
+    _ensure_unique_name(db, user_id, payload.name)
+    max_active = db.scalar(
+        select(func.coalesce(func.max(Board.position), -1)).where(
+            Board.user_id == user_id,
+            Board.archived_at.is_(None),
+        )
+    )
+    board = Board(
+        user_id=user_id,
         name=payload.name,
         color=payload.color,
         icon_name=payload.icon_name or DEFAULT_BOARD_ICON,
         timezone=payload.timezone,
-        position=_unused_board_position(db, start_from=int(max_active) + 1),
+        position=_unused_board_position(db, user_id, start_from=int(max_active) + 1),
     )
     db.add(board)
     db.flush()
@@ -329,25 +387,16 @@ def create_board(db: Session, payload: BoardCreate) -> BoardRead:
                     position=index,
                 )
             )
-    else:
-        for index, (name, color, is_done) in enumerate(DEFAULT_BOARD_COLUMNS):
-            db.add(
-                BoardColumn(
-                    board_id=board.id,
-                    name=name,
-                    color=color,
-                    is_done=is_done,
-                    position=index,
-                )
+        db.add(
+            Category(
+                board_id=board.id,
+                name=UNCATEGORIZED_NAME,
+                color=UNCATEGORIZED_COLOR,
+                position=0,
             )
-    db.add(
-        Category(
-            board_id=board.id,
-            name=UNCATEGORIZED_NAME,
-            color=UNCATEGORIZED_COLOR,
-            position=0,
         )
-    )
+    else:
+        _add_default_columns_and_category(db, board)
     try:
         db.commit()
     except IntegrityError:
@@ -357,16 +406,14 @@ def create_board(db: Session, payload: BoardCreate) -> BoardRead:
             detail=f'A board named "{payload.name}" already exists',
         ) from None
     db.refresh(board)
-    return _read_board(db, board)
+    return _read_board(db, user_id, board)
 
 
-def update_board(db: Session, board_id: uuid.UUID, payload: BoardUpdate) -> BoardRead:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+def update_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: BoardUpdate) -> BoardRead:
+    board = get_board_for_user(db, user_id, board_id)
     data = payload.model_dump(exclude_unset=True)
     if "name" in data and data["name"] is not None:
-        _ensure_unique_name(db, data["name"], exclude_id=board.id)
+        _ensure_unique_name(db, user_id, data["name"], exclude_id=board.id)
     for key, value in data.items():
         setattr(board, key, value)
     try:
@@ -378,13 +425,11 @@ def update_board(db: Session, board_id: uuid.UUID, payload: BoardUpdate) -> Boar
             detail="A board with that name already exists",
         ) from None
     db.refresh(board)
-    return _read_board(db, board)
+    return _read_board(db, user_id, board)
 
 
-def reorder_board(db: Session, board_id: uuid.UUID, payload: BoardReorder) -> BoardRead:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+def reorder_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: BoardReorder) -> BoardRead:
+    board = get_board_for_user(db, user_id, board_id)
     if board.archived_at is not None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -394,7 +439,7 @@ def reorder_board(db: Session, board_id: uuid.UUID, payload: BoardReorder) -> Bo
     active = list(
         db.scalars(
             select(Board)
-            .where(Board.archived_at.is_(None))
+            .where(Board.user_id == user_id, Board.archived_at.is_(None))
             .order_by(Board.position)
             .with_for_update()
         ).all()
@@ -404,7 +449,7 @@ def reorder_board(db: Session, board_id: uuid.UUID, payload: BoardReorder) -> Bo
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
     target = min(max(payload.target_position, 0), len(active) - 1)
     if target == old_index:
-        return _read_board(db, board)
+        return _read_board(db, user_id, board)
 
     active.pop(old_index)
     active.insert(target, board)
@@ -413,7 +458,9 @@ def reorder_board(db: Session, board_id: uuid.UUID, payload: BoardReorder) -> Bo
     db.flush()
     used_archived = {
         int(value)
-        for value in db.scalars(select(Board.position).where(Board.archived_at.is_not(None))).all()
+        for value in db.scalars(
+            select(Board.position).where(Board.user_id == user_id, Board.archived_at.is_not(None))
+        ).all()
         if value is not None
     }
     next_pos = 0
@@ -424,18 +471,20 @@ def reorder_board(db: Session, board_id: uuid.UUID, payload: BoardReorder) -> Bo
         next_pos += 1
     db.commit()
     db.refresh(board)
-    return _read_board(db, board)
+    return _read_board(db, user_id, board)
 
 
-def archive_board(db: Session, board_id: uuid.UUID) -> BoardRead:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+def archive_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> BoardRead:
+    board = get_board_for_user(db, user_id, board_id)
     if board.archived_at is not None:
-        return _read_board(db, board)
+        return _read_board(db, user_id, board)
 
     remaining = db.scalar(
-        select(func.count(Board.id)).where(Board.archived_at.is_(None), Board.id != board.id)
+        select(func.count(Board.id)).where(
+            Board.user_id == user_id,
+            Board.archived_at.is_(None),
+            Board.id != board.id,
+        )
     )
     if int(remaining or 0) == 0:
         raise HTTPException(
@@ -446,36 +495,40 @@ def archive_board(db: Session, board_id: uuid.UUID) -> BoardRead:
     board.position = -1
     db.flush()
     board.archived_at = datetime.now(UTC)
-    max_pos = db.scalar(select(func.coalesce(func.max(Board.position), -1)).where(Board.id != board.id))
-    board.position = _unused_board_position(db, start_from=max(1_000_000, int(max_pos) + 1))
+    max_pos = db.scalar(
+        select(func.coalesce(func.max(Board.position), -1)).where(
+            Board.user_id == user_id,
+            Board.id != board.id,
+        )
+    )
+    board.position = _unused_board_position(db, user_id, start_from=max(1_000_000, int(max_pos) + 1))
     db.commit()
     db.refresh(board)
-    return _read_board(db, board)
+    return _read_board(db, user_id, board)
 
 
-def restore_board(db: Session, board_id: uuid.UUID) -> BoardRead:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+def restore_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> BoardRead:
+    board = get_board_for_user(db, user_id, board_id)
     if board.archived_at is None:
-        return _read_board(db, board)
+        return _read_board(db, user_id, board)
 
     max_active = db.scalar(
-        select(func.coalesce(func.max(Board.position), -1)).where(Board.archived_at.is_(None))
+        select(func.coalesce(func.max(Board.position), -1)).where(
+            Board.user_id == user_id,
+            Board.archived_at.is_(None),
+        )
     )
     board.position = -1
     db.flush()
     board.archived_at = None
-    board.position = _unused_board_position(db, start_from=int(max_active) + 1)
+    board.position = _unused_board_position(db, user_id, start_from=int(max_active) + 1)
     db.commit()
     db.refresh(board)
-    return _read_board(db, board)
+    return _read_board(db, user_id, board)
 
 
-def delete_board(db: Session, board_id: uuid.UUID) -> None:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+def delete_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> None:
+    board = get_board_for_user(db, user_id, board_id)
     if board.archived_at is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

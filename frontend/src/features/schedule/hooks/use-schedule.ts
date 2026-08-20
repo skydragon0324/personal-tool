@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
+import { todayKeys } from "@/features/today/api/today-queries";
 
 import type { ScheduleEntryCreate, ScheduleEntryUpdate } from "../types";
 
@@ -20,8 +21,10 @@ export function useSchedule(weekStart: string, today: string) {
 
 export function useScheduleMutations(weekStart: string, today: string) {
   const queryClient = useQueryClient();
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: scheduleKeys.week(weekStart, today) });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: scheduleKeys.week(weekStart, today) });
+    void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+  };
 
   const create = useMutation({
     mutationFn: (payload: ScheduleEntryCreate) => apiClient.createSchedule(payload),

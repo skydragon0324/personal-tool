@@ -34,6 +34,7 @@ class Task(Base):
     __tablename__ = "tasks"
     __table_args__ = (
         CheckConstraint("priority IN ('low', 'medium', 'high')", name="ck_tasks_priority"),
+        CheckConstraint("start_date <= due_date", name="ck_tasks_start_due"),
         UniqueConstraint(
             "column_id",
             "position",
@@ -43,6 +44,7 @@ class Task(Base):
         ),
         Index("ix_tasks_column_position", "column_id", "position"),
         Index("ix_tasks_due_priority", "due_date", "priority"),
+        Index("ix_tasks_start_due", "start_date", "due_date"),
         Index("ix_tasks_content_text", "content_text"),
     )
 
@@ -64,6 +66,7 @@ class Task(Base):
         Integer, nullable=False, default=1, server_default=text("1")
     )
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
     priority: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))

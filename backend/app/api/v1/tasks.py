@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.api.deps import CurrentUser
 from app.db.session import get_db
 from app.schemas.task import (
     TaskAttachmentRead,
@@ -22,28 +23,38 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @router.post("", response_model=TaskDetailRead, status_code=status.HTTP_201_CREATED)
-def create_task(payload: TaskCreate, db: Session = Depends(get_db)) -> TaskDetailRead:
-    return task_service.create_task(db, payload)
+def create_task(payload: TaskCreate, user: CurrentUser, db: Session = Depends(get_db)) -> TaskDetailRead:
+    return task_service.create_task(db, user.id, payload)
 
 
 @router.get("/{task_id}", response_model=TaskDetailRead)
-def get_task(task_id: UUID, db: Session = Depends(get_db)) -> TaskDetailRead:
-    return task_service.get_task(db, task_id)
+def get_task(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> TaskDetailRead:
+    return task_service.get_task(db, user.id, task_id)
 
 
 @router.patch("/{task_id}", response_model=TaskDetailRead)
-def update_task(task_id: UUID, payload: TaskUpdate, db: Session = Depends(get_db)) -> TaskDetailRead:
-    return task_service.update_task(db, task_id, payload)
+def update_task(
+    task_id: UUID,
+    payload: TaskUpdate,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> TaskDetailRead:
+    return task_service.update_task(db, user.id, task_id, payload)
 
 
 @router.patch("/{task_id}/move", response_model=TaskDetailRead)
-def move_task(task_id: UUID, payload: TaskMove, db: Session = Depends(get_db)) -> TaskDetailRead:
-    return task_ordering_service.move_task(db, task_id, payload)
+def move_task(
+    task_id: UUID,
+    payload: TaskMove,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> TaskDetailRead:
+    return task_ordering_service.move_task(db, user.id, task_id, payload)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: UUID, db: Session = Depends(get_db)) -> Response:
-    task_service.delete_task(db, task_id)
+def delete_task(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> Response:
+    task_service.delete_task(db, user.id, task_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -54,19 +65,21 @@ def delete_task(task_id: UUID, db: Session = Depends(get_db)) -> Response:
 )
 async def upload_attachment(
     task_id: UUID,
+    user: CurrentUser,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> TaskAttachmentRead:
-    return await attachment_service.upload_attachment(db, task_id, file)
+    return await attachment_service.upload_attachment(db, user.id, task_id, file)
 
 
 @router.get("/{task_id}/attachments/{attachment_id}/download")
 def download_attachment(
     task_id: UUID,
     attachment_id: UUID,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> FileResponse:
-    return attachment_service.download_attachment(db, task_id, attachment_id)
+    return attachment_service.download_attachment(db, user.id, task_id, attachment_id)
 
 
 @router.delete(
@@ -76,9 +89,10 @@ def download_attachment(
 def delete_attachment(
     task_id: UUID,
     attachment_id: UUID,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> Response:
-    attachment_service.delete_attachment(db, task_id, attachment_id)
+    attachment_service.delete_attachment(db, user.id, task_id, attachment_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -90,18 +104,20 @@ def delete_attachment(
 def create_subtask(
     task_id: UUID,
     payload: SubtaskCreate,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> SubtaskRead:
-    return subtask_service.create_subtask(db, task_id, payload)
+    return subtask_service.create_subtask(db, user.id, task_id, payload)
 
 
 @router.patch("/{task_id}/subtasks/reorder", response_model=list[SubtaskRead])
 def reorder_subtasks(
     task_id: UUID,
     payload: SubtaskReorder,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> list[SubtaskRead]:
-    return subtask_service.reorder_subtasks(db, task_id, payload)
+    return subtask_service.reorder_subtasks(db, user.id, task_id, payload)
 
 
 @router.patch("/{task_id}/subtasks/{subtask_id}", response_model=SubtaskRead)
@@ -109,9 +125,10 @@ def update_subtask(
     task_id: UUID,
     subtask_id: UUID,
     payload: SubtaskUpdate,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> SubtaskRead:
-    return subtask_service.update_subtask(db, task_id, subtask_id, payload)
+    return subtask_service.update_subtask(db, user.id, task_id, subtask_id, payload)
 
 
 @router.delete(
@@ -121,7 +138,8 @@ def update_subtask(
 def delete_subtask(
     task_id: UUID,
     subtask_id: UUID,
+    user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> Response:
-    subtask_service.delete_subtask(db, task_id, subtask_id)
+    subtask_service.delete_subtask(db, user.id, task_id, subtask_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

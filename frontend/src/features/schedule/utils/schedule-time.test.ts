@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ScheduleEntry } from "../types";
-import { assignLanes, entriesForDay } from "./schedule-layout";
+import { assignLanes, entriesForDay, entriesForIsoDate } from "./schedule-layout";
 import { mondayOf, minutesToTime, parseTimeToMinutes, shiftIso, weekdayIndex } from "./schedule-time";
 
 function entry(partial: Partial<ScheduleEntry> & Pick<ScheduleEntry, "id" | "title" | "start_time" | "end_time">): ScheduleEntry {
@@ -44,5 +44,14 @@ describe("schedule overlap lanes", () => {
     expect(byId.c.lane).toBe(0);
     expect(byId.c.laneCount).toBe(1);
     expect(entriesForDay(items, 1)).toEqual([]);
+    expect(
+      entriesForIsoDate(
+        [
+          ...items,
+          entry({ id: "d", title: "D", start_time: "08:00:00", end_time: "09:00:00", weekdays: [2] }),
+        ],
+        "2026-08-19",
+      ).map((item) => item.id),
+    ).toEqual(["d"]);
   });
 });

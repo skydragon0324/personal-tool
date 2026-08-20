@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { useAuth } from "@/features/auth/components/auth-provider";
 import { ThemeToggle } from "@/features/board/components/theme-toggle";
 import { useBoards, activeBoards } from "@/features/board/hooks/use-boards";
 import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons";
@@ -18,6 +19,7 @@ let savedBoardListScrollTop = 0;
 export function AppSidebar() {
   const pathname = usePathname();
   const chrome = useWorkspaceChrome();
+  const { user, logout } = useAuth();
   const boardsQuery = useBoards(true);
   const boards = activeBoards(boardsQuery.data);
   const currentBoardId = boardIdFromPath(pathname);
@@ -48,7 +50,15 @@ export function AppSidebar() {
         <p className="font-display text-lg text-[var(--app-text)]">Life Management</p>
       </div>
       <nav aria-label="Application" className="flex min-h-0 flex-1 flex-col px-2 py-3">
-        <div className="flex items-center gap-1">
+        <Link
+          href="/today"
+          aria-current={section === "today" ? "page" : undefined}
+          onClick={() => chrome?.closeSidebar()}
+          className={`shrink-0 ${navItemClass(section === "today")}`}
+        >
+          Today
+        </Link>
+        <div className="mt-1 flex items-center gap-1">
           <Link
             href="/boards"
             aria-current={pathname === "/boards" ? "page" : undefined}
@@ -94,7 +104,18 @@ export function AppSidebar() {
         </Link>
       </nav>
       <div className="border-t border-[var(--app-border)] px-3 py-3">
-        <ThemeToggle />
+        {user ? (
+          <div className="mb-3 px-1">
+            <p className="truncate text-sm font-medium text-[var(--app-text)]">{user.display_name}</p>
+            <p className="truncate text-xs text-[var(--app-text-muted)]">{user.email}</p>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="subtle" color="gray" onClick={() => void logout()}>
+            Logout
+          </Button>
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );

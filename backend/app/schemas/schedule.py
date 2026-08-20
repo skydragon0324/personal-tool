@@ -135,3 +135,16 @@ class ScheduleEntryUpdate(BaseModel):
         if cleaned not in CATEGORY_COLORS:
             raise ValueError(f"Color must be one of: {', '.join(CATEGORY_COLORS)}")
         return cleaned
+
+
+class ScheduleOccurrenceUpdate(BaseModel):
+    is_completed: bool
+
+
+class ScheduleOccurrenceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    schedule_entry_id: uuid.UUID
+    occurrence_date: date
+    is_completed: bool
+    completed_at: datetime | None

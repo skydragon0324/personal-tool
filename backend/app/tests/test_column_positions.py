@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.constants import COLUMN_IN_PROGRESS_ID, COLUMN_TODO_ID
+from app.core.constants import BOOTSTRAP_USER_ID, COLUMN_IN_PROGRESS_ID, COLUMN_TODO_ID
 from app.models import Task
 from app.schemas.task import TaskCreate, TaskMove, TaskUpdate
 from app.services import task_ordering_service, task_service
@@ -21,6 +21,7 @@ def test_column_wide_positions_ignore_due_date(
         column_id=COLUMN_TODO_ID,
         category_id=uncategorized_id,
         title="Later",
+        start_date=today + timedelta(days=3),
         due_date=today + timedelta(days=3),
         priority="low",
         position=3,
@@ -32,6 +33,7 @@ def test_column_wide_positions_ignore_due_date(
     moving = seed_tasks[0]
     result = task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskMove(
             target_column_id=COLUMN_TODO_ID,
@@ -58,6 +60,7 @@ def test_anchor_move_skips_hidden_neighbors(
     alpha, bravo, charlie = seed_tasks
     result = task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         charlie.id,
         TaskMove(
             target_column_id=COLUMN_TODO_ID,
@@ -85,6 +88,7 @@ def test_cross_column_different_due_dates(
         column_id=COLUMN_IN_PROGRESS_ID,
         category_id=uncategorized_id,
         title="Progress later",
+        start_date=today + timedelta(days=5),
         due_date=today + timedelta(days=5),
         priority="medium",
         position=0,
@@ -96,6 +100,7 @@ def test_cross_column_different_due_dates(
     moving = seed_tasks[0]
     result = task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskMove(
             target_column_id=COLUMN_IN_PROGRESS_ID,
@@ -114,7 +119,7 @@ def test_due_date_change_keeps_column_position(
     today: date,
 ) -> None:
     moving = seed_tasks[1]
-    updated = task_service.update_task(db, moving.id, TaskUpdate(due_date=today + timedelta(days=4)))
+    updated = task_service.update_task(db, BOOTSTRAP_USER_ID, moving.id, TaskUpdate(due_date=today + timedelta(days=4)))
     assert updated.position == 1
     remaining = list(
         db.scalars(select(Task).where(Task.column_id == COLUMN_TODO_ID).order_by(Task.position)).all()
@@ -130,6 +135,7 @@ def test_create_appends_to_column_regardless_of_due_date(
 ) -> None:
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
             category_id=uncategorized_id,
@@ -152,6 +158,7 @@ def test_positions_stay_unique_after_filtered_anchor_move(
     alpha, _bravo, charlie = seed_tasks
     task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         charlie.id,
         TaskMove(
             target_column_id=COLUMN_TODO_ID,

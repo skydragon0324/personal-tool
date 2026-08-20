@@ -10,7 +10,6 @@ import { notifyApiError } from "@/lib/notify";
 import { useSchedule, useScheduleMutations } from "../hooks/use-schedule";
 import type { ScheduleEntry, ScheduleEntryCreate, ScheduleView } from "../types";
 import {
-  currentWeekStart,
   mondayOf,
   shiftIso,
   weekDates,
@@ -29,7 +28,6 @@ export function SchedulePage() {
   const [pendingDelete, setPendingDelete] = useState<ScheduleEntry | null>(null);
 
   const weekStart = mondayOf(anchor);
-  const thisWeekStart = currentWeekStart(today);
   const dates = useMemo(
     () => (view === "day" ? [anchor] : weekDates(weekStart)),
     [anchor, view, weekStart],
@@ -56,7 +54,7 @@ export function SchedulePage() {
     try {
       await mutations.create.mutateAsync({
         ...payload,
-        week_start: payload.kind === "this_week" ? thisWeekStart : null,
+        week_start: payload.kind === "this_week" ? weekStart : null,
       });
       setModalOpen(false);
     } catch (error) {
@@ -70,7 +68,7 @@ export function SchedulePage() {
         entryId,
         payload: {
           ...payload,
-          week_start: payload.kind === "this_week" ? thisWeekStart : null,
+          week_start: payload.kind === "this_week" ? weekStart : null,
         },
       });
       setModalOpen(false);
@@ -167,7 +165,7 @@ export function SchedulePage() {
         opened={modalOpen}
         entry={editing}
         prefill={prefill}
-        weekStart={thisWeekStart}
+        weekStart={weekStart}
         submitting={mutations.create.isPending || mutations.update.isPending}
         onClose={() => {
           setModalOpen(false);

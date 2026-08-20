@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.constants import COLUMN_TODO_ID, DEFAULT_BOARD_ID
+from app.core.constants import BOOTSTRAP_USER_ID, COLUMN_TODO_ID, DEFAULT_BOARD_ID
 from app.models import Board, Category, Task
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.services import board_service, task_service
@@ -18,8 +18,11 @@ from app.services.url_validation import validate_http_url
 
 
 def _extra_board(db: Session, name: str) -> Board:
-    max_pos = db.scalar(select(func.coalesce(func.max(Board.position), -1)))
+    max_pos = db.scalar(
+        select(func.coalesce(func.max(Board.position), -1)).where(Board.user_id == BOOTSTRAP_USER_ID)
+    )
     board = Board(
+        user_id=BOOTSTRAP_USER_ID,
         name=name,
         timezone="UTC",
         color="slate",
@@ -90,6 +93,7 @@ def test_cannot_assign_category_from_another_board(
     with pytest.raises(HTTPException) as exc:
         task_service.create_task(
             db,
+            BOOTSTRAP_USER_ID,
             TaskCreate(
                 column_id=COLUMN_TODO_ID,
                 category_id=foreign.id,
@@ -108,7 +112,7 @@ def test_existing_tasks_are_linked_to_uncategorized(
     today: date,
 ) -> None:
     assert all(task.category_id == uncategorized_id for task in seed_tasks)
-    view = board_service.get_board_view(db, DEFAULT_BOARD_ID, legacy_date=today)
+    view = board_service.get_board_view(db, BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID, legacy_date=today)
     summaries = [task for column in view.columns for task in column.tasks]
     assert summaries
     assert all(task.category.id == uncategorized_id for task in summaries)
@@ -123,6 +127,7 @@ def test_task_summary_and_detail_include_category(
 ) -> None:
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
             category_id=uncategorized_id,
@@ -133,7 +138,7 @@ def test_task_summary_and_detail_include_category(
     assert created.category.id == uncategorized_id
     assert created.category.name == "Uncategorized"
 
-    view = board_service.get_board_view(db, DEFAULT_BOARD_ID, legacy_date=today)
+    view = board_service.get_board_view(db, BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID, legacy_date=today)
     match = next(task for column in view.columns for task in column.tasks if task.id == created.id)
     assert match.category.name == "Uncategorized"
     assert created.category.color == "gray"
@@ -146,6 +151,7 @@ def test_update_rejects_foreign_category(
 ) -> None:
     task = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
             category_id=uncategorized_id,
@@ -159,7 +165,7 @@ def test_update_rejects_foreign_category(
     db.commit()
 
     with pytest.raises(HTTPException) as exc:
-        task_service.update_task(db, task.id, TaskUpdate(category_id=foreign.id))
+        task_service.update_task(db, BOOTSTRAP_USER_ID, task.id, TaskUpdate(category_id=foreign.id))
     assert exc.value.status_code == 422
 
 
@@ -180,6 +186,7 @@ def test_unsafe_content_image_url_is_blocked(
     with pytest.raises(HTTPException) as exc:
         task_service.create_task(
             db,
+            BOOTSTRAP_USER_ID,
             TaskCreate(
                 column_id=COLUMN_TODO_ID,
                 category_id=uncategorized_id,
@@ -220,6 +227,7 @@ def test_checklist_checked_state_is_persisted(
     }
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
             category_id=uncategorized_id,
@@ -228,7 +236,7 @@ def test_checklist_checked_state_is_persisted(
             content=content,
         ),
     )
-    reloaded = task_service.get_task(db, created.id)
+    reloaded = task_service.get_task(db, BOOTSTRAP_USER_ID, created.id)
     done, total = count_checklist_items(reloaded.content)
     assert (done, total) == (1, 1)
     item = reloaded.content["content"][0]["content"][0]

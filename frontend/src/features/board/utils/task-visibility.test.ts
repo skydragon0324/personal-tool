@@ -11,6 +11,7 @@ const task = {
   content: null,
   content_text: "notes",
   content_schema_version: 1,
+  start_date: "2026-08-13",
   due_date: "2026-08-13",
   priority: "medium" as const,
   position: 0,

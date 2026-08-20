@@ -9,14 +9,12 @@ from sqlalchemy.orm import Session
 
 from app.models import Task, TaskSubtask
 from app.schemas.task import SubtaskCreate, SubtaskRead, SubtaskReorder, SubtaskUpdate
+from app.services.ownership import get_task_for_user
 from app.services.task_ordering_service import resolve_insert_index
 
 
-def _get_task_or_404(db: Session, task_id: uuid.UUID) -> Task:
-    task = db.get(Task, task_id)
-    if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    return task
+def _get_task_or_404(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> Task:
+    return get_task_for_user(db, user_id, task_id)
 
 
 def _get_subtask_or_404(db: Session, task_id: uuid.UUID, subtask_id: uuid.UUID) -> TaskSubtask:
@@ -26,8 +24,8 @@ def _get_subtask_or_404(db: Session, task_id: uuid.UUID, subtask_id: uuid.UUID) 
     return subtask
 
 
-def list_subtasks(db: Session, task_id: uuid.UUID) -> list[SubtaskRead]:
-    _get_task_or_404(db, task_id)
+def list_subtasks(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> list[SubtaskRead]:
+    _get_task_or_404(db, user_id, task_id)
     items = list(
         db.scalars(
             select(TaskSubtask).where(TaskSubtask.task_id == task_id).order_by(TaskSubtask.position)
@@ -36,8 +34,8 @@ def list_subtasks(db: Session, task_id: uuid.UUID) -> list[SubtaskRead]:
     return [SubtaskRead.model_validate(item) for item in items]
 
 
-def create_subtask(db: Session, task_id: uuid.UUID, payload: SubtaskCreate) -> SubtaskRead:
-    _get_task_or_404(db, task_id)
+def create_subtask(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: SubtaskCreate) -> SubtaskRead:
+    _get_task_or_404(db, user_id, task_id)
     max_pos = db.scalar(
         select(func.coalesce(func.max(TaskSubtask.position), -1)).where(TaskSubtask.task_id == task_id)
     )
@@ -56,10 +54,12 @@ def create_subtask(db: Session, task_id: uuid.UUID, payload: SubtaskCreate) -> S
 
 def update_subtask(
     db: Session,
+    user_id: uuid.UUID,
     task_id: uuid.UUID,
     subtask_id: uuid.UUID,
     payload: SubtaskUpdate,
 ) -> SubtaskRead:
+    _get_task_or_404(db, user_id, task_id)
     subtask = _get_subtask_or_404(db, task_id, subtask_id)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
@@ -70,7 +70,8 @@ def update_subtask(
     return SubtaskRead.model_validate(subtask)
 
 
-def delete_subtask(db: Session, task_id: uuid.UUID, subtask_id: uuid.UUID) -> None:
+def delete_subtask(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, subtask_id: uuid.UUID) -> None:
+    _get_task_or_404(db, user_id, task_id)
     subtask = _get_subtask_or_404(db, task_id, subtask_id)
     position = subtask.position
     db.delete(subtask)
@@ -83,8 +84,8 @@ def delete_subtask(db: Session, task_id: uuid.UUID, subtask_id: uuid.UUID) -> No
     db.commit()
 
 
-def reorder_subtasks(db: Session, task_id: uuid.UUID, payload: SubtaskReorder) -> list[SubtaskRead]:
-    _get_task_or_404(db, task_id)
+def reorder_subtasks(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: SubtaskReorder) -> list[SubtaskRead]:
+    _get_task_or_404(db, user_id, task_id)
     items = list(
         db.scalars(
             select(TaskSubtask)
@@ -135,4 +136,4 @@ def reorder_subtasks(db: Session, task_id: uuid.UUID, payload: SubtaskReorder) -
     moving.position = target
     moving.updated_at = datetime.now(UTC)
     db.commit()
-    return list_subtasks(db, task_id)
+    return list_subtasks(db, user_id, task_id)

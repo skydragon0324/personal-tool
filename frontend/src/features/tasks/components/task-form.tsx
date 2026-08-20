@@ -83,6 +83,7 @@ export function TaskForm({
 }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
+  const [taskStartDate, setTaskStartDate] = useState(initial?.start_date ?? todayISO());
   const [taskDueDate, setTaskDueDate] = useState(initial?.due_date ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [content, setContent] = useState<TiptapJSON | null>(null);
@@ -103,6 +104,7 @@ export function TaskForm({
     if (initial) {
       setTitle(initial.title);
       setPriority(initial.priority);
+      setTaskStartDate(initial.start_date ?? initial.due_date);
       setTaskDueDate(initial.due_date);
       setCategoryId(initial.category.id);
       setContent(
@@ -121,6 +123,7 @@ export function TaskForm({
     } else {
       setTitle("");
       setPriority("medium");
+      setTaskStartDate(todayISO());
       setTaskDueDate(todayISO());
       setCategoryId(null);
       setContent(null);
@@ -262,6 +265,10 @@ export function TaskForm({
       setError("Choose a category.");
       return;
     }
+    if (taskStartDate > taskDueDate) {
+      setError("Start date must be on or before due date.");
+      return;
+    }
     try {
       const persistableContent = sanitizeContentForPersist(content);
       const created = await onSubmit(
@@ -271,6 +278,7 @@ export function TaskForm({
           title: title.trim(),
           description: null,
           content: persistableContent,
+          start_date: taskStartDate,
           due_date: taskDueDate,
           priority,
           links: links.map((link, index) => ({
@@ -338,6 +346,14 @@ export function TaskForm({
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <DatePickerInput
+              label="Start date"
+              value={taskStartDate}
+              onChange={(value) => {
+                if (typeof value === "string" && value) setTaskStartDate(value);
+              }}
+              valueFormat="MMM D, YYYY"
+            />
+            <DatePickerInput
               label="Due date"
               value={taskDueDate}
               onChange={(value) => {
@@ -345,7 +361,8 @@ export function TaskForm({
               }}
               valueFormat="MMM D, YYYY"
             />
-            <Select
+          </SimpleGrid>
+          <Select
               label="Priority"
               data={[
                 { value: "low", label: "Low" },
@@ -357,7 +374,6 @@ export function TaskForm({
                 if (value) setPriority(value as Priority);
               }}
             />
-          </SimpleGrid>
         </section>
 
         <Divider />

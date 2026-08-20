@@ -8,6 +8,7 @@ const task = (id: string, position: number, dueDate = "2026-08-13"): TaskSummary
   column_id: "todo",
   title: id,
   due_date: dueDate,
+  start_date: dueDate,
   priority: "medium",
   position,
   version: 1,

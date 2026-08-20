@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import { normalizeStoredColorScheme } from "@/features/board/utils/color-scheme";
 import { ssrSafeColorSchemeManager } from "@/features/board/utils/ssr-color-scheme-manager";
+import { AuthProvider } from "@/features/auth/components/auth-provider";
 import { makeQueryClient } from "@/lib/query-client";
 
 import "@mantine/core/styles.css";
@@ -52,7 +53,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ColorSchemeHydrator />
         <Notifications position="top-right" />
         <DatesProvider settings={{ consistentWeeks: true, firstDayOfWeek: 1, locale: "en" }}>
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </DatesProvider>
       </MantineProvider>
     </QueryClientProvider>

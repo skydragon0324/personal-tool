@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.constants import DEFAULT_BOARD_ID
+from app.core.constants import BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID
 from app.models import Task, TaskSubtask
 from app.schemas.task import SubtaskCreate, SubtaskReorder, SubtaskUpdate
 from app.services import subtask_service, task_service
@@ -18,13 +18,14 @@ def test_subtask_crud_reorder_and_progress(
     seed_tasks: list[Task],
 ) -> None:
     parent = seed_tasks[0]
-    first = subtask_service.create_subtask(db, parent.id, SubtaskCreate(title="Sketch"))
-    second = subtask_service.create_subtask(db, parent.id, SubtaskCreate(title="Review copy"))
-    third = subtask_service.create_subtask(db, parent.id, SubtaskCreate(title="Ship"))
+    first = subtask_service.create_subtask(db, BOOTSTRAP_USER_ID, parent.id, SubtaskCreate(title="Sketch"))
+    second = subtask_service.create_subtask(db, BOOTSTRAP_USER_ID, parent.id, SubtaskCreate(title="Review copy"))
+    third = subtask_service.create_subtask(db, BOOTSTRAP_USER_ID, parent.id, SubtaskCreate(title="Ship"))
     assert [first.position, second.position, third.position] == [0, 1, 2]
 
     updated = subtask_service.update_subtask(
         db,
+        BOOTSTRAP_USER_ID,
         parent.id,
         first.id,
         SubtaskUpdate(is_completed=True),
@@ -33,6 +34,7 @@ def test_subtask_crud_reorder_and_progress(
 
     renamed = subtask_service.update_subtask(
         db,
+        BOOTSTRAP_USER_ID,
         parent.id,
         second.id,
         SubtaskUpdate(title="Review final copy"),
@@ -41,6 +43,7 @@ def test_subtask_crud_reorder_and_progress(
 
     reordered = subtask_service.reorder_subtasks(
         db,
+        BOOTSTRAP_USER_ID,
         parent.id,
         SubtaskReorder(subtask_id=third.id, after_subtask_id=None, before_subtask_id=first.id),
     )
@@ -53,7 +56,7 @@ def test_subtask_crud_reorder_and_progress(
     assert [item["title"] for item in body["subtasks"]] == ["Ship", "Sketch", "Review final copy"]
     assert sum(1 for item in body["subtasks"] if item["is_completed"]) == 1
 
-    subtask_service.delete_subtask(db, parent.id, first.id)
+    subtask_service.delete_subtask(db, BOOTSTRAP_USER_ID, parent.id, first.id)
     leftover = list(
         db.scalars(select(TaskSubtask).where(TaskSubtask.task_id == parent.id).order_by(TaskSubtask.position)).all()
     )
@@ -67,8 +70,8 @@ def test_deleting_parent_cascades_subtasks(
     today: date,
 ) -> None:
     parent = seed_tasks[2]
-    created = subtask_service.create_subtask(db, parent.id, SubtaskCreate(title="Nested work"))
-    task_service.delete_task(db, parent.id)
+    created = subtask_service.create_subtask(db, BOOTSTRAP_USER_ID, parent.id, SubtaskCreate(title="Nested work"))
+    task_service.delete_task(db, BOOTSTRAP_USER_ID, parent.id)
     leftover = db.get(TaskSubtask, created.id)
     assert leftover is None
 

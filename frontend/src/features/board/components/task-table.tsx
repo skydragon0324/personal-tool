@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { CategoryBadge } from "@/features/tasks/components/category-badge";
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
-import { formatDisplayDate } from "@/lib/dates";
+import { formatTaskPeriod } from "@/lib/dates";
 import type { BoardColumn, TaskSummary, TasksByColumn } from "../types";
 import { flattenVisibleTasks } from "../utils/progress-stats";
 import { BOARD_CONTENT_GUTTER } from "../utils/board-layout";
@@ -60,7 +60,7 @@ export function TaskTable({ columns, tasksByColumn, onOpenDetail, onMoveStatus }
             </Table.Th>
             <Table.Th>
               <button type="button" className="font-semibold" onClick={() => toggleSort("due_date")}>
-                Due date {sortKey === "due_date" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                Dates {sortKey === "due_date" ? (sortDir === "asc" ? "↑" : "↓") : ""}
               </button>
             </Table.Th>
             <Table.Th>Subtasks</Table.Th>
@@ -93,7 +93,7 @@ export function TaskTable({ columns, tasksByColumn, onOpenDetail, onMoveStatus }
               <Table.Td>
                 <PriorityBadge priority={task.priority} />
               </Table.Td>
-              <Table.Td>{formatDisplayDate(task.due_date)}</Table.Td>
+              <Table.Td>{formatTaskPeriod(task.start_date, task.due_date)}</Table.Td>
               <Table.Td>
                 {task.subtask_total > 0
                   ? `${task.subtask_completed}/${task.subtask_total}`

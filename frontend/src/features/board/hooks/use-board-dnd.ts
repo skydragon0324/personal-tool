@@ -25,10 +25,12 @@ export function useBoardDnd({
   const [items, setItems] = useState<TasksByColumn>(syncedInitial);
   const itemsRef = useRef(syncedInitial);
   const snapshot = useRef(syncedInitial);
+  const dragging = useRef(false);
   const moveTask = useMoveTask(query);
   const columnKey = columnIds.join(",");
 
   useLayoutEffect(() => {
+    if (dragging.current) return;
     const next = itemsByColumnIds(initialTasksByColumn, columnIds);
     setItems(next);
     itemsRef.current = next;
@@ -36,6 +38,7 @@ export function useBoardDnd({
   }, [initialTasksByColumn, columnKey, columnIds]);
 
   const onDragStart = useCallback(() => {
+    dragging.current = true;
     snapshot.current = itemsRef.current;
   }, []);
 
@@ -72,6 +75,7 @@ export function useBoardDnd({
   const onDragEnd = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (event: any) => {
+      dragging.current = false;
       if (event.canceled) {
         setItems(snapshot.current);
         itemsRef.current = snapshot.current;

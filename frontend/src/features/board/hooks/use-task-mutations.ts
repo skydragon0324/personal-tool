@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
+import { todayKeys } from "@/features/today/api/today-queries";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
 import type { BoardQueryParams, BoardView, TaskCreate, TaskDetail, TaskUpdate } from "../types";
@@ -24,6 +25,7 @@ export function useTaskMutations(
         );
       }
       void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({ queryKey: todayKeys.all });
     },
   });
 
@@ -44,6 +46,7 @@ export function useTaskMutations(
         );
       }
       void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({ queryKey: todayKeys.all });
     },
   });
 
@@ -51,6 +54,7 @@ export function useTaskMutations(
     mutationFn: (taskId: string) => taskMutations.remove(taskId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: key });
+      await queryClient.invalidateQueries({ queryKey: todayKeys.all });
     },
   });
 

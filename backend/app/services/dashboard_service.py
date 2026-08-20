@@ -23,10 +23,12 @@ def _rate(completed: int, total: int) -> float:
     return round(completed / total, 4)
 
 
-def get_dashboard_summary(db: Session, today: date) -> DashboardSummary:
+def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> DashboardSummary:
     active_boards = list(
         db.scalars(
-            select(Board).where(Board.archived_at.is_(None)).order_by(Board.position, Board.name)
+            select(Board)
+            .where(Board.user_id == user_id, Board.archived_at.is_(None))
+            .order_by(Board.position, Board.name)
         ).all()
     )
     board_ids = [board.id for board in active_boards]
@@ -63,7 +65,7 @@ def get_dashboard_summary(db: Session, today: date) -> DashboardSummary:
                 ),
             )
             .outerjoin(Task, Task.column_id == BoardColumn.id)
-            .where(Board.archived_at.is_(None))
+            .where(Board.user_id == user_id, Board.archived_at.is_(None))
             .group_by(Board.id)
         ).all()
         if board_ids
@@ -86,6 +88,7 @@ def get_dashboard_summary(db: Session, today: date) -> DashboardSummary:
             .join(BoardColumn, BoardColumn.id == Task.column_id)
             .join(Board, Board.id == BoardColumn.board_id)
             .where(
+                Board.user_id == user_id,
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
             )
@@ -110,6 +113,7 @@ def get_dashboard_summary(db: Session, today: date) -> DashboardSummary:
             .join(BoardColumn, BoardColumn.id == Task.column_id)
             .join(Board, Board.id == BoardColumn.board_id)
             .where(
+                Board.user_id == user_id,
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
                 BoardColumn.is_done.is_(False),

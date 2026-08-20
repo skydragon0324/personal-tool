@@ -8,6 +8,7 @@ const task = (
 ): TaskSummary => ({
   column_id: "col-1",
   due_date: "2026-08-19",
+  start_date: "2026-08-19",
   priority: "medium",
   position: 0,
   version: 1,

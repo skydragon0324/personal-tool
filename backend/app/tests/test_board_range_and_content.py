@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.constants import COLUMN_TODO_ID, DEFAULT_BOARD_ID
+from app.core.constants import BOOTSTRAP_USER_ID, COLUMN_TODO_ID, DEFAULT_BOARD_ID
 from app.core.config import get_settings
 from app.models import Task
 from app.schemas.task import TaskCreate, TaskLinkInput, TaskUpdate
@@ -22,7 +22,7 @@ from app.services.url_validation import validate_http_url
 
 
 def test_board_view_single_day(db: Session, seed_tasks: list[Task], today: date) -> None:
-    view = board_service.get_board_view(db, DEFAULT_BOARD_ID, legacy_date=today)
+    view = board_service.get_board_view(db, BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID, legacy_date=today)
     assert view.start_date == today.isoformat()
     assert view.end_date == today.isoformat()
     assert view.summary.total == 3
@@ -36,6 +36,7 @@ def test_board_view_inclusive_range(
         column_id=COLUMN_TODO_ID,
         category_id=uncategorized_id,
         title="Tomorrow",
+        start_date=today + timedelta(days=1),
         due_date=today + timedelta(days=1),
         priority="low",
         position=3,
@@ -46,6 +47,7 @@ def test_board_view_inclusive_range(
 
     view = board_service.get_board_view(
         db,
+        BOOTSTRAP_USER_ID,
         DEFAULT_BOARD_ID,
         start_date=today,
         end_date=today + timedelta(days=1),
@@ -59,6 +61,7 @@ def test_board_view_invalid_range(db: Session, today: date) -> None:
     with pytest.raises(HTTPException) as exc:
         board_service.get_board_view(
             db,
+            BOOTSTRAP_USER_ID,
             DEFAULT_BOARD_ID,
             start_date=today,
             end_date=today - timedelta(days=1),
@@ -70,6 +73,7 @@ def test_board_view_range_too_long(db: Session, today: date) -> None:
     with pytest.raises(HTTPException) as exc:
         board_service.get_board_view(
             db,
+            BOOTSTRAP_USER_ID,
             DEFAULT_BOARD_ID,
             start_date=today,
             end_date=today + timedelta(days=3654),
@@ -83,6 +87,7 @@ def test_board_view_full_leap_year(db: Session, today: date, uncategorized_id) -
         column_id=COLUMN_TODO_ID,
         category_id=uncategorized_id,
         title="Leap day",
+        start_date=date(2024, 2, 29),
         due_date=date(2024, 2, 29),
         priority="low",
         position=40,
@@ -92,6 +97,7 @@ def test_board_view_full_leap_year(db: Session, today: date, uncategorized_id) -
     db.commit()
     view = board_service.get_board_view(
         db,
+        BOOTSTRAP_USER_ID,
         DEFAULT_BOARD_ID,
         start_date=date(2024, 1, 1),
         end_date=date(2024, 12, 31),
@@ -108,6 +114,7 @@ def test_board_view_month_end_and_year_spanning_week(
         column_id=COLUMN_TODO_ID,
         category_id=uncategorized_id,
         title="January last",
+        start_date=date(2026, 1, 31),
         due_date=date(2026, 1, 31),
         priority="low",
         position=41,
@@ -118,6 +125,7 @@ def test_board_view_month_end_and_year_spanning_week(
         column_id=COLUMN_TODO_ID,
         category_id=uncategorized_id,
         title="New year",
+        start_date=date(2026, 1, 1),
         due_date=date(2026, 1, 1),
         priority="low",
         position=42,
@@ -128,6 +136,7 @@ def test_board_view_month_end_and_year_spanning_week(
 
     january = board_service.get_board_view(
         db,
+        BOOTSTRAP_USER_ID,
         DEFAULT_BOARD_ID,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 31),
@@ -138,6 +147,7 @@ def test_board_view_month_end_and_year_spanning_week(
 
     week = board_service.get_board_view(
         db,
+        BOOTSTRAP_USER_ID,
         DEFAULT_BOARD_ID,
         start_date=date(2025, 12, 29),
         end_date=date(2026, 1, 4),
@@ -149,6 +159,7 @@ def test_board_view_month_end_and_year_spanning_week(
 def test_board_view_custom_ten_years_allowed(db: Session, today: date) -> None:
     view = board_service.get_board_view(
         db,
+        BOOTSTRAP_USER_ID,
         DEFAULT_BOARD_ID,
         start_date=date(2016, 1, 1),
         end_date=date(2026, 1, 1),
@@ -176,6 +187,7 @@ def test_due_date_change_repositions(db: Session, seed_tasks: list[Task], today:
     new_due = today + timedelta(days=2)
     result = task_service.update_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskUpdate(due_date=new_due),
     )
@@ -230,6 +242,7 @@ def test_rich_content_create_update(db: Session, today: date, uncategorized_id) 
     }
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
             category_id=uncategorized_id,
@@ -246,6 +259,7 @@ def test_rich_content_create_update(db: Session, today: date, uncategorized_id) 
 
     updated = task_service.update_task(
         db,
+        BOOTSTRAP_USER_ID,
         created.id,
         TaskUpdate(content={"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Updated"}]}]}),
     )
@@ -273,6 +287,7 @@ def test_attachment_upload_download_delete(
 
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(column_id=COLUMN_TODO_ID, category_id=uncategorized_id, title="Files", due_date=today),
     )
     files = {"file": ("note.txt", BytesIO(b"hello attachment"), "text/plain")}
@@ -304,6 +319,7 @@ def test_attachment_rejects_path_traversal_name(
 
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(column_id=COLUMN_TODO_ID, category_id=uncategorized_id, title="Safe", due_date=today),
     )
     files = {"file": ("../../etc/passwd.txt", BytesIO(b"nope"), "text/plain")}
@@ -328,6 +344,7 @@ def test_delete_task_cleans_attachments(
 
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(column_id=COLUMN_TODO_ID, category_id=uncategorized_id, title="Cleanup", due_date=today),
     )
     files = {"file": ("a.txt", BytesIO(b"x"), "text/plain")}

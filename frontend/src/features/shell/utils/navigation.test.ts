@@ -11,11 +11,13 @@ import { boardsGroupExpanded } from "./boards-nav";
 describe("application navigation", () => {
   it("treats the dashboard and board pages as the boards section", () => {
     expect(sectionFromPath("/")).toBe("boards");
+    expect(sectionFromPath("/today")).toBe("today");
     expect(sectionFromPath("/boards")).toBe("boards");
     expect(sectionFromPath("/boards/abc")).toBe("boards");
     expect(sectionFromPath("/notepad")).toBe("notepad");
     expect(sectionFromPath("/schedule")).toBe("schedule");
-    expect(isBoardsPath("/notepad")).toBe(false);
+    expect(isBoardsPath("/")).toBe(false);
+    expect(isBoardsPath("/today")).toBe(false);
     expect(isBoardsPath("/boards")).toBe(true);
     expect(isBoardDetailPath("/boards")).toBe(false);
     expect(isBoardDetailPath("/boards/abc")).toBe(true);

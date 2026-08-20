@@ -11,6 +11,57 @@ export class ApiError extends Error {
   }
 }
 
+const CSRF_COOKIE = "life_csrf";
+const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const PUBLIC_MUTATIONS = new Set(["/api/v1/auth/login", "/api/v1/auth/register"]);
+
+let csrfToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+let csrfInflight: Promise<string> | null = null;
+
+export function setCsrfToken(token: string | null) {
+  csrfToken = token;
+}
+
+export function getCsrfToken(): string | null {
+  return csrfToken ?? readCsrfCookie();
+}
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function isAuthApiPath(path: string): boolean {
+  return path.startsWith("/api/v1/auth/");
+}
+
+async function fetchCsrfToken(): Promise<string> {
+  const body = await request<{ csrf_token: string }>("/api/v1/auth/csrf");
+  setCsrfToken(body.csrf_token);
+  return body.csrf_token;
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+  const existing = getCsrfToken();
+  if (existing) return existing;
+  if (!csrfInflight) {
+    csrfInflight = fetchCsrfToken().finally(() => {
+      csrfInflight = null;
+    });
+  }
+  try {
+    return await csrfInflight;
+  } catch {
+    return getCsrfToken();
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   const isFormData =
@@ -21,13 +72,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
 
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (
+    MUTATING.has(method) &&
+    !headers.has("X-CSRF-Token") &&
+    !PUBLIC_MUTATIONS.has(path)
+  ) {
+    const token = await ensureCsrfToken();
+    if (token) headers.set("X-CSRF-Token", token);
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !isAuthApiPath(path)) {
+      unauthorizedHandler?.();
+    }
     let detail = response.statusText;
     try {
       const body = (await response.json()) as { detail?: string | unknown };
@@ -233,6 +298,26 @@ export const apiClient = {
       `/api/v1/schedule?week_start=${encodeURIComponent(weekStart)}&today=${encodeURIComponent(today)}`,
     ),
 
+  setScheduleOccurrence: (
+    entryId: string,
+    occurrenceDate: string,
+    payload: { is_completed: boolean },
+  ) =>
+    request<{
+      schedule_entry_id: string;
+      occurrence_date: string;
+      is_completed: boolean;
+      completed_at: string | null;
+    }>(`/api/v1/schedule/${entryId}/occurrences/${occurrenceDate}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  getToday: (date: string) =>
+    request<import("@/features/today/types").TodayResponse>(
+      `/api/v1/today?date=${encodeURIComponent(date)}`,
+    ),
+
   createSchedule: (payload: import("@/features/schedule/types").ScheduleEntryCreate) =>
     request<import("@/features/schedule/types").ScheduleEntry>(`/api/v1/schedule`, {
       method: "POST",
@@ -302,4 +387,31 @@ export const apiClient = {
       `/api/v1/tasks/${taskId}/subtasks/reorder`,
       { method: "PATCH", body: JSON.stringify(payload) },
     ),
+
+  me: () => request<import("@/features/auth/types").AuthUser>("/api/v1/auth/me"),
+
+  getCsrf: () => fetchCsrfToken(),
+
+  register: (payload: import("@/features/auth/types").RegisterPayload) =>
+    request<import("@/features/auth/types").AuthResponse>("/api/v1/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((body) => {
+      setCsrfToken(body.csrf_token);
+      return body;
+    }),
+
+  login: (payload: import("@/features/auth/types").LoginPayload) =>
+    request<import("@/features/auth/types").AuthResponse>("/api/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((body) => {
+      setCsrfToken(body.csrf_token);
+      return body;
+    }),
+
+  logout: () =>
+    request<void>("/api/v1/auth/logout", { method: "POST" }).finally(() => {
+      setCsrfToken(null);
+    }),
 };

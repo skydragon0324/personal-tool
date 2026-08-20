@@ -10,13 +10,11 @@ from sqlalchemy.orm import Session
 from app.core.constants import UNCATEGORIZED_NAME
 from app.models import Board, Category
 from app.schemas.category import CategoryCreate, CategoryRead
+from app.services.ownership import get_board_for_user
 
 
-def get_board_or_404(db: Session, board_id: uuid.UUID) -> Board:
-    board = db.get(Board, board_id)
-    if board is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
-    return board
+def get_board_or_404(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> Board:
+    return get_board_for_user(db, user_id, board_id)
 
 
 def get_category_or_404(db: Session, category_id: uuid.UUID) -> Category:
@@ -40,8 +38,8 @@ def ensure_category_on_board(
     return category
 
 
-def list_categories(db: Session, board_id: uuid.UUID) -> list[CategoryRead]:
-    get_board_or_404(db, board_id)
+def list_categories(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> list[CategoryRead]:
+    get_board_or_404(db, user_id, board_id)
     categories = list(
         db.scalars(
             select(Category).where(Category.board_id == board_id).order_by(Category.position, Category.name)
@@ -50,8 +48,8 @@ def list_categories(db: Session, board_id: uuid.UUID) -> list[CategoryRead]:
     return [CategoryRead.model_validate(category) for category in categories]
 
 
-def create_category(db: Session, board_id: uuid.UUID, payload: CategoryCreate) -> CategoryRead:
-    get_board_or_404(db, board_id)
+def create_category(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: CategoryCreate) -> CategoryRead:
+    get_board_or_404(db, user_id, board_id)
     name = payload.name.strip()
     existing = db.scalar(
         select(Category).where(

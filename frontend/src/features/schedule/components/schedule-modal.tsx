@@ -159,7 +159,10 @@ export function ScheduleModal({
           label="Title"
           required
           value={draft.title}
-          onChange={(event) => setDraft((current) => ({ ...current, title: event.currentTarget.value }))}
+          onChange={(event) => {
+            const title = event.currentTarget.value;
+            setDraft((current) => ({ ...current, title }));
+          }}
         />
         <Select
           label="Type"
@@ -206,17 +209,19 @@ export function ScheduleModal({
             type="time"
             label="Start time"
             value={toInputTime(draft.start_time)}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, start_time: fromInputTime(event.currentTarget.value) }))
-            }
+            onChange={(event) => {
+              const start_time = fromInputTime(event.currentTarget.value);
+              setDraft((current) => ({ ...current, start_time }));
+            }}
           />
           <TextInput
             type="time"
             label="End time"
             value={toInputTime(draft.end_time)}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, end_time: fromInputTime(event.currentTarget.value) }))
-            }
+            onChange={(event) => {
+              const end_time = fromInputTime(event.currentTarget.value);
+              setDraft((current) => ({ ...current, end_time }));
+            }}
           />
         </Group>
         <Group grow>
@@ -253,7 +258,10 @@ export function ScheduleModal({
           minRows={3}
           autosize
           value={draft.notes}
-          onChange={(event) => setDraft((current) => ({ ...current, notes: event.currentTarget.value }))}
+          onChange={(event) => {
+            const notes = event.currentTarget.value;
+            setDraft((current) => ({ ...current, notes }));
+          }}
         />
         {error ? (
           <Text size="sm" c="red">

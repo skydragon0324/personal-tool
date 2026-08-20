@@ -15,10 +15,22 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
-from app.core.constants import COLUMN_DONE_ID, COLUMN_IN_PROGRESS_ID, COLUMN_TODO_ID, DEFAULT_BOARD_ID
-from app.db.session import get_db
+from app.core.constants import (
+    BOOTSTRAP_USER_ID,
+    COLUMN_DONE_ID,
+    COLUMN_IN_PROGRESS_ID,
+    COLUMN_TODO_ID,
+    DEFAULT_BOARD_ID,
+)
 from app.main import app
 from app.models import BoardColumn, Category, Task
+from app.tests.auth_helpers import (
+    TEST_OWNER_EMAIL,
+    TEST_OWNER_NAME,
+    TEST_OWNER_PASSWORD,
+    bind_client,
+    register_user,
+)
 from app.tests.db_guard import DatabaseIsolationError, assert_distinct_database_urls
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -86,17 +98,28 @@ def db(test_engine) -> Generator[Session, None, None]:
 
 
 @pytest.fixture()
-def client(db: Session) -> Generator[TestClient, None, None]:
-    def override_get_db() -> Generator[Session, None, None]:
-        try:
-            yield db
-        finally:
-            pass
+def owner_id() -> UUID:
+    return BOOTSTRAP_USER_ID
 
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+
+@pytest.fixture()
+def anonymous_client(db: Session) -> Generator[TestClient, None, None]:
+    client = bind_client(db)
+    try:
+        yield client
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def client(anonymous_client: TestClient) -> TestClient:
+    register_user(
+        anonymous_client,
+        email=TEST_OWNER_EMAIL,
+        password=TEST_OWNER_PASSWORD,
+        display_name=TEST_OWNER_NAME,
+    )
+    return anonymous_client
 
 
 @pytest.fixture()
@@ -139,6 +162,7 @@ def seed_tasks(db: Session, today: date, uncategorized_id: UUID) -> list[Task]:
             title="Alpha",
             description=None,
             due_date=today,
+            start_date=today,
             priority="medium",
             position=0,
             version=1,
@@ -150,6 +174,7 @@ def seed_tasks(db: Session, today: date, uncategorized_id: UUID) -> list[Task]:
             title="Bravo",
             description=None,
             due_date=today,
+            start_date=today,
             priority="high",
             position=1,
             version=1,
@@ -161,6 +186,7 @@ def seed_tasks(db: Session, today: date, uncategorized_id: UUID) -> list[Task]:
             title="Charlie",
             description=None,
             due_date=today,
+            start_date=today,
             priority="low",
             position=2,
             version=1,

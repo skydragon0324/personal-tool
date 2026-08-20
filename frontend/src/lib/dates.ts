@@ -45,3 +45,26 @@ export function formatDateTime(iso: string): string {
     minute: "2-digit",
   });
 }
+
+export function formatWeekdayDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function formatTaskPeriod(startDate: string, dueDate: string): string {
+  if (startDate === dueDate) return formatDisplayDate(dueDate);
+  return `${formatDisplayDate(startDate)} – ${formatDisplayDate(dueDate)}`;
+}
+
+export function greetingForName(name: string, hour = new Date().getHours()): string {
+  const display = name.trim() || "there";
+  if (hour < 12) return `Good morning, ${display}`;
+  if (hour < 17) return `Good afternoon, ${display}`;
+  return `Good evening, ${display}`;
+}

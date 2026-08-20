@@ -12,10 +12,26 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
     public_base_url: str = "http://localhost:8000"
+    environment: str = "development"
+    session_cookie_name: str = "life_session"
+    csrf_cookie_name: str = "life_csrf"
+    csrf_header_name: str = "X-CSRF-Token"
+    session_ttl_days: int = 30
+    cookie_secure: bool | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def use_secure_cookies(self) -> bool:
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.environment.lower() == "production"
+
+    @property
+    def session_max_age_seconds(self) -> int:
+        return self.session_ttl_days * 24 * 60 * 60
 
 
 @lru_cache

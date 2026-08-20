@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { AuthHomeRedirect } from "@/features/auth/components/auth-home-redirect";
 
 export default function HomePage() {
-  redirect("/boards");
+  return <AuthHomeRedirect />;
 }

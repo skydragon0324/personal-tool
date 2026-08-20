@@ -5,7 +5,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.category import CategorySummary
 from app.services.url_validation import validate_http_url
@@ -69,6 +69,7 @@ class TaskSummaryRead(BaseModel):
     id: uuid.UUID
     column_id: uuid.UUID
     title: str
+    start_date: date
     due_date: date
     priority: Priority
     position: int
@@ -96,6 +97,7 @@ class TaskDetailRead(BaseModel):
     content: dict[str, Any] | None
     content_text: str | None
     content_schema_version: int
+    start_date: date
     due_date: date
     priority: Priority
     position: int
@@ -148,19 +150,39 @@ class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     description: str | None = None
     content: dict[str, Any] | None = None
+    start_date: date | None = None
     due_date: date
     priority: Priority = Priority.medium
     links: list[TaskLinkInput] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _dates(self) -> "TaskCreate":
+        if self.start_date is None:
+            self.start_date = self.due_date
+        if self.start_date > self.due_date:
+            raise ValueError("start_date must be on or before due_date")
+        return self
 
 
 class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = None
     content: dict[str, Any] | None = None
+    start_date: date | None = None
     due_date: date | None = None
     priority: Priority | None = None
     category_id: uuid.UUID | None = None
     links: list[TaskLinkInput] | None = None
+
+    @model_validator(mode="after")
+    def _dates(self) -> "TaskUpdate":
+        if (
+            self.start_date is not None
+            and self.due_date is not None
+            and self.start_date > self.due_date
+        ):
+            raise ValueError("start_date must be on or before due_date")
+        return self
 
 
 class TaskMove(BaseModel):

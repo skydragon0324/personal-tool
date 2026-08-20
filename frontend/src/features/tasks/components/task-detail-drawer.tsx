@@ -16,7 +16,7 @@ import { PriorityBadge } from "./priority-badge";
 import { SubtaskList } from "./subtask-list";
 import { TaskContentViewer } from "./task-content-viewer";
 import { TaskForm } from "./task-form";
-import { formatDateTime, formatDisplayDate } from "@/lib/dates";
+import { formatDateTime, formatTaskPeriod } from "@/lib/dates";
 
 interface TaskDetailDrawerProps {
   taskId: string | null;
@@ -113,7 +113,7 @@ export function TaskDetailDrawer({
             <CategoryBadge category={task.category} />
             <PriorityBadge priority={task.priority} />
           </Group>
-          <Text size="sm">Due {formatDisplayDate(task.due_date)}</Text>
+          <Text size="sm">{formatTaskPeriod(task.start_date, task.due_date)}</Text>
           <Text size="xs" c="dimmed">
             Created {formatDateTime(task.created_at)} · Updated {formatDateTime(task.updated_at)}
           </Text>

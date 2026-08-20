@@ -5,10 +5,11 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
-from app.models import BoardColumn, Task
+from app.models import Task
 from app.schemas.task import TaskDetailRead, TaskMove
+from app.services.ownership import get_column_for_user, get_task_for_user
 from app.services.task_serializers import to_detail
 
 
@@ -41,11 +42,9 @@ def resolve_insert_index(
     return len(sibling_ids)
 
 
-def move_task(db: Session, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailRead:
+def move_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailRead:
     """Reorder a task inside one PostgreSQL transaction with row locks."""
-    task = db.scalar(select(Task).where(Task.id == task_id).with_for_update())
-    if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    task = get_task_for_user(db, user_id, task_id, for_update=True)
 
     if task.version != payload.expected_version:
         raise HTTPException(
@@ -53,9 +52,7 @@ def move_task(db: Session, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailR
             detail="Task version is stale; refresh and try again",
         )
 
-    target_column = db.get(BoardColumn, payload.target_column_id)
-    if target_column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target column not found")
+    target_column = get_column_for_user(db, user_id, payload.target_column_id)
     if target_column.archived_at is not None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -63,9 +60,7 @@ def move_task(db: Session, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailR
         )
 
     source_column_id = task.column_id
-    source_column = db.get(BoardColumn, source_column_id)
-    if source_column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source column not found")
+    source_column = get_column_for_user(db, user_id, source_column_id)
     if source_column.board_id != target_column.board_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -97,7 +92,7 @@ def move_task(db: Session, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailR
 
     same_column = source_column_id == payload.target_column_id
     if same_column and target_position == old_position:
-        return to_detail(_reload(db, task_id))
+        return to_detail(_reload(db, user_id, task_id))
 
     task.position = -1
     db.flush()
@@ -150,19 +145,8 @@ def move_task(db: Session, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailR
     task.completed_at = datetime.now(UTC) if target_column.is_done else None
 
     db.commit()
-    return to_detail(_reload(db, task_id))
+    return to_detail(_reload(db, user_id, task_id))
 
 
-def _reload(db: Session, task_id: uuid.UUID) -> Task:
-    refreshed = db.scalar(
-        select(Task)
-        .where(Task.id == task_id)
-        .options(
-            selectinload(Task.links),
-            selectinload(Task.attachments),
-            selectinload(Task.category),
-            selectinload(Task.subtasks),
-        )
-    )
-    assert refreshed is not None
-    return refreshed
+def _reload(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> Task:
+    return get_task_for_user(db, user_id, task_id, with_details=True)

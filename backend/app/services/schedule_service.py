@@ -9,21 +9,20 @@ from sqlalchemy.orm import Session
 
 from app.models.schedule_entry import ScheduleEntry
 from app.schemas.schedule import ScheduleEntryCreate, ScheduleEntryRead, ScheduleEntryUpdate
+from app.services.ownership import get_schedule_entry_for_user
 
 
 def monday_on_or_before(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
-def get_entry_or_404(db: Session, entry_id: uuid.UUID) -> ScheduleEntry:
-    entry = db.get(ScheduleEntry, entry_id)
-    if entry is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule entry not found")
-    return entry
+def get_entry_or_404(db: Session, user_id: uuid.UUID, entry_id: uuid.UUID) -> ScheduleEntry:
+    return get_schedule_entry_for_user(db, user_id, entry_id)
 
 
 def list_schedule_entries(
     db: Session,
+    user_id: uuid.UUID,
     *,
     week_start: date,
     today: date,
@@ -42,15 +41,16 @@ def list_schedule_entries(
     entries = list(
         db.scalars(
             select(ScheduleEntry)
-            .where(or_(*filters))
+            .where(ScheduleEntry.user_id == user_id, or_(*filters))
             .order_by(ScheduleEntry.start_time, ScheduleEntry.title)
         ).all()
     )
     return [ScheduleEntryRead.model_validate(entry) for entry in entries]
 
 
-def create_schedule_entry(db: Session, payload: ScheduleEntryCreate) -> ScheduleEntryRead:
+def create_schedule_entry(db: Session, user_id: uuid.UUID, payload: ScheduleEntryCreate) -> ScheduleEntryRead:
     entry = ScheduleEntry(
+        user_id=user_id,
         title=payload.title,
         kind=payload.kind,
         weekdays=payload.weekdays,
@@ -67,16 +67,17 @@ def create_schedule_entry(db: Session, payload: ScheduleEntryCreate) -> Schedule
     return ScheduleEntryRead.model_validate(entry)
 
 
-def get_schedule_entry(db: Session, entry_id: uuid.UUID) -> ScheduleEntryRead:
-    return ScheduleEntryRead.model_validate(get_entry_or_404(db, entry_id))
+def get_schedule_entry(db: Session, user_id: uuid.UUID, entry_id: uuid.UUID) -> ScheduleEntryRead:
+    return ScheduleEntryRead.model_validate(get_entry_or_404(db, user_id, entry_id))
 
 
 def update_schedule_entry(
     db: Session,
+    user_id: uuid.UUID,
     entry_id: uuid.UUID,
     payload: ScheduleEntryUpdate,
 ) -> ScheduleEntryRead:
-    entry = get_entry_or_404(db, entry_id)
+    entry = get_entry_or_404(db, user_id, entry_id)
     data = payload.model_dump(exclude_unset=True)
     if not data:
         return ScheduleEntryRead.model_validate(entry)
@@ -120,7 +121,7 @@ def update_schedule_entry(
     return ScheduleEntryRead.model_validate(entry)
 
 
-def delete_schedule_entry(db: Session, entry_id: uuid.UUID) -> None:
-    entry = get_entry_or_404(db, entry_id)
+def delete_schedule_entry(db: Session, user_id: uuid.UUID, entry_id: uuid.UUID) -> None:
+    entry = get_entry_or_404(db, user_id, entry_id)
     db.delete(entry)
     db.commit()

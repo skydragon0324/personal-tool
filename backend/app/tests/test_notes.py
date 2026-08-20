@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.constants import DEFAULT_BOARD_ID
+from app.core.constants import BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID
 from app.models.note import Note
 from app.models.task import Task
 
@@ -51,9 +51,9 @@ def test_list_notes_sorts_pinned_then_updated_then_created(client: TestClient, d
     middle = datetime.now(timezone.utc) - timedelta(days=1)
     newer = datetime.now(timezone.utc) - timedelta(hours=1)
 
-    first = Note(title="Unpinned older", body="", is_pinned=False, created_at=older, updated_at=older)
-    second = Note(title="Unpinned newer", body="", is_pinned=False, created_at=middle, updated_at=newer)
-    pinned = Note(title="Pinned stale", body="", is_pinned=True, created_at=older, updated_at=older)
+    first = Note(user_id=BOOTSTRAP_USER_ID, title="Unpinned older", body="", is_pinned=False, created_at=older, updated_at=older)
+    second = Note(user_id=BOOTSTRAP_USER_ID, title="Unpinned newer", body="", is_pinned=False, created_at=middle, updated_at=newer)
+    pinned = Note(user_id=BOOTSTRAP_USER_ID, title="Pinned stale", body="", is_pinned=True, created_at=older, updated_at=older)
     db.add_all([first, second, pinned])
     db.commit()
 

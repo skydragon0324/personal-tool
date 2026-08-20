@@ -6,7 +6,7 @@ import { useSortable } from "@dnd-kit/react/sortable";
 
 import { CategoryBadge } from "@/features/tasks/components/category-badge";
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
-import { formatDisplayDate, todayISO } from "@/lib/dates";
+import { formatTaskPeriod, todayISO } from "@/lib/dates";
 import type { BoardColumn, TaskSummary } from "../types";
 import { POINTER_ACTIVATION_DISTANCE, wasShortClick } from "../utils/pointer-activation";
 
@@ -106,8 +106,8 @@ export function TaskCard({
               : "text-[var(--app-text-muted)]"
         }`}
       >
-        {overdue ? "Overdue · " : dueToday ? "Due today · " : "Due "}
-        {formatDisplayDate(task.due_date)}
+        {overdue ? "Overdue · " : dueToday ? "Due today · " : ""}
+        {formatTaskPeriod(task.start_date, task.due_date)}
       </p>
       {task.content_preview ? (
         <p className="mt-1 line-clamp-2 text-sm text-[var(--app-text-muted)]">

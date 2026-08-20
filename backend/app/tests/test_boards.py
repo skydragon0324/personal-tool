@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.constants import COLUMN_TODO_ID, DEFAULT_BOARD_ID
+from app.core.constants import BOOTSTRAP_USER_ID, COLUMN_TODO_ID, DEFAULT_BOARD_ID
 from app.models import Task
 from app.schemas.task import TaskCreate, TaskMove
 from app.services import task_ordering_service, task_service
@@ -112,6 +112,7 @@ def test_archive_preserves_tasks_and_restore_returns_them(
 
     task = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=todo["id"],
             category_id=uncategorized["id"],
@@ -155,6 +156,7 @@ def test_move_rejects_status_from_another_board(
     with pytest.raises(HTTPException) as exc:
         task_ordering_service.move_task(
             db,
+            BOOTSTRAP_USER_ID,
             moving.id,
             TaskMove(
                 target_column_id=other_done["id"],
@@ -184,6 +186,7 @@ def test_new_board_done_status_counts_as_completed(
     uncategorized = client.get(f"/api/v1/boards/{board_id}/categories").json()[0]
     task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=columns["Done"]["id"],
             category_id=uncategorized["id"],
@@ -285,6 +288,7 @@ def test_delete_board_removes_upload_files(
     uncategorized = client.get(f"/api/v1/boards/{board_id}/categories").json()[0]
     task = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=todo["id"],
             category_id=uncategorized["id"],

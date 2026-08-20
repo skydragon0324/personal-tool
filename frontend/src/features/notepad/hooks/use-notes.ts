@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, apiClient } from "@/lib/api-client";
+import { todayKeys } from "@/features/today/api/today-queries";
 import { notifyApiError } from "@/lib/notify";
 
 import { noteKeys } from "../api/note-queries";
@@ -21,6 +22,7 @@ export function useNoteMutations() {
 
   const invalidateLists = async () => {
     await queryClient.invalidateQueries({ queryKey: noteKeys.all });
+    await queryClient.invalidateQueries({ queryKey: todayKeys.all });
   };
 
   const create = useMutation({

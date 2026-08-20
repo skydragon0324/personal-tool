@@ -45,11 +45,13 @@ describe("English UI copy", () => {
       "utf8",
     );
     expect(sidebar).toContain("Life Management");
+    expect(sidebar).toContain("Today");
     expect(sidebar).toContain("New board");
     expect(sidebar).toContain("Manage boards");
     expect(sidebar).toContain("Boards");
     expect(sidebar).toContain("Notepad");
     expect(sidebar).toContain("Schedule");
+    expect(sidebar).toContain("Logout");
     expect(sidebar).toContain("ThemeToggle");
     expect(sidebar).toContain('aria-current={current ? "page" : undefined}');
     const shell = readFileSync(
@@ -74,6 +76,37 @@ describe("English UI copy", () => {
       "utf8",
     );
     expect(notepadView).toContain("life-management:notepad-view");
+    const today = readFileSync(join(SRC_ROOT, "features/today/components/today-page.tsx"), "utf8");
+    expect(today).toContain("Today");
+    expect(today).toContain("Could not load today.");
+    expect(today).toContain("Retry");
+    expect(today).not.toContain("later step");
+    const todaySchedule = readFileSync(
+      join(SRC_ROOT, "features/today/components/today-schedule-section.tsx"),
+      "utf8",
+    );
+    expect(todaySchedule).toContain("Today&apos;s schedule");
+    expect(todaySchedule).toContain("Open schedule");
+    const todayLabels = readFileSync(join(SRC_ROOT, "features/today/utils/labels.ts"), "utf8");
+    expect(todayLabels).toContain("Routine");
+    expect(todayLabels).toContain("This week only");
+    expect(todayLabels).toContain("Due today");
+    expect(todayLabels).toContain("Overdue");
+    const todayTasks = readFileSync(
+      join(SRC_ROOT, "features/today/components/today-tasks-section.tsx"),
+      "utf8",
+    );
+    expect(todayTasks).toContain("Active tasks");
+    expect(todayTasks).toContain("Open boards");
+    const todayNotes = readFileSync(
+      join(SRC_ROOT, "features/today/components/today-notes-section.tsx"),
+      "utf8",
+    );
+    expect(todayNotes).toContain("Pinned notes");
+    expect(todayNotes).toContain("View all notes");
+    expect(todayNotes).toContain("Open notepad");
+    const todayRoute = readFileSync(join(SRC_ROOT, "app/(workspace)/today/page.tsx"), "utf8");
+    expect(todayRoute).toContain("TodayPage");
     const schedule = readFileSync(
       join(SRC_ROOT, "features/schedule/components/schedule-page.tsx"),
       "utf8",

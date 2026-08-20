@@ -50,6 +50,7 @@ export interface TaskSummary {
   id: string;
   column_id: string;
   title: string;
+  start_date: string;
   due_date: string;
   priority: Priority;
   position: number;
@@ -85,6 +86,7 @@ export interface TaskDetail {
   content: TiptapJSON | null;
   content_text: string | null;
   content_schema_version: number;
+  start_date: string;
   due_date: string;
   priority: Priority;
   position: number;
@@ -184,6 +186,7 @@ export interface TaskCreate {
   title: string;
   description?: string | null;
   content?: TiptapJSON | null;
+  start_date: string;
   due_date: string;
   priority?: Priority;
   links?: TaskLinkInput[];
@@ -193,6 +196,7 @@ export interface TaskUpdate {
   title?: string;
   description?: string | null;
   content?: TiptapJSON | null;
+  start_date?: string;
   due_date?: string;
   priority?: Priority;
   category_id?: string;

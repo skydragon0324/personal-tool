@@ -7,7 +7,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.constants import COLUMN_DONE_ID, COLUMN_TODO_ID, DEFAULT_BOARD_ID
+from app.core.constants import BOOTSTRAP_USER_ID, COLUMN_DONE_ID, COLUMN_TODO_ID, DEFAULT_BOARD_ID
 from app.models import Task
 from app.schemas.task import TaskCreate
 from app.services import board_service, task_service
@@ -24,12 +24,14 @@ def test_board_view_defaults_include_month_range_tasks(
         category_id=uncategorized_id,
         title="Mid month",
         due_date=date(today.year, today.month, 13) if today.day != 13 else today,
+        start_date=date(today.year, today.month, 13) if today.day != 13 else today,
         priority="medium",
         position=10,
         version=1,
     )
     if extra.due_date.month != today.month:
         extra.due_date = today.replace(day=1)
+        extra.start_date = extra.due_date
     db.add(extra)
     db.commit()
 
@@ -38,7 +40,7 @@ def test_board_view_defaults_include_month_range_tasks(
         end = date(today.year, 12, 31)
     else:
         end = date(today.year, today.month + 1, 1) - timedelta(days=1)
-    view = board_service.get_board_view(db, DEFAULT_BOARD_ID, start_date=start, end_date=end)
+    view = board_service.get_board_view(db, BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID, start_date=start, end_date=end)
     titles = [task.title for column in view.columns for task in column.tasks]
     assert extra.title in titles
 
@@ -46,6 +48,7 @@ def test_board_view_defaults_include_month_range_tasks(
 def test_date_field_created_at(client: TestClient, db: Session, today: date, uncategorized_id) -> None:
     created = task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=COLUMN_TODO_ID,
             category_id=uncategorized_id,
@@ -85,6 +88,7 @@ def test_unbounded_view_returns_old_task(
         column_id=COLUMN_TODO_ID,
         category_id=uncategorized_id,
         title="Old due",
+        start_date=today - timedelta(days=400),
         due_date=today - timedelta(days=400),
         priority="low",
         position=20,
@@ -92,7 +96,7 @@ def test_unbounded_view_returns_old_task(
     )
     db.add(old)
     db.commit()
-    view = board_service.get_board_view(db, DEFAULT_BOARD_ID, unbounded=True)
+    view = board_service.get_board_view(db, BOOTSTRAP_USER_ID, DEFAULT_BOARD_ID, unbounded=True)
     titles = [task.title for column in view.columns for task in column.tasks]
     assert "Old due" in titles
     assert view.unbounded is True
@@ -149,6 +153,7 @@ def test_archive_column_with_tasks_requires_move(
     column_id = created.json()["id"]
     task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=column_id,
             category_id=uncategorized_id,
@@ -181,6 +186,7 @@ def test_restore_archived_column_appends_empty(
     original_name = created.json()["name"]
     task_service.create_task(
         db,
+        BOOTSTRAP_USER_ID,
         TaskCreate(
             column_id=column_id,
             category_id=uncategorized_id,

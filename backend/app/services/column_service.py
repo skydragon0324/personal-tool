@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models import BoardColumn, Task
 from app.schemas.column import ColumnArchive, ColumnCreate, ColumnRead, ColumnReorder, ColumnUpdate
 from app.services.category_service import get_board_or_404
+from app.services.ownership import get_column_for_user
 
 
 def _task_count(db: Session, column_id: uuid.UUID) -> int:
@@ -31,8 +32,14 @@ def _to_read(db: Session, column: BoardColumn) -> ColumnRead:
     )
 
 
-def list_columns(db: Session, board_id: uuid.UUID, *, include_archived: bool = True) -> list[ColumnRead]:
-    get_board_or_404(db, board_id)
+def list_columns(
+    db: Session,
+    user_id: uuid.UUID,
+    board_id: uuid.UUID,
+    *,
+    include_archived: bool = True,
+) -> list[ColumnRead]:
+    get_board_or_404(db, user_id, board_id)
     query = select(BoardColumn).where(BoardColumn.board_id == board_id)
     if not include_archived:
         query = query.where(BoardColumn.archived_at.is_(None))
@@ -54,8 +61,8 @@ def _unused_column_position(db: Session, board_id: uuid.UUID, *, start_from: int
     return position
 
 
-def create_column(db: Session, board_id: uuid.UUID, payload: ColumnCreate) -> ColumnRead:
-    get_board_or_404(db, board_id)
+def create_column(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: ColumnCreate) -> ColumnRead:
+    get_board_or_404(db, user_id, board_id)
     max_active = db.scalar(
         select(func.coalesce(func.max(BoardColumn.position), -1)).where(
             BoardColumn.board_id == board_id,
@@ -76,10 +83,8 @@ def create_column(db: Session, board_id: uuid.UUID, payload: ColumnCreate) -> Co
     return _to_read(db, column)
 
 
-def update_column(db: Session, column_id: uuid.UUID, payload: ColumnUpdate) -> ColumnRead:
-    column = db.get(BoardColumn, column_id)
-    if column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
+def update_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload: ColumnUpdate) -> ColumnRead:
+    column = get_column_for_user(db, user_id, column_id)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
         setattr(column, key, value)
@@ -88,10 +93,8 @@ def update_column(db: Session, column_id: uuid.UUID, payload: ColumnUpdate) -> C
     return _to_read(db, column)
 
 
-def reorder_column(db: Session, column_id: uuid.UUID, payload: ColumnReorder) -> ColumnRead:
-    column = db.get(BoardColumn, column_id)
-    if column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
+def reorder_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload: ColumnReorder) -> ColumnRead:
+    column = get_column_for_user(db, user_id, column_id)
     if column.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Archived statuses cannot be reordered")
 
@@ -122,10 +125,8 @@ def reorder_column(db: Session, column_id: uuid.UUID, payload: ColumnReorder) ->
     return _to_read(db, column)
 
 
-def archive_column(db: Session, column_id: uuid.UUID, payload: ColumnArchive) -> ColumnRead:
-    column = db.get(BoardColumn, column_id)
-    if column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
+def archive_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload: ColumnArchive) -> ColumnRead:
+    column = get_column_for_user(db, user_id, column_id)
     if column.archived_at is not None:
         return _to_read(db, column)
 
@@ -151,8 +152,8 @@ def archive_column(db: Session, column_id: uuid.UUID, payload: ColumnArchive) ->
             detail="This status still has tasks. Move them to another status before archiving.",
         )
     if payload.move_to_column_id is not None:
-        target = db.get(BoardColumn, payload.move_to_column_id)
-        if target is None or target.board_id != column.board_id or target.archived_at is not None:
+        target = get_column_for_user(db, user_id, payload.move_to_column_id)
+        if target.board_id != column.board_id or target.archived_at is not None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Choose a valid active status to move tasks into",
@@ -201,10 +202,8 @@ def archive_column(db: Session, column_id: uuid.UUID, payload: ColumnArchive) ->
     return _to_read(db, column)
 
 
-def restore_column(db: Session, column_id: uuid.UUID) -> ColumnRead:
-    column = db.get(BoardColumn, column_id)
-    if column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
+def restore_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID) -> ColumnRead:
+    column = get_column_for_user(db, user_id, column_id)
     if column.archived_at is None:
         return _to_read(db, column)
 
@@ -227,10 +226,8 @@ def restore_column(db: Session, column_id: uuid.UUID) -> ColumnRead:
     return _to_read(db, column)
 
 
-def delete_column(db: Session, column_id: uuid.UUID) -> None:
-    column = db.get(BoardColumn, column_id)
-    if column is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
+def delete_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID) -> None:
+    column = get_column_for_user(db, user_id, column_id)
     if column.archived_at is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

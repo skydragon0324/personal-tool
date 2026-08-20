@@ -39,6 +39,7 @@ export function applyDetailToView(view: BoardView, task: TaskDetail): BoardView 
     id: task.id,
     column_id: task.column_id,
     title: task.title,
+    start_date: task.start_date,
     due_date: task.due_date,
     priority: task.priority,
     position: task.position,

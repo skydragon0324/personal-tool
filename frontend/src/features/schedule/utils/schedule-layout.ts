@@ -1,4 +1,4 @@
-import { parseTimeToMinutes } from "./schedule-time";
+import { parseTimeToMinutes, weekdayIndex } from "./schedule-time";
 import type { ScheduleEntry } from "../types";
 
 export interface LaidOutEntry {
@@ -11,6 +11,12 @@ export interface LaidOutEntry {
 
 export function entriesForDay(entries: ScheduleEntry[], weekday: number): ScheduleEntry[] {
   return entries.filter((entry) => entry.weekdays.includes(weekday));
+}
+
+export function entriesForIsoDate(entries: ScheduleEntry[], iso: string): ScheduleEntry[] {
+  return entriesForDay(entries, weekdayIndex(iso)).sort(
+    (a, b) => parseTimeToMinutes(a.start_time) - parseTimeToMinutes(b.start_time),
+  );
 }
 
 export function assignLanes(entries: ScheduleEntry[]): LaidOutEntry[] {

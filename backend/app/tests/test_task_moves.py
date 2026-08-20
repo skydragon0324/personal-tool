@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.constants import COLUMN_DONE_ID, COLUMN_IN_PROGRESS_ID, COLUMN_TODO_ID
+from app.core.constants import BOOTSTRAP_USER_ID, COLUMN_DONE_ID, COLUMN_IN_PROGRESS_ID, COLUMN_TODO_ID
 from app.models import Task
 from app.schemas.task import TaskMove
 from app.services import task_ordering_service
@@ -16,6 +16,7 @@ def test_cross_column_move(db: Session, seed_tasks: list[Task], today: date) -> 
     moving = seed_tasks[1]
     result = task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskMove(
             target_column_id=COLUMN_IN_PROGRESS_ID,
@@ -43,6 +44,7 @@ def test_move_to_done_sets_completed_at(db: Session, seed_tasks: list[Task]) -> 
     moving = seed_tasks[0]
     result = task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskMove(target_column_id=COLUMN_DONE_ID, target_position=0, expected_version=1),
     )
@@ -54,12 +56,14 @@ def test_move_from_done_clears_completed_at(db: Session, seed_tasks: list[Task])
     moving = seed_tasks[0]
     task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskMove(target_column_id=COLUMN_DONE_ID, target_position=0, expected_version=1),
     )
     db.refresh(moving)
     result = task_ordering_service.move_task(
         db,
+        BOOTSTRAP_USER_ID,
         moving.id,
         TaskMove(
             target_column_id=COLUMN_TODO_ID,
@@ -76,6 +80,7 @@ def test_stale_version_returns_409(db: Session, seed_tasks: list[Task]) -> None:
     try:
         task_ordering_service.move_task(
             db,
+            BOOTSTRAP_USER_ID,
             moving.id,
             TaskMove(
                 target_column_id=COLUMN_IN_PROGRESS_ID,
