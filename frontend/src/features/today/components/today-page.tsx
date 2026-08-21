@@ -10,8 +10,9 @@ import { PageHeader } from "@/features/shell/components/page-header";
 import { formatWeekdayDate, greetingForName, todayISO } from "@/lib/dates";
 import { notifyApiError } from "@/lib/notify";
 import { mondayOf } from "@/features/schedule/utils/schedule-time";
+import { useScheduleOccurrence } from "@/features/schedule/hooks/use-schedule-occurrence";
 
-import { useScheduleOccurrence, useToday } from "../hooks/use-today";
+import { useToday } from "../hooks/use-today";
 import type { TodayPinnedNote, TodaySchedule, TodayTask } from "../types";
 import { loadNote, TodayNoteDrawer, TodayScheduleEditor, TodayTaskDrawer } from "./today-editors";
 import { TodayNotesSection } from "./today-notes-section";
@@ -46,12 +47,7 @@ export function TodayPage() {
   }
 
   function handleToggleComplete(entry: TodaySchedule, isCompleted: boolean) {
-    occurrence.mutate(
-      { entryId: entry.id, occurrenceDate: date, isCompleted },
-      {
-        onError: (error) => notifyApiError(error, "Could not update schedule"),
-      },
-    );
+    occurrence.mutate({ entryId: entry.id, occurrenceDate: date, isCompleted });
   }
 
   return (
@@ -91,7 +87,7 @@ export function TodayPage() {
                 <TodayScheduleSection
                   date={data.date}
                   schedules={data.schedules}
-                  togglingId={occurrence.isPending ? occurrence.variables?.entryId : null}
+                  togglingId={occurrence.pendingKey}
                   onToggleComplete={handleToggleComplete}
                   onOpen={setOpenSchedule}
                 />

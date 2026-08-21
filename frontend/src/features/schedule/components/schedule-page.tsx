@@ -8,6 +8,7 @@ import { todayISO } from "@/lib/dates";
 import { notifyApiError } from "@/lib/notify";
 
 import { useSchedule, useScheduleMutations } from "../hooks/use-schedule";
+import { useScheduleOccurrence } from "../hooks/use-schedule-occurrence";
 import type { ScheduleEntry, ScheduleEntryCreate, ScheduleView } from "../types";
 import {
   mondayOf,
@@ -34,7 +35,9 @@ export function SchedulePage() {
   );
   const scheduleQuery = useSchedule(weekStart, today);
   const mutations = useScheduleMutations(weekStart, today);
-  const entries = scheduleQuery.data ?? [];
+  const occurrence = useScheduleOccurrence();
+  const entries = scheduleQuery.data?.entries ?? [];
+  const occurrences = scheduleQuery.data?.occurrences ?? [];
   const empty = !scheduleQuery.isLoading && entries.length === 0;
 
   useEffect(() => {
@@ -149,6 +152,8 @@ export function SchedulePage() {
               view={view}
               dates={view === "day" ? dates : weekDates(weekStart)}
               entries={entries}
+              occurrences={occurrences}
+              pendingKey={occurrence.pendingKey}
               onSlotClick={(weekday, startTime, endTime) =>
                 openCreate({ weekday, start_time: startTime, end_time: endTime })
               }
@@ -156,6 +161,9 @@ export function SchedulePage() {
                 setEditing(entry);
                 setPrefill(null);
                 setModalOpen(true);
+              }}
+              onToggleComplete={(entry, occurrenceDate, isCompleted) => {
+                occurrence.mutate({ entryId: entry.id, occurrenceDate, isCompleted });
               }}
             />
           ) : null}

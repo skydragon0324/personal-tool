@@ -61,7 +61,7 @@ export function TodayScheduleSection({
                 />
                 <Checkbox
                   checked={entry.is_completed}
-                  disabled={togglingId === entry.id}
+                  disabled={togglingId === `${entry.id}:${date}`}
                   aria-label={
                     entry.is_completed
                       ? `Mark ${entry.title} incomplete`

@@ -148,3 +148,10 @@ class ScheduleOccurrenceRead(BaseModel):
     occurrence_date: date
     is_completed: bool
     completed_at: datetime | None
+
+
+class ScheduleWeekRead(BaseModel):
+    week_start: date
+    today: date
+    entries: list[ScheduleEntryRead]
+    occurrences: list[ScheduleOccurrenceRead]

@@ -41,13 +41,17 @@ vi.mock("@/features/auth/components/auth-provider", () => ({
   }),
 }));
 
-vi.mock("../hooks/use-today", () => ({
-  useToday: () => todayQuery,
+vi.mock("@/features/schedule/hooks/use-schedule-occurrence", () => ({
   useScheduleOccurrence: () => ({
     mutate: occurrenceMutate,
     isPending: false,
     variables: undefined,
+    pendingKey: null,
   }),
+}));
+
+vi.mock("../hooks/use-today", () => ({
+  useToday: () => todayQuery,
 }));
 
 vi.mock("./today-editors", () => ({
@@ -240,10 +244,11 @@ describe("Today page", () => {
     const user = userEvent.setup();
     wrap(createElement(TodayPage));
     await user.click(screen.getByLabelText("Mark Morning walk complete"));
-    expect(occurrenceMutate).toHaveBeenCalledWith(
-      { entryId: "sched-1", occurrenceDate: "2026-08-20", isCompleted: true },
-      expect.any(Object),
-    );
+    expect(occurrenceMutate).toHaveBeenCalledWith({
+      entryId: "sched-1",
+      occurrenceDate: "2026-08-20",
+      isCompleted: true,
+    });
   });
 
   it("opens the task detail drawer", async () => {

@@ -31,3 +31,17 @@ export interface ScheduleEntryCreate {
 export type ScheduleEntryUpdate = Partial<ScheduleEntryCreate>;
 
 export type ScheduleView = "day" | "week";
+
+export interface ScheduleOccurrence {
+  schedule_entry_id: string;
+  occurrence_date: string;
+  is_completed: boolean;
+  completed_at: string | null;
+}
+
+export interface ScheduleWeek {
+  week_start: string;
+  today: string;
+  entries: ScheduleEntry[];
+  occurrences: ScheduleOccurrence[];
+}

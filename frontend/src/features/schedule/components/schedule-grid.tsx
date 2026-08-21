@@ -1,9 +1,12 @@
 "use client";
 
+import { Checkbox } from "@mantine/core";
+
 import { statusHeaderClass } from "@/features/board/utils/status-colors";
 
-import type { ScheduleEntry } from "../types";
+import type { ScheduleEntry, ScheduleOccurrence } from "../types";
 import { assignLanes, entriesForDay } from "../utils/schedule-layout";
+import { isOccurrenceCompleted, occurrenceKey } from "../utils/occurrence-state";
 import {
   SLOT_MINUTES,
   SLOTS_PER_DAY,
@@ -20,11 +23,23 @@ interface ScheduleGridProps {
   view: "day" | "week";
   dates: string[];
   entries: ScheduleEntry[];
+  occurrences: ScheduleOccurrence[];
+  pendingKey?: string | null;
   onSlotClick: (weekday: number, startTime: string, endTime: string) => void;
   onEntryClick: (entry: ScheduleEntry) => void;
+  onToggleComplete: (entry: ScheduleEntry, occurrenceDate: string, isCompleted: boolean) => void;
 }
 
-export function ScheduleGrid({ view, dates, entries, onSlotClick, onEntryClick }: ScheduleGridProps) {
+export function ScheduleGrid({
+  view,
+  dates,
+  entries,
+  occurrences,
+  pendingKey,
+  onSlotClick,
+  onEntryClick,
+  onToggleComplete,
+}: ScheduleGridProps) {
   const columns = view === "day" ? 1 : 7;
   const visibleDates = view === "day" ? dates.slice(0, 1) : dates;
 
@@ -52,8 +67,11 @@ export function ScheduleGrid({ view, dates, entries, onSlotClick, onEntryClick }
             slot={slot}
             dates={visibleDates}
             entries={entries}
+            occurrences={occurrences}
+            pendingKey={pendingKey}
             onSlotClick={onSlotClick}
             onEntryClick={onEntryClick}
+            onToggleComplete={onToggleComplete}
           />
         ))}
       </div>
@@ -65,14 +83,20 @@ function SlotRow({
   slot,
   dates,
   entries,
+  occurrences,
+  pendingKey,
   onSlotClick,
   onEntryClick,
+  onToggleComplete,
 }: {
   slot: number;
   dates: string[];
   entries: ScheduleEntry[];
+  occurrences: ScheduleOccurrence[];
+  pendingKey?: string | null;
   onSlotClick: (weekday: number, startTime: string, endTime: string) => void;
   onEntryClick: (entry: ScheduleEntry) => void;
+  onToggleComplete: (entry: ScheduleEntry, occurrenceDate: string, isCompleted: boolean) => void;
 }) {
   const start = minutesToTime(slotStartMinutes(slot));
   const end = minutesToTime(slotStartMinutes(slot) + SLOT_MINUTES);
@@ -98,21 +122,47 @@ function SlotRow({
               onClick={() => onSlotClick(weekday, start, end)}
               className="absolute inset-0 hover:bg-[var(--app-surface-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
             />
-            {starting.map((item) => (
-              <button
-                key={item.entry.id}
-                type="button"
-                onClick={() => onEntryClick(item.entry)}
-                className={`absolute top-0 z-[1] overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[11px] font-medium text-white ${statusHeaderClass(item.entry.color)}`}
-                style={{
-                  left: `calc(${(item.lane / item.laneCount) * 100}% + 2px)`,
-                  width: `calc(${100 / item.laneCount}% - 4px)`,
-                  height: `calc(${slotCount(item.entry.start_time, item.entry.end_time)} * 100% - 2px)`,
-                }}
-              >
-                {item.entry.title}
-              </button>
-            ))}
+            {starting.map((item) => {
+              const completed = isOccurrenceCompleted(occurrences, item.entry.id, iso);
+              const key = occurrenceKey(item.entry.id, iso);
+              return (
+                <div
+                  key={key}
+                  className={`absolute top-0 z-[1] flex items-start gap-1 overflow-hidden rounded-md px-1 py-0.5 text-left text-[11px] font-medium text-white ${statusHeaderClass(item.entry.color)} ${
+                    completed ? "opacity-55" : ""
+                  }`}
+                  style={{
+                    left: `calc(${(item.lane / item.laneCount) * 100}% + 2px)`,
+                    width: `calc(${100 / item.laneCount}% - 4px)`,
+                    height: `calc(${slotCount(item.entry.start_time, item.entry.end_time)} * 100% - 2px)`,
+                  }}
+                >
+                  <Checkbox
+                    size="xs"
+                    checked={completed}
+                    disabled={pendingKey === key}
+                    aria-label={
+                      completed
+                        ? `Mark ${item.entry.title} incomplete on ${iso}`
+                        : `Mark ${item.entry.title} complete on ${iso}`
+                    }
+                    onChange={(event) =>
+                      onToggleComplete(item.entry, iso, event.currentTarget.checked)
+                    }
+                    onClick={(event) => event.stopPropagation()}
+                    className="mt-px shrink-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onEntryClick(item.entry)}
+                    className="min-w-0 flex-1 truncate text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+                  >
+                    <span className={completed ? "line-through" : undefined}>{item.entry.title}</span>
+                    {completed ? <span className="sr-only">Completed</span> : null}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         );
       })}

@@ -21,6 +21,45 @@ def entry_occurs_on(entry: ScheduleEntry, day: date) -> bool:
     return entry.kind == "this_week" and entry.week_start == monday_on_or_before(day)
 
 
+def list_occurrence_states_for_range(
+    db: Session,
+    user_id: uuid.UUID,
+    *,
+    start: date,
+    end: date,
+    entries: list[ScheduleEntry],
+) -> list[ScheduleOccurrenceRead]:
+    if start > end or not entries:
+        return []
+    entry_ids = [entry.id for entry in entries]
+    by_id = {entry.id: entry for entry in entries}
+    rows = list(
+        db.scalars(
+            select(ScheduleOccurrenceState).where(
+                ScheduleOccurrenceState.user_id == user_id,
+                ScheduleOccurrenceState.schedule_entry_id.in_(entry_ids),
+                ScheduleOccurrenceState.occurrence_date >= start,
+                ScheduleOccurrenceState.occurrence_date <= end,
+            )
+        ).all()
+    )
+    states: list[ScheduleOccurrenceRead] = []
+    for row in rows:
+        entry = by_id.get(row.schedule_entry_id)
+        if entry is None or not entry_occurs_on(entry, row.occurrence_date):
+            continue
+        states.append(
+            ScheduleOccurrenceRead(
+                schedule_entry_id=row.schedule_entry_id,
+                occurrence_date=row.occurrence_date,
+                is_completed=row.is_completed,
+                completed_at=row.completed_at,
+            )
+        )
+    states.sort(key=lambda item: (item.occurrence_date, str(item.schedule_entry_id)))
+    return states
+
+
 def prune_old_occurrence_states(db: Session, user_id: uuid.UUID, today: date) -> None:
     cutoff = monday_on_or_before(today)
     db.execute(

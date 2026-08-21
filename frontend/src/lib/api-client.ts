@@ -317,7 +317,7 @@ export const apiClient = {
     ),
 
   listSchedule: (weekStart: string, today: string) =>
-    request<import("@/features/schedule/types").ScheduleEntry[]>(
+    request<import("@/features/schedule/types").ScheduleWeek>(
       `/api/v1/schedule?week_start=${encodeURIComponent(weekStart)}&today=${encodeURIComponent(today)}`,
     ),
 

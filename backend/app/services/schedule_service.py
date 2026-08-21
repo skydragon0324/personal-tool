@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.schedule_entry import ScheduleEntry
-from app.schemas.schedule import ScheduleEntryCreate, ScheduleEntryRead, ScheduleEntryUpdate
+from app.schemas.schedule import ScheduleEntryCreate, ScheduleEntryRead, ScheduleEntryUpdate, ScheduleWeekRead
 from app.services.ownership import get_schedule_entry_for_user
 
 
@@ -26,7 +26,7 @@ def list_schedule_entries(
     *,
     week_start: date,
     today: date,
-) -> list[ScheduleEntryRead]:
+) -> ScheduleWeekRead:
     if week_start.weekday() != 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -45,7 +45,21 @@ def list_schedule_entries(
             .order_by(ScheduleEntry.start_time, ScheduleEntry.title)
         ).all()
     )
-    return [ScheduleEntryRead.model_validate(entry) for entry in entries]
+    week_end = week_start + timedelta(days=6)
+    from app.services.schedule_occurrence_service import list_occurrence_states_for_range
+
+    return ScheduleWeekRead(
+        week_start=week_start,
+        today=today,
+        entries=[ScheduleEntryRead.model_validate(entry) for entry in entries],
+        occurrences=list_occurrence_states_for_range(
+            db,
+            user_id,
+            start=week_start,
+            end=week_end,
+            entries=entries,
+        ),
+    )
 
 
 def create_schedule_entry(db: Session, user_id: uuid.UUID, payload: ScheduleEntryCreate) -> ScheduleEntryRead:

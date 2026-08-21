@@ -12,19 +12,20 @@ from app.schemas.schedule import (
     ScheduleEntryUpdate,
     ScheduleOccurrenceRead,
     ScheduleOccurrenceUpdate,
+    ScheduleWeekRead,
 )
 from app.services import schedule_occurrence_service, schedule_service
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
-@router.get("", response_model=list[ScheduleEntryRead])
+@router.get("", response_model=ScheduleWeekRead)
 def list_schedule_entries(
     user: CurrentUser,
     week_start: date = Query(..., description="Monday of the visible week"),
     today: date = Query(..., description="Local calendar date YYYY-MM-DD"),
     db: Session = Depends(get_db),
-) -> list[ScheduleEntryRead]:
+) -> ScheduleWeekRead:
     return schedule_service.list_schedule_entries(db, user.id, week_start=week_start, today=today)
 
 
