@@ -6,6 +6,7 @@ describe("api client auth helpers", () => {
   afterEach(() => {
     setUnauthorizedHandler(null);
     setCsrfToken(null);
+    document.cookie = "life_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     vi.unstubAllGlobals();
   });
 
@@ -72,5 +73,86 @@ describe("api client auth helpers", () => {
     await apiClient.login({ email: "a@b.com", password: "password12" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/v1/auth/login");
+  });
+
+  it("uses the existing CSRF cookie instead of rotating on every mutation", async () => {
+    setCsrfToken(null);
+    document.cookie = "life_csrf=cookie-csrf";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ id: "board-1" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.createBoard({ name: "Work", timezone: "UTC", color: "teal" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("/api/v1/auth/csrf");
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("X-CSRF-Token")).toBe(
+      "cookie-csrf",
+    );
+    document.cookie = "life_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  });
+
+  it("retries a CSRF failure once after rotating the token", async () => {
+    setCsrfToken("stale-csrf");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: async () => ({ detail: "CSRF check failed" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ csrf_token: "fresh-csrf" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "task-1", version: 2 }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.moveTask("task-1", {
+      target_column_id: "col-2",
+      expected_version: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/api/v1/auth/csrf");
+    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get("X-CSRF-Token")).toBe(
+      "fresh-csrf",
+    );
+  });
+
+  it("does not retry CSRF failures more than once", async () => {
+    setCsrfToken("stale-csrf");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: async () => ({ detail: "CSRF check failed" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ csrf_token: "fresh-csrf" }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: async () => ({ detail: "CSRF check failed" }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.moveTask("task-1", { target_column_id: "col-2", expected_version: 1 }),
+    ).rejects.toMatchObject({ status: 403, message: "CSRF check failed" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

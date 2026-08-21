@@ -62,7 +62,23 @@ async function ensureCsrfToken(): Promise<string | null> {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function isCsrfFailure(detail: string): boolean {
+  return detail.toLowerCase().includes("csrf");
+}
+
+async function readErrorDetail(response: Response): Promise<string> {
+  let detail = response.statusText;
+  try {
+    const body = (await response.json()) as { detail?: string | unknown };
+    if (typeof body.detail === "string") detail = body.detail;
+    else if (body.detail) detail = JSON.stringify(body.detail);
+  } catch {
+    /* ignore */
+  }
+  return detail;
+}
+
+async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const headers = new Headers(init?.headers);
   const isFormData =
     typeof FormData !== "undefined" && init?.body instanceof FormData;
@@ -93,13 +109,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (response.status === 401 && !isAuthApiPath(path)) {
       unauthorizedHandler?.();
     }
-    let detail = response.statusText;
-    try {
-      const body = (await response.json()) as { detail?: string | unknown };
-      if (typeof body.detail === "string") detail = body.detail;
-      else if (body.detail) detail = JSON.stringify(body.detail);
-    } catch {
-      /* ignore */
+    const detail = await readErrorDetail(response);
+    const canRetryCsrf =
+      !retried &&
+      !isFormData &&
+      response.status === 403 &&
+      MUTATING.has(method) &&
+      !PUBLIC_MUTATIONS.has(path) &&
+      isCsrfFailure(detail);
+    if (canRetryCsrf) {
+      setCsrfToken(null);
+      const token = await fetchCsrfToken();
+      const retryHeaders = new Headers(headers);
+      retryHeaders.set("X-CSRF-Token", token);
+      return request<T>(path, { ...init, headers: retryHeaders }, true);
     }
     throw new ApiError(detail, response.status);
   }

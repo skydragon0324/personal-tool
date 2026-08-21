@@ -7,9 +7,13 @@ export function shouldActivatePointerDrag(
   return distancePx >= threshold;
 }
 
+const INTERACTIVE_SELECTOR =
+  "a[href], button, input, textarea, select, option, [role='menuitem'], [contenteditable='true']";
+
 export function isNoDragTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  return Boolean(target.closest("[data-no-dnd]"));
+  if (target.closest("[data-no-dnd]")) return true;
+  return Boolean(target.closest(INTERACTIVE_SELECTOR));
 }
 
 export function wasShortClick(

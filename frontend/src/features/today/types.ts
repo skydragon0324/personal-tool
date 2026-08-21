@@ -57,7 +57,8 @@ export interface TodayResponse {
   date: string;
   task_progress: TodayProgress;
   schedule_progress: TodayProgress;
-  tasks: TodayTask[];
+  active_tasks: TodayTask[];
+  overdue_tasks: TodayTask[];
   schedules: TodaySchedule[];
   pinned_notes: TodayPinnedNote[];
   pinned_notes_total: number;

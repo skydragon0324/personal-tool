@@ -66,7 +66,8 @@ class TodayRead(BaseModel):
     date: date
     task_progress: ProgressRead
     schedule_progress: ProgressRead
-    tasks: list[TodayTaskRead]
+    active_tasks: list[TodayTaskRead]
+    overdue_tasks: list[TodayTaskRead]
     schedules: list[TodayScheduleRead]
     pinned_notes: list[TodayPinnedNoteRead]
     pinned_notes_total: int

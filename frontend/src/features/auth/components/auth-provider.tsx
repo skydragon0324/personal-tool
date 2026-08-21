@@ -35,11 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   });
 
-  useEffect(() => {
-    if (!meQuery.data) return;
-    void apiClient.getCsrf();
-  }, [meQuery.data]);
-
   const resetWorkspace = useCallback(() => {
     queryClient.clear();
     clearUserLocalState(window.localStorage);

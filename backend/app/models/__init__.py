@@ -1,6 +1,7 @@
 from app.models.board import Board
 from app.models.board_column import BoardColumn
 from app.models.category import Category
+from app.models.inbox_item import InboxItem
 from app.models.note import Note
 from app.models.schedule_entry import ScheduleEntry
 from app.models.schedule_occurrence_state import ScheduleOccurrenceState
@@ -15,6 +16,7 @@ __all__ = [
     "Board",
     "BoardColumn",
     "Category",
+    "InboxItem",
     "Note",
     "ScheduleEntry",
     "ScheduleOccurrenceState",

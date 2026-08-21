@@ -14,6 +14,7 @@ from app.models import (  # noqa: E402, F401
     Board,
     BoardColumn,
     Category,
+    InboxItem,
     Note,
     ScheduleEntry,
     Task,

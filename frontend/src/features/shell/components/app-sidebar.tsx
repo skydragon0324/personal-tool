@@ -12,6 +12,7 @@ import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons"
 
 import { boardsGroupExpanded, readBoardsNavCollapsed, writeBoardsNavCollapsed } from "../utils/boards-nav";
 import { boardIdFromPath, sectionFromPath } from "../utils/navigation";
+import { NavIcon } from "./nav-icons";
 import { useWorkspaceChrome } from "./workspace-chrome";
 
 let savedBoardListScrollTop = 0;
@@ -24,6 +25,7 @@ export function AppSidebar() {
   const boards = activeBoards(boardsQuery.data);
   const currentBoardId = boardIdFromPath(pathname);
   const section = sectionFromPath(pathname);
+  const boardsParentActive = pathname === "/boards";
   const [storedCollapsed, setStoredCollapsed] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -39,11 +41,6 @@ export function AppSidebar() {
     writeBoardsNavCollapsed(next, window.localStorage);
   }
 
-  function handleBoardsClick() {
-    setCollapsed(false);
-    chrome?.closeSidebar();
-  }
-
   return (
     <div className="flex h-full flex-col bg-[var(--app-surface)]">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
@@ -56,15 +53,20 @@ export function AppSidebar() {
           onClick={() => chrome?.closeSidebar()}
           className={`shrink-0 ${navItemClass(section === "today")}`}
         >
+          <NavIcon name="today" />
           Today
         </Link>
         <div className="mt-1 flex items-center gap-1">
           <Link
             href="/boards"
-            aria-current={pathname === "/boards" ? "page" : undefined}
-            onClick={handleBoardsClick}
-            className={`flex-1 ${navItemClass(pathname === "/boards")}`}
+            aria-current={boardsParentActive ? "page" : undefined}
+            onClick={() => {
+              setCollapsed(false);
+              chrome?.closeSidebar();
+            }}
+            className={`flex-1 ${navItemClass(boardsParentActive)}`}
           >
+            <NavIcon name="boards" />
             Boards
           </Link>
           <button
@@ -72,7 +74,7 @@ export function AppSidebar() {
             aria-label={expanded ? "Collapse boards" : "Expand boards"}
             aria-expanded={expanded}
             onClick={() => setCollapsed(expanded)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
           >
             <ChevronIcon expanded={expanded} />
           </button>
@@ -82,8 +84,6 @@ export function AppSidebar() {
             boards={boards}
             currentBoardId={currentBoardId}
             onNavigate={() => chrome?.closeSidebar()}
-            onNewBoard={() => chrome?.openNewBoard()}
-            onManageBoards={() => chrome?.openManageBoards()}
           />
         ) : null}
         <Link
@@ -92,6 +92,7 @@ export function AppSidebar() {
           onClick={() => chrome?.closeSidebar()}
           className={`mt-1 shrink-0 ${navItemClass(section === "notepad")}`}
         >
+          <NavIcon name="notepad" />
           Notepad
         </Link>
         <Link
@@ -100,6 +101,7 @@ export function AppSidebar() {
           onClick={() => chrome?.closeSidebar()}
           className={`mt-1 shrink-0 ${navItemClass(section === "schedule")}`}
         >
+          <NavIcon name="schedule" />
           Schedule
         </Link>
       </nav>
@@ -125,8 +127,6 @@ function BoardList({
   boards,
   currentBoardId,
   onNavigate,
-  onNewBoard,
-  onManageBoards,
 }: {
   boards: Array<{
     id: string;
@@ -136,8 +136,6 @@ function BoardList({
   }>;
   currentBoardId?: string;
   onNavigate: () => void;
-  onNewBoard: () => void;
-  onManageBoards: () => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef<HTMLAnchorElement>(null);
@@ -167,9 +165,12 @@ function BoardList({
   }, [currentBoardId]);
 
   return (
-    <div className="mt-1 flex min-h-0 flex-1 flex-col">
-      <ScrollArea className="min-h-0 flex-1" type="auto" viewportRef={viewportRef}>
-        <div className="flex flex-col gap-1 py-1">
+    <div
+      aria-label="Your boards"
+      className="mt-1 ml-3 max-h-[min(40vh,320px)] min-h-0 shrink-0 overflow-hidden border-l border-[var(--app-border)] pl-3"
+    >
+      <ScrollArea className="h-full max-h-[min(40vh,320px)]" type="auto" viewportRef={viewportRef}>
+        <div className="flex flex-col gap-0.5 py-1">
           {boards.map((board) => {
             const current = board.id === currentBoardId;
             return (
@@ -179,44 +180,34 @@ function BoardList({
                 ref={current ? currentRef : undefined}
                 onClick={onNavigate}
                 aria-current={current ? "page" : undefined}
-                className={`flex items-center gap-2 rounded-r-lg py-2 pr-2 text-sm font-medium ${
+                className={`flex items-center gap-2 rounded-md py-1.5 pr-2 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)] ${
                   current
-                    ? "border-l-[3px] border-[var(--app-primary)] bg-[var(--app-primary)]/18 pl-[5px] text-[var(--app-text)]"
-                    : "border-l-[3px] border-transparent pl-[5px] text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)]"
+                    ? "border-l-2 border-[var(--app-primary)] bg-[var(--app-primary)]/12 pl-1.5 text-[var(--app-text)]"
+                    : "border-l-2 border-transparent pl-1.5 text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)]"
                 }`}
               >
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-md text-white ${boardColorClass(board.color)} ${
-                    current
-                      ? "ring-2 ring-[var(--app-primary)] ring-offset-2 ring-offset-[var(--app-surface)]"
-                      : ""
-                  }`}
+                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-white ${boardColorClass(board.color)}`}
                 >
-                  <BoardGlyph name={board.icon_name} size={14} />
+                  <BoardGlyph name={board.icon_name} size={12} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{board.name}</span>
               </Link>
             );
           })}
           {!boards.length ? (
-            <Text size="sm" c="dimmed" px="xs">
+            <Text size="xs" c="dimmed" px="xs">
               No boards yet
             </Text>
           ) : null}
         </div>
       </ScrollArea>
-      <div className="flex flex-col gap-2 px-1 py-2">
-        <Button onClick={onNewBoard}>New board</Button>
-        <Button variant="light" onClick={onManageBoards}>
-          Manage boards
-        </Button>
-      </div>
     </div>
   );
 }
 
 function navItemClass(active: boolean): string {
-  return `flex min-w-0 items-center rounded-md px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)] ${
+  return `flex min-w-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)] ${
     active
       ? "bg-[var(--app-primary)]/15 text-[var(--app-text)]"
       : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)]"

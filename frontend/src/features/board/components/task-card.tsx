@@ -8,7 +8,11 @@ import { CategoryBadge } from "@/features/tasks/components/category-badge";
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
 import { formatTaskPeriod, todayISO } from "@/lib/dates";
 import type { BoardColumn, TaskSummary } from "../types";
-import { POINTER_ACTIVATION_DISTANCE, wasShortClick } from "../utils/pointer-activation";
+import {
+  POINTER_ACTIVATION_DISTANCE,
+  isNoDragTarget,
+  wasShortClick,
+} from "../utils/pointer-activation";
 
 interface TaskCardProps {
   task: TaskSummary;
@@ -46,7 +50,7 @@ export function TaskCard({
     <article
       ref={ref}
       data-dragging={isDragging || undefined}
-      className={`cursor-grab rounded-2xl border bg-[var(--app-surface)] p-3 shadow-sm transition ${
+      className={`touch-none cursor-grab select-none rounded-2xl border bg-[var(--app-surface)] p-3 shadow-sm transition ${
         isDragging
           ? "cursor-grabbing scale-[1.02] opacity-40 shadow-xl"
           : "hover:shadow-md"
@@ -57,26 +61,31 @@ export function TaskCard({
             ? "border-[var(--app-primary)]"
             : "border-[var(--app-border)]"
       }`}
+      onPointerDown={(event) => {
+        if (isNoDragTarget(event.target)) {
+          pointerStart.current = null;
+          return;
+        }
+        pointerStart.current = { x: event.clientX, y: event.clientY };
+      }}
+      onClick={(event) => {
+        if (isNoDragTarget(event.target)) return;
+        if (
+          !wasShortClick(
+            pointerStart.current,
+            { x: event.clientX, y: event.clientY },
+            POINTER_ACTIVATION_DISTANCE,
+          )
+        ) {
+          return;
+        }
+        onOpenDetail(task, "view");
+      }}
     >
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onPointerDown={(event) => {
-            pointerStart.current = { x: event.clientX, y: event.clientY };
-          }}
-          onClick={(event) => {
-            event.stopPropagation();
-            if (
-              !wasShortClick(pointerStart.current, { x: event.clientX, y: event.clientY }, POINTER_ACTIVATION_DISTANCE)
-            ) {
-              return;
-            }
-            onOpenDetail(task, "view");
-          }}
-          className="min-w-0 flex-1 rounded-sm text-left font-medium text-[var(--app-text)] hover:text-[var(--app-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-primary)]"
-        >
+        <h2 className="min-w-0 flex-1 text-left font-medium text-[var(--app-text)]">
           <span className="line-clamp-2">{task.title}</span>
-        </button>
+        </h2>
         <div data-no-dnd="true">
           <Menu shadow="md" position="bottom-end" withinPortal>
             <Menu.Target>

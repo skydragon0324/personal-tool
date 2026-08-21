@@ -31,12 +31,12 @@ export function KanbanColumn({
     id: column.id,
     type: "column",
     accept: "item",
-    collisionPriority: CollisionPriority.Low,
+    collisionPriority: tasks.length === 0 ? CollisionPriority.High : CollisionPriority.Low,
   });
 
   return (
     <section
-      className="flex flex-none flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-muted)]"
+      className="flex flex-none flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-muted)]"
       style={{ width: "20rem", minWidth: "20rem", maxWidth: "20rem" }}
     >
       <header
@@ -56,6 +56,7 @@ export function KanbanColumn({
       </header>
       <div
         ref={ref}
+        data-column-id={column.id}
         className={`flex min-h-[12rem] flex-1 flex-col gap-3 overflow-y-auto p-3 ${statusSoftClass(column.color)} ${
           isDropTarget ? "bg-[var(--app-primary)]/10" : ""
         }`}

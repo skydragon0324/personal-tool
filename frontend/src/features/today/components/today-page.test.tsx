@@ -67,7 +67,7 @@ function populatedToday(): TodayResponse {
     date: "2026-08-20",
     task_progress: { total: 2, completed: 1, remaining: 1, percentage: 50 },
     schedule_progress: { total: 1, completed: 0, remaining: 1, percentage: 0 },
-    tasks: [
+    active_tasks: [
       {
         id: "task-open",
         title: "Write brief",
@@ -105,6 +105,27 @@ function populatedToday(): TodayResponse {
         subtask_completed: 0,
         subtask_total: 0,
         deadline_status: "completed",
+      },
+    ],
+    overdue_tasks: [
+      {
+        id: "task-overdue",
+        title: "Pay rent",
+        start_date: "2026-08-01",
+        due_date: "2026-08-10",
+        priority: "high",
+        completed_at: null,
+        board_id: "board-home",
+        board_name: "Home",
+        board_color: "teal",
+        board_icon_name: "home",
+        status_id: "status-todo",
+        status_name: "Todo",
+        status_color: "blue",
+        status_is_done: false,
+        subtask_completed: 0,
+        subtask_total: 0,
+        deadline_status: "overdue",
       },
     ],
     schedules: [
@@ -159,24 +180,34 @@ describe("Today page", () => {
     });
   });
 
-  it("renders progress, schedule, tasks, and pinned notes", () => {
+  it("renders a summary strip and four dashboard panels", () => {
     wrap(createElement(TodayPage));
     expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByText("Thursday, August 20, 2026")).toBeInTheDocument();
+    expect(screen.getByText("Your tasks, schedule, and pinned notes for today.")).toBeInTheDocument();
+    expect(screen.getAllByText("Thursday, August 20, 2026").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Good (morning|afternoon|evening), Ada/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Progress overview")).toBeInTheDocument();
+    expect(screen.getByLabelText("Today summary")).toBeInTheDocument();
+    expect(screen.getByText("Tasks")).toBeInTheDocument();
+    expect(screen.getByText("Schedule")).toBeInTheDocument();
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
     expect(screen.getByText("0 / 1")).toBeInTheDocument();
-    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("Time blocks planned for today")).toBeInTheDocument();
     expect(screen.getByText("Morning walk")).toBeInTheDocument();
     expect(screen.getByText("Routine")).toBeInTheDocument();
+    expect(screen.getByText("Tasks whose active period includes today")).toBeInTheDocument();
     expect(screen.getByText("Write brief")).toBeInTheDocument();
     expect(screen.getByText("Work")).toBeInTheDocument();
     expect(screen.getByText("Ship notes")).toBeInTheDocument();
-    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getAllByText("Home").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Unfinished tasks past their due date")).toBeInTheDocument();
+    expect(screen.getByText("Pay rent")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Active tasks")).queryByText("Pay rent")).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Needs attention")).getByText("Pay rent")).toBeInTheDocument();
     expect(screen.getByText("Grocery list")).toBeInTheDocument();
     expect(screen.getByText("View all notes")).toBeInTheDocument();
-    expect(screen.getByLabelText("Progress overview").className).toContain("sm:grid-cols-2");
+    const grid = screen.getByLabelText("Today dashboard");
+    expect(grid.className).toContain("grid-cols-1");
+    expect(grid.className).toContain("md:grid-cols-2");
   });
 
   it("keeps completed tasks visible and dimmed", () => {
@@ -191,16 +222,18 @@ describe("Today page", () => {
       date: "2026-08-20",
       task_progress: emptyProgress,
       schedule_progress: emptyProgress,
-      tasks: [],
+      active_tasks: [],
+      overdue_tasks: [],
       schedules: [],
       pinned_notes: [],
       pinned_notes_total: 0,
     };
     wrap(createElement(TodayPage));
-    expect(screen.getAllByText("0%").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("0 / 0").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("link", { name: "Open schedule" })).toHaveAttribute("href", "/schedule");
     expect(screen.getByRole("link", { name: "Open boards" })).toHaveAttribute("href", "/boards");
     expect(screen.getByRole("link", { name: "Open notepad" })).toHaveAttribute("href", "/notepad");
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
   });
 
   it("toggles schedule completion", async () => {
@@ -256,7 +289,8 @@ describe("Today page", () => {
   it("uses theme tokens and a mobile-first layout", () => {
     const { container } = wrap(createElement(TodayPage));
     expect(container.innerHTML).toContain("bg-[var(--app-bg)]");
-    expect(screen.getByLabelText("Pinned notes").innerHTML).toContain("sm:grid-cols-2");
+    expect(screen.getByLabelText("Today dashboard").className).toContain("grid-cols-1");
+    expect(screen.getByLabelText("Pinned notes").innerHTML).not.toContain("sm:grid-cols-2");
     expect(screen.getByLabelText("Today's schedule").innerHTML).toContain("dark:");
   });
 });

@@ -1,8 +1,9 @@
 "use client";
 
-import { AutoScroller, PointerActivationConstraints } from "@dnd-kit/dom";
+import { PointerActivationConstraints } from "@dnd-kit/dom";
+import type { DragOverEvent } from "@dnd-kit/react";
 import { DragDropProvider, KeyboardSensor, PointerSensor } from "@dnd-kit/react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { ApiError } from "@/lib/api-client";
 import { notifyApiError, notifyConflict } from "@/lib/notify";
@@ -38,22 +39,28 @@ export function KanbanBoard({
     () => orderedColumns.map((column) => column.id),
     [orderedColumns],
   );
-  const pointerSensor = useMemo(
-    () =>
+  const sensors = useMemo(
+    () => [
       PointerSensor.configure({
         activationConstraints: [
           new PointerActivationConstraints.Distance({ value: POINTER_ACTIVATION_DISTANCE }),
         ],
         preventActivation: (event) => isNoDragTarget(event.target),
       }),
+      KeyboardSensor,
+    ],
     [],
   );
-  const { items, onDragStart, onDragOver, onDragEnd, moveTask } = useBoardDnd({
+  const { items, onDragStart, projectDrag, onDragEnd, resolveOverlayTask, moveTask } = useBoardDnd({
     query,
     columnIds,
     initialTasksByColumn: tasksByColumn,
   });
-  const [activeTask, setActiveTask] = useState<TaskSummary | null>(null);
+
+  const resolveTask = useCallback(
+    (taskId: string) => resolveOverlayTask(taskId, tasksByColumn),
+    [resolveOverlayTask, tasksByColumn],
+  );
 
   async function handleMoveStatus(task: TaskSummary, columnId: string) {
     if (columnId === task.column_id) return;
@@ -74,33 +81,24 @@ export function KanbanBoard({
     }
   }
 
+  function handleDragOver(event: DragOverEvent) {
+    if (String(event.operation.source?.type ?? "") === "column") return;
+    projectDrag(event);
+  }
+
   return (
     <div className={`${BOARD_CONTENT_GUTTER} pb-8`}>
       <DragDropProvider
-        sensors={[pointerSensor, KeyboardSensor]}
-        plugins={[AutoScroller.configure({ threshold: { x: 0.12, y: 0.2 } })]}
+        sensors={sensors}
         onDragStart={(event) => {
-          onDragStart();
-          const id = String(event.operation.source?.id ?? "");
-          const task =
-            Object.values(items)
-              .flat()
-              .find((item) => item.id === id) ?? null;
-          setActiveTask(task);
+          onDragStart(String(event.operation.source?.id ?? ""));
         }}
-        onDragOver={(event) => {
-          const source = event.operation.source;
-          if (source?.type === "column") return;
-          onDragOver(event);
-        }}
-        onDragEnd={async (event) => {
-          setActiveTask(null);
-          await onDragEnd(event);
+        onDragOver={handleDragOver}
+        onDragEnd={(event) => {
+          void onDragEnd(event);
         }}
       >
-        <div
-          className="flex h-[calc(100vh-16rem)] min-h-[28rem] gap-4 overflow-x-auto overflow-y-hidden"
-        >
+        <div className="flex h-[calc(100vh-16rem)] min-h-[28rem] gap-4 overflow-x-auto overflow-y-hidden">
           {orderedColumns.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -114,7 +112,7 @@ export function KanbanBoard({
             />
           ))}
         </div>
-        <TaskDragOverlay task={activeTask} />
+        <TaskDragOverlay resolveTask={resolveTask} />
       </DragDropProvider>
     </div>
   );

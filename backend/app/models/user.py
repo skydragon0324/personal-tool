@@ -12,6 +12,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.board import Board
+    from app.models.inbox_item import InboxItem
     from app.models.note import Note
     from app.models.schedule_entry import ScheduleEntry
     from app.models.schedule_occurrence_state import ScheduleOccurrenceState
@@ -44,6 +45,11 @@ class User(Base):
     )
     boards: Mapped[list[Board]] = relationship("Board", back_populates="user")
     notes: Mapped[list[Note]] = relationship("Note", back_populates="user")
+    inbox_items: Mapped[list[InboxItem]] = relationship(
+        "InboxItem",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     schedule_entries: Mapped[list[ScheduleEntry]] = relationship(
         "ScheduleEntry",
         back_populates="user",

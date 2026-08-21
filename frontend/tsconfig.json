@@ -31,7 +31,9 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "next-env.d.ts"
+    "next-env.d.ts",
+    ".next-dev/types/**/*.ts",
+    ".next-prod/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

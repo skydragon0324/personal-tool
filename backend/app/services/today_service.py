@@ -15,7 +15,6 @@ from app.schemas.today import (
     TodayTaskRead,
 )
 from app.services.schedule_occurrence_service import entry_occurs_on, prune_old_occurrence_states
-from app.services.schedule_service import monday_on_or_before
 
 PINNED_NOTES_LIMIT = 6
 PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
@@ -44,11 +43,31 @@ def _note_preview(body: str, lines: int = 2) -> str:
     return "\n".join(parts[:lines]).strip()
 
 
-def get_today(db: Session, user_id: uuid.UUID, selected: date) -> TodayRead:
-    prune_old_occurrence_states(db, user_id, selected)
-    db.commit()
+def _serialize_task(task: Task, board: Board, column: BoardColumn, selected: date) -> TodayTaskRead:
+    subtasks = list(task.subtasks or [])
+    return TodayTaskRead(
+        id=task.id,
+        title=task.title,
+        start_date=task.start_date,
+        due_date=task.due_date,
+        priority=task.priority,
+        completed_at=task.completed_at,
+        board_id=board.id,
+        board_name=board.name,
+        board_color=board.color,
+        board_icon_name=board.icon_name,
+        status_id=column.id,
+        status_name=column.name,
+        status_color=column.color,
+        status_is_done=column.is_done,
+        subtask_completed=sum(1 for item in subtasks if item.is_completed),
+        subtask_total=len(subtasks),
+        deadline_status=_deadline_status(task, column, selected),
+    )
 
-    task_rows = list(
+
+def _load_task_rows(db: Session, user_id: uuid.UUID, *extra_filters):
+    return list(
         db.execute(
             select(Task, Board, BoardColumn)
             .join(BoardColumn, BoardColumn.id == Task.column_id)
@@ -58,50 +77,63 @@ def get_today(db: Session, user_id: uuid.UUID, selected: date) -> TodayRead:
                 Board.user_id == user_id,
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
-                Task.start_date <= selected,
-                Task.due_date >= selected,
+                *extra_filters,
             )
         ).all()
     )
 
-    today_tasks: list[TodayTaskRead] = []
-    for task, board, column in task_rows:
-        subtasks = list(task.subtasks or [])
-        today_tasks.append(
-            TodayTaskRead(
-                id=task.id,
-                title=task.title,
-                start_date=task.start_date,
-                due_date=task.due_date,
-                priority=task.priority,
-                completed_at=task.completed_at,
-                board_id=board.id,
-                board_name=board.name,
-                board_color=board.color,
-                board_icon_name=board.icon_name,
-                status_id=column.id,
-                status_name=column.name,
-                status_color=column.color,
-                status_is_done=column.is_done,
-                subtask_completed=sum(1 for item in subtasks if item.is_completed),
-                subtask_total=len(subtasks),
-                deadline_status=_deadline_status(task, column, selected),
-            )
-        )
 
-    today_tasks.sort(
+def _sort_active(tasks: list[TodayTaskRead]) -> list[TodayTaskRead]:
+    return sorted(
+        tasks,
         key=lambda item: (
             1 if item.status_is_done or item.completed_at is not None else 0,
             PRIORITY_RANK.get(item.priority, 9),
             item.due_date,
             item.title.lower(),
-        )
+        ),
     )
 
-    task_completed = sum(1 for item in today_tasks if item.status_is_done or item.completed_at is not None)
 
-    weekday = selected.weekday()
-    week_start = monday_on_or_before(selected)
+def _sort_overdue(tasks: list[TodayTaskRead]) -> list[TodayTaskRead]:
+    return sorted(
+        tasks,
+        key=lambda item: (
+            PRIORITY_RANK.get(item.priority, 9),
+            item.due_date,
+            item.title.lower(),
+        ),
+    )
+
+
+def get_today(db: Session, user_id: uuid.UUID, selected: date) -> TodayRead:
+    prune_old_occurrence_states(db, user_id, selected)
+    db.commit()
+
+    active_rows = _load_task_rows(
+        db,
+        user_id,
+        Task.start_date <= selected,
+        Task.due_date >= selected,
+    )
+    overdue_rows = _load_task_rows(
+        db,
+        user_id,
+        Task.due_date < selected,
+        Task.completed_at.is_(None),
+        BoardColumn.is_done.is_(False),
+    )
+
+    active_tasks = _sort_active(
+        [_serialize_task(task, board, column, selected) for task, board, column in active_rows]
+    )
+    overdue_tasks = _sort_overdue(
+        [_serialize_task(task, board, column, selected) for task, board, column in overdue_rows]
+    )
+    task_completed = sum(
+        1 for item in active_tasks if item.status_is_done or item.completed_at is not None
+    )
+
     entries = list(
         db.scalars(
             select(ScheduleEntry)
@@ -161,9 +193,10 @@ def get_today(db: Session, user_id: uuid.UUID, selected: date) -> TodayRead:
 
     return TodayRead(
         date=selected,
-        task_progress=_progress(len(today_tasks), task_completed),
+        task_progress=_progress(len(active_tasks), task_completed),
         schedule_progress=_progress(len(today_schedules), schedule_completed),
-        tasks=today_tasks,
+        active_tasks=active_tasks,
+        overdue_tasks=overdue_tasks,
         schedules=today_schedules,
         pinned_notes=pinned_notes,
         pinned_notes_total=len(pinned_all),

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api-client";
-import { boardKeys } from "../api/board-queries";
+import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
 import type { BoardQueryParams, BoardView, TaskMove, TaskSummary } from "../types";
 
@@ -86,7 +86,11 @@ export function useMoveTask(params: BoardQueryParams) {
         await queryClient.invalidateQueries({ queryKey: key });
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (task) => {
+      queryClient.setQueryData(taskKeys.detail(task.id), task);
+      queryClient.setQueryData<BoardView>(key, (current) =>
+        current ? applyDetailToView(current, task) : current,
+      );
       await queryClient.invalidateQueries({ queryKey: key });
     },
   });

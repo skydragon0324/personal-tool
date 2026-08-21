@@ -12,6 +12,7 @@ export function isBoardDetailPath(pathname: string | null): boolean {
 
 export function sectionFromPath(pathname: string | null): AppSection {
   if (pathname === "/today" || pathname?.startsWith("/today/")) return "today";
+  if (pathname === "/inbox" || pathname?.startsWith("/inbox/")) return "today";
   if (pathname === "/notepad" || pathname?.startsWith("/notepad/")) return "notepad";
   if (pathname === "/schedule" || pathname?.startsWith("/schedule/")) return "schedule";
   return "boards";

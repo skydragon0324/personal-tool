@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
 import type { Note } from "@/features/notepad/types";
+import { DashboardGrid } from "@/features/shell/components/dashboard-panel";
 import { PageHeader } from "@/features/shell/components/page-header";
 import { formatWeekdayDate, greetingForName, todayISO } from "@/lib/dates";
 import { notifyApiError } from "@/lib/notify";
@@ -14,7 +15,7 @@ import { useScheduleOccurrence, useToday } from "../hooks/use-today";
 import type { TodayPinnedNote, TodaySchedule, TodayTask } from "../types";
 import { loadNote, TodayNoteDrawer, TodayScheduleEditor, TodayTaskDrawer } from "./today-editors";
 import { TodayNotesSection } from "./today-notes-section";
-import { TodayProgressOverview } from "./today-progress";
+import { TodaySummaryStrip } from "./today-progress";
 import { TodayScheduleSection } from "./today-schedule-section";
 import { TodayTasksSection } from "./today-tasks-section";
 
@@ -61,9 +62,9 @@ export function TodayPage() {
         </Text>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-5 sm:px-6">
-          <p className="font-display text-xl text-[var(--app-text)] sm:text-2xl">
-            {greetingForName(user?.display_name ?? "")}
+        <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
+          <p className="text-sm text-[var(--app-text-muted)]">
+            Your tasks, schedule, and pinned notes for today.
           </p>
           {todayQuery.isLoading ? (
             <div className="flex justify-center py-16">
@@ -80,20 +81,44 @@ export function TodayPage() {
           ) : null}
           {data ? (
             <>
-              <TodayProgressOverview tasks={data.task_progress} schedule={data.schedule_progress} />
-              <TodayScheduleSection
-                date={data.date}
-                schedules={data.schedules}
-                togglingId={occurrence.isPending ? occurrence.variables?.entryId : null}
-                onToggleComplete={handleToggleComplete}
-                onOpen={setOpenSchedule}
+              <TodaySummaryStrip
+                greeting={greetingForName(user?.display_name ?? "")}
+                dateLabel={formatWeekdayDate(date)}
+                tasks={data.task_progress}
+                schedule={data.schedule_progress}
               />
-              <TodayTasksSection tasks={data.tasks} onOpen={setOpenTask} />
-              <TodayNotesSection
-                notes={data.pinned_notes}
-                total={data.pinned_notes_total}
-                onOpen={(note) => void handleOpenNote(note)}
-              />
+              <DashboardGrid label="Today dashboard">
+                <TodayScheduleSection
+                  date={data.date}
+                  schedules={data.schedules}
+                  togglingId={occurrence.isPending ? occurrence.variables?.entryId : null}
+                  onToggleComplete={handleToggleComplete}
+                  onOpen={setOpenSchedule}
+                />
+                <TodayTasksSection
+                  title="Active tasks"
+                  description="Tasks whose active period includes today"
+                  emptyText="No tasks are scheduled for today."
+                  emptyActionHref="/boards"
+                  emptyActionLabel="Open boards"
+                  icon="boards"
+                  tasks={data.active_tasks}
+                  onOpen={setOpenTask}
+                />
+                <TodayTasksSection
+                  title="Needs attention"
+                  description="Unfinished tasks past their due date"
+                  emptyText="You're all caught up."
+                  icon="today"
+                  tasks={data.overdue_tasks}
+                  onOpen={setOpenTask}
+                />
+                <TodayNotesSection
+                  notes={data.pinned_notes}
+                  total={data.pinned_notes_total}
+                  onOpen={(note) => void handleOpenNote(note)}
+                />
+              </DashboardGrid>
             </>
           ) : null}
         </div>

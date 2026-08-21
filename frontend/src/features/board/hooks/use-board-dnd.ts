@@ -1,19 +1,39 @@
 "use client";
 
 import { move } from "@dnd-kit/helpers";
+import type { DragEndEvent, DragOverEvent } from "@dnd-kit/react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { ApiError } from "@/lib/api-client";
 import { notifyApiError, notifyConflict } from "@/lib/notify";
 import type { BoardQueryParams, TaskSummary, TasksByColumn } from "../types";
-import { moveAnchors } from "../utils/move-anchors";
-import { itemsByColumnIds, reindexColumnTasks } from "../utils/reorder-tasks";
+import {
+  applyMovedTaskVersion,
+  buildMovePayload,
+  collectionFromIdMap,
+  collectionFromTargetFallback,
+  collectionIdsEqual,
+  entityFromDragValue,
+  resolveOverlayTask as resolveOverlayTaskFromCollections,
+} from "../utils/board-move";
+import { itemsByColumnIds } from "../utils/reorder-tasks";
 import { useMoveTask } from "./use-move-task";
 
 interface UseBoardDndArgs {
   query: BoardQueryParams;
   columnIds: string[];
   initialTasksByColumn: TasksByColumn;
+}
+
+function pointFromOperation(operation: {
+  position?: { current?: { x?: number; y?: number } };
+  targetIdentifier?: string | number | null;
+}): { x: number; y: number } | null {
+  const current = operation.position?.current;
+  if (typeof current?.x === "number" && typeof current?.y === "number") {
+    return { x: current.x, y: current.y };
+  }
+  return null;
 }
 
 export function useBoardDnd({
@@ -25,6 +45,9 @@ export function useBoardDnd({
   const [items, setItems] = useState<TasksByColumn>(syncedInitial);
   const itemsRef = useRef(syncedInitial);
   const snapshot = useRef(syncedInitial);
+  const sourceTaskId = useRef<string | null>(null);
+  const sawDragOver = useRef(false);
+  const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
   const moveTask = useMoveTask(query);
   const columnKey = columnIds.join(",");
@@ -37,101 +60,128 @@ export function useBoardDnd({
     snapshot.current = next;
   }, [initialTasksByColumn, columnKey, columnIds]);
 
-  const onDragStart = useCallback(() => {
+  useLayoutEffect(() => {
+    function onPointerMove(event: PointerEvent | MouseEvent) {
+      if (!dragging.current) return;
+      lastPoint.current = { x: event.clientX, y: event.clientY };
+    }
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("mousemove", onPointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("mousemove", onPointerMove);
+    };
+  }, []);
+
+  const onDragStart = useCallback((taskId: string) => {
     dragging.current = true;
+    sawDragOver.current = false;
+    lastPoint.current = null;
+    sourceTaskId.current = taskId;
     snapshot.current = itemsRef.current;
   }, []);
 
-  const onDragOver = useCallback(
-    (event: Parameters<typeof move>[1]) => {
-      setItems((current) => {
-        const source = itemsByColumnIds(current, columnIds);
-        const idMap: Record<string, string[]> = {};
-        const taskLookup = new Map<string, TaskSummary>();
-        for (const [columnId, tasks] of Object.entries(source)) {
-          idMap[columnId] = tasks.map((task) => task.id);
-          for (const task of tasks) taskLookup.set(task.id, task);
-        }
-        const nextIds = move(idMap, event) as Record<string, string[]>;
-        const next: TasksByColumn = {};
-        for (const columnId of columnIds) {
-          const ids = nextIds[columnId] ?? [];
-          next[columnId] = reindexColumnTasks(
-            ids
-              .map((id) => {
-                const task = taskLookup.get(id);
-                return task ? { ...task, column_id: columnId } : null;
-              })
-              .filter((task): task is TaskSummary => task !== null),
-          );
-        }
-        itemsRef.current = next;
-        return next;
-      });
+  const projectDrag = useCallback(
+    (event: DragOverEvent) => {
+      const taskId = sourceTaskId.current ?? String(event.operation.source?.id ?? "");
+      if (!taskId) return;
+
+      const current = itemsByColumnIds(itemsRef.current, columnIds);
+      const idMap: Record<string, string[]> = {};
+      const taskLookup = new Map<string, TaskSummary>();
+      for (const columnId of columnIds) {
+        const tasks = current[columnId] ?? [];
+        idMap[columnId] = tasks.map((task) => task.id);
+        for (const task of tasks) taskLookup.set(task.id, task);
+      }
+
+      const nextIds = move(idMap, event) as Record<string, string[]>;
+      let next = collectionFromIdMap(taskLookup, columnIds, nextIds);
+      const target = entityFromDragValue(event.operation.target);
+      lastPoint.current = pointFromOperation(event.operation) ?? lastPoint.current;
+
+      if (target && collectionIdsEqual(next, current, columnIds)) {
+        const fallback = collectionFromTargetFallback(
+          snapshot.current,
+          columnIds,
+          taskId,
+          target,
+          {
+            targetId: (event.operation as { targetIdentifier?: string | number | null })
+              .targetIdentifier,
+            point: lastPoint.current,
+          },
+        );
+        if (fallback) next = fallback;
+      }
+
+      if (collectionIdsEqual(next, current, columnIds)) return;
+
+      sawDragOver.current = true;
+      itemsRef.current = next;
+      setItems(next);
     },
     [columnIds],
   );
 
   const onDragEnd = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (event: any) => {
-      dragging.current = false;
-      if (event.canceled) {
+    async (event: DragEndEvent) => {
+      const taskId = sourceTaskId.current ?? "";
+      if (event.canceled || !taskId) {
+        dragging.current = false;
+        sourceTaskId.current = null;
         setItems(snapshot.current);
         itemsRef.current = snapshot.current;
         return;
       }
 
-      const source = event.operation?.source;
-      const sourceId = source?.id != null ? String(source.id) : "";
-      if (!sourceId || source?.type === "column") return;
-
-      let expectedVersion = 1;
-      for (const list of Object.values(snapshot.current)) {
-        const original = list.find((task) => task.id === sourceId);
-        if (original) {
-          expectedVersion = original.version;
-          break;
+      let collection = itemsRef.current;
+      if (!sawDragOver.current) {
+        const operation = event.operation as {
+          target?: unknown;
+          targetIdentifier?: string | number | null;
+          position?: { current?: { x?: number; y?: number } };
+        };
+        const fallback = collectionFromTargetFallback(
+          snapshot.current,
+          columnIds,
+          taskId,
+          entityFromDragValue(operation.target),
+          {
+            targetId: operation.targetIdentifier,
+            point: lastPoint.current ?? pointFromOperation(operation),
+          },
+        );
+        if (fallback) {
+          collection = fallback;
         }
       }
 
-      let targetColumnId: string | null = null;
-      let targetList: TaskSummary[] = [];
-      for (const [columnId, tasks] of Object.entries(itemsRef.current)) {
-        if (tasks.some((task) => task.id === sourceId)) {
-          targetColumnId = columnId;
-          targetList = tasks;
-          break;
-        }
-      }
-      if (!targetColumnId) {
-        setItems(snapshot.current);
-        itemsRef.current = snapshot.current;
+      const payload = buildMovePayload(snapshot.current, collection, taskId);
+      if (payload.unchanged || !payload.targetColumnId) {
+        dragging.current = false;
+        sourceTaskId.current = null;
+        setItems(collection);
+        itemsRef.current = collection;
         return;
       }
 
-      const anchors = moveAnchors(targetList, sourceId);
-      let unchanged = false;
-      for (const [columnId, tasks] of Object.entries(snapshot.current)) {
-        const index = tasks.findIndex((task) => task.id === sourceId);
-        if (index >= 0) {
-          const currentIndex = targetList.findIndex((task) => task.id === sourceId);
-          unchanged = columnId === targetColumnId && index === currentIndex;
-          break;
-        }
-      }
-      if (unchanged) return;
+      setItems(collection);
+      itemsRef.current = collection;
 
       try {
-        await moveTask.mutateAsync({
-          taskId: sourceId,
+        const saved = await moveTask.mutateAsync({
+          taskId: payload.taskId,
           payload: {
-            target_column_id: targetColumnId,
-            expected_version: expectedVersion,
-            after_task_id: anchors.after_task_id,
-            before_task_id: anchors.before_task_id,
+            target_column_id: payload.targetColumnId,
+            expected_version: payload.expectedVersion,
+            after_task_id: payload.afterTaskId,
+            before_task_id: payload.beforeTaskId,
           },
         });
+        const withVersion = applyMovedTaskVersion(collection, columnIds, saved);
+        setItems(withVersion);
+        itemsRef.current = withVersion;
       } catch (error) {
         setItems(snapshot.current);
         itemsRef.current = snapshot.current;
@@ -140,16 +190,32 @@ export function useBoardDnd({
           return;
         }
         notifyApiError(error, "Could not move the task");
+      } finally {
+        dragging.current = false;
+        sourceTaskId.current = null;
       }
     },
-    [moveTask],
+    [columnIds, moveTask],
+  );
+
+  const resolveOverlayTask = useCallback(
+    (taskId: string, initial?: TasksByColumn) =>
+      resolveOverlayTaskFromCollections(
+        taskId,
+        snapshot.current,
+        itemsRef.current,
+        initial,
+      ),
+    [],
   );
 
   return {
     items,
     onDragStart,
-    onDragOver,
+    projectDrag,
+    onDragOver: projectDrag,
     onDragEnd,
+    resolveOverlayTask,
     isPersisting: moveTask.isPending,
     moveTask,
   };

@@ -58,12 +58,16 @@ def test_today_includes_inclusive_date_boundaries(client: TestClient) -> None:
     earlier = _create_task(client, title="Ended yesterday", start=SELECTED - timedelta(days=5), due=SELECTED - timedelta(days=1))
 
     body = client.get("/api/v1/today", params={"date": SELECTED.isoformat()}).json()
-    titles = {item["title"] for item in body["tasks"]}
+    titles = {item["title"] for item in body["active_tasks"]}
+    overdue = {item["title"] for item in body["overdue_tasks"]}
     assert starts_today["title"] in titles
     assert due_today["title"] in titles
     assert spanning["title"] in titles
     assert outside["title"] not in titles
     assert earlier["title"] not in titles
+    assert earlier["title"] in overdue
+    assert outside["title"] not in overdue
+    assert starts_today["title"] not in overdue
     assert body["date"] == SELECTED.isoformat()
 
 
@@ -98,10 +102,10 @@ def test_today_includes_completed_tasks_and_excludes_archived_boards(
     assert client.post(f"/api/v1/boards/{board_id}/archive").status_code == 200
 
     body = client.get("/api/v1/today", params={"date": SELECTED.isoformat()}).json()
-    titles = {item["title"] for item in body["tasks"]}
+    titles = {item["title"] for item in body["active_tasks"]}
     assert finished["title"] in titles
     assert hidden["title"] not in titles
-    completed = next(item for item in body["tasks"] if item["id"] == finished["id"])
+    completed = next(item for item in body["active_tasks"] if item["id"] == finished["id"])
     assert completed["status_is_done"] is True
     assert completed["deadline_status"] == "completed"
     assert body["task_progress"]["total"] >= 1
@@ -274,3 +278,49 @@ def test_today_progress_is_zero_when_empty(client: TestClient) -> None:
     assert body["schedule_progress"]["percentage"] == 0.0
     assert body["task_progress"]["total"] == 0
     assert body["schedule_progress"]["total"] == 0
+    assert body["active_tasks"] == []
+    assert body["overdue_tasks"] == []
+
+
+def test_overdue_tasks_are_isolated_from_active_today(client: TestClient) -> None:
+    active = _create_task(client, title="Active today", start=SELECTED, due=SELECTED)
+    overdue = _create_task(
+        client,
+        title="Needs attention",
+        start=SELECTED - timedelta(days=10),
+        due=SELECTED - timedelta(days=1),
+    )
+    future = _create_task(
+        client,
+        title="Future work",
+        start=SELECTED + timedelta(days=1),
+        due=SELECTED + timedelta(days=3),
+    )
+    done_id = next(
+        item["id"]
+        for item in client.get(f"/api/v1/boards/{DEFAULT_BOARD_ID}/columns").json()
+        if item["name"] == "Done"
+    )
+    category_id = client.get(f"/api/v1/boards/{DEFAULT_BOARD_ID}/categories").json()[0]["id"]
+    finished_overdue = _create_task(
+        client,
+        title="Finished last week",
+        start=SELECTED - timedelta(days=10),
+        due=SELECTED - timedelta(days=2),
+        column_id=done_id,
+        category_id=category_id,
+    )
+
+    body = client.get("/api/v1/today", params={"date": SELECTED.isoformat()}).json()
+    active_titles = {item["title"] for item in body["active_tasks"]}
+    overdue_titles = {item["title"] for item in body["overdue_tasks"]}
+    assert active["title"] in active_titles
+    assert overdue["title"] not in active_titles
+    assert overdue["title"] in overdue_titles
+    assert active["title"] not in overdue_titles
+    assert future["title"] not in active_titles
+    assert future["title"] not in overdue_titles
+    assert finished_overdue["title"] not in overdue_titles
+    assert finished_overdue["title"] not in active_titles
+    assert all(item["due_date"] < SELECTED.isoformat() for item in body["overdue_tasks"])
+    assert all(item["completed_at"] is None for item in body["overdue_tasks"])
