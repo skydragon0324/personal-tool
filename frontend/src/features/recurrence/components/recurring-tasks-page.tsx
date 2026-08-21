@@ -576,6 +576,7 @@ function SeriesActions({
   onPause: (item: RecurrenceSeriesListItem) => void;
   onResume: (item: RecurrenceSeriesListItem) => void;
 }) {
+  const hintId = useId();
   if (item.status === "active") {
     return (
       <Button
@@ -594,7 +595,6 @@ function SeriesActions({
   if (item.status !== "stopped") return null;
 
   const blockedByArchive = item.board_archived;
-  const hintId = useId();
   return (
     <div className="flex min-w-[9.5rem] flex-col items-start gap-1">
       <Button
