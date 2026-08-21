@@ -168,9 +168,30 @@ describe("English UI copy", () => {
     expect(recurring).toContain("Customized");
     expect(recurring).toContain("Reset filters");
     expect(recurring).toContain("No recurring tasks yet");
-    expect(recurring).not.toContain("Pause");
-    expect(recurring).not.toContain("Resume");
+    expect(recurring).toContain("Actions");
+    expect(recurring).toContain("Pause");
+    expect(recurring).toContain("Resume");
+    expect(recurring).toContain("Pausing...");
+    expect(recurring).toContain("Resuming...");
+    expect(recurring).toContain("Restore the board before resuming this recurring task.");
     expect(recurring).not.toContain("Delete");
+    expect(recurring).not.toContain(">Edit<");
+    const pauseDialog = readFileSync(
+      join(SRC_ROOT, "features/recurrence/components/pause-recurrence-dialog.tsx"),
+      "utf8",
+    );
+    expect(pauseDialog).toContain("Pause recurring task?");
+    expect(pauseDialog).toContain(
+      "Future occurrences will stop generating. Existing tasks and completed history will stay.",
+    );
+    const actionsHook = readFileSync(
+      join(SRC_ROOT, "features/recurrence/hooks/use-recurrence-series-actions.ts"),
+      "utf8",
+    );
+    expect(actionsHook).toContain("Recurring task paused");
+    expect(actionsHook).toContain("Recurring task resumed");
+    expect(actionsHook).toContain("Could not pause recurring task");
+    expect(actionsHook).toContain("Could not resume recurring task");
     expect(header).toContain("Create a status first");
     const newBoard = readFileSync(
       join(SRC_ROOT, "features/board/components/new-board-modal.tsx"),

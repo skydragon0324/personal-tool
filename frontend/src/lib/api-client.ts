@@ -185,7 +185,9 @@ export const apiClient = {
   },
 
   getRecurrenceSeries: (seriesId: string) =>
-    request<{ status: string }>(`/api/v1/task-recurrence/${seriesId}`),
+    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
+      `/api/v1/task-recurrence/${seriesId}`,
+    ),
 
   listRecurrenceSeries: (
     params: import("@/features/recurrence/types").RecurrenceSeriesListParams = {},
@@ -202,9 +204,16 @@ export const apiClient = {
   },
 
   stopRecurrence: (seriesId: string) =>
-    request<{ status: string }>(`/api/v1/task-recurrence/${seriesId}/stop`, {
-      method: "POST",
-    }),
+    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
+      `/api/v1/task-recurrence/${seriesId}/stop`,
+      { method: "POST" },
+    ),
+
+  resumeRecurrence: (seriesId: string) =>
+    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
+      `/api/v1/task-recurrence/${seriesId}/resume`,
+      { method: "POST" },
+    ),
 
   uploadAttachment: (taskId: string, file: File) => {
     const body = new FormData();

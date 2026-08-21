@@ -46,3 +46,27 @@ export interface RecurrenceSeriesListResponse {
   offset: number;
   limit: number;
 }
+
+export interface RecurrenceSeriesRead {
+  id: string;
+  board_id: string;
+  default_column_id: string | null;
+  category_id: string;
+  title: string;
+  priority: Priority;
+  duration_days: number;
+  timezone: string;
+  freq: RecurrenceFreq;
+  interval: number;
+  weekdays: number[];
+  month_day: number | null;
+  until_date: string | null;
+  occurrence_limit: number | null;
+  status: RecurrenceSeriesStatus;
+  dtstart: string;
+  generated_through: string | null;
+  next_occurrence_date: string | null;
+  open_count: number;
+  completed_count: number;
+  detached_count: number;
+}

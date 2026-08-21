@@ -5,10 +5,16 @@ import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api-client";
+
 import type { RecurrenceSeriesListItem, RecurrenceSeriesListResponse } from "../types";
 import { RecurringTasksPage } from "./recurring-tasks-page";
 
 const listRecurrenceSeries = vi.fn();
+const stopRecurrence = vi.fn();
+const resumeRecurrence = vi.fn();
+const notifyApiError = vi.fn();
+const notifySuccess = vi.fn();
 
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) =>
@@ -22,9 +28,16 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
     apiClient: {
       ...actual.apiClient,
       listRecurrenceSeries: (...args: unknown[]) => listRecurrenceSeries(...args),
+      stopRecurrence: (...args: unknown[]) => stopRecurrence(...args),
+      resumeRecurrence: (...args: unknown[]) => resumeRecurrence(...args),
     },
   };
 });
+
+vi.mock("@/lib/notify", () => ({
+  notifyApiError: (...args: unknown[]) => notifyApiError(...args),
+  notifySuccess: (...args: unknown[]) => notifySuccess(...args),
+}));
 
 vi.mock("@/features/board/hooks/use-boards", () => ({
   useBoards: () => ({
@@ -103,6 +116,12 @@ function wrap() {
 describe("Recurring tasks page", () => {
   beforeEach(() => {
     listRecurrenceSeries.mockReset();
+    stopRecurrence.mockReset();
+    resumeRecurrence.mockReset();
+    notifyApiError.mockReset();
+    notifySuccess.mockReset();
+    stopRecurrence.mockResolvedValue({ id: "series-1", status: "stopped" });
+    resumeRecurrence.mockResolvedValue({ id: "series-1", status: "active" });
   });
 
   it("shows a loading state", () => {
@@ -324,19 +343,236 @@ describe("Recurring tasks page", () => {
     }
   });
 
-  it("does not include Pause, Resume, Edit, or Delete actions", async () => {
+  it("shows Pause on active rows and Resume on stopped rows", async () => {
+    const user = userEvent.setup();
+    const stopped = series({
+      id: "series-stopped",
+      title: "Old chore",
+      status: "stopped",
+      next_occurrence_date: null,
+    });
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([stopped]);
+      return page([series()]);
+    });
+    wrap();
+    await screen.findAllByText("Weekly standup");
+    expect(screen.getAllByRole("button", { name: "Pause Weekly standup" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Resume Weekly standup" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete$/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Stopped" }));
+    expect(await screen.findAllByText("Old chore")).not.toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: "Resume Old chore" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Pause Old chore" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete$/ })).not.toBeInTheDocument();
+  });
+
+  it("opens a confirmation modal for Pause and does not call the API on cancel", async () => {
+    const user = userEvent.setup();
     listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
       if (params.status === "stopped") return page([]);
       return page([series()]);
     });
     wrap();
+    await user.click((await screen.findAllByRole("button", { name: "Pause Weekly standup" }))[0]);
+    const dialog = await screen.findByRole("dialog", { name: "Pause recurring task?" });
+    expect(dialog).toHaveTextContent(
+      "Future occurrences will stop generating. Existing tasks and completed history will stay.",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Pause recurring task?" })).not.toBeInTheDocument();
+    });
+    expect(stopRecurrence).not.toHaveBeenCalled();
+  });
+
+  it("calls the stop endpoint after Pause is confirmed", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([]);
+      return page([series()]);
+    });
+    wrap();
+    await user.click((await screen.findAllByRole("button", { name: "Pause Weekly standup" }))[0]);
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Pause" }));
+    await waitFor(() => {
+      expect(stopRecurrence).toHaveBeenCalledWith("series-1");
+    });
+    expect(resumeRecurrence).not.toHaveBeenCalled();
+  });
+
+  it("calls the resume endpoint without a confirmation modal", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") {
+        return page([series({ id: "series-stopped", title: "Old chore", status: "stopped" })]);
+      }
+      return page([]);
+    });
+    wrap();
+    await user.click(await screen.findByRole("tab", { name: "Stopped" }));
+    await user.click((await screen.findAllByRole("button", { name: "Resume Old chore" }))[0]);
+    await waitFor(() => {
+      expect(resumeRecurrence).toHaveBeenCalledWith("series-stopped");
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(stopRecurrence).not.toHaveBeenCalled();
+  });
+
+  it("keeps the current tab and board filter after a successful pause", async () => {
+    const user = userEvent.setup();
+    let paused = false;
+    listRecurrenceSeries.mockImplementation(
+      async (params: { status?: string; board_id?: string }) => {
+        if (params.status === "stopped") return page([]);
+        if (paused) return page([]);
+        return page([series()]);
+      },
+    );
+    stopRecurrence.mockImplementation(async () => {
+      paused = true;
+      return { id: "series-1", status: "stopped" };
+    });
+    wrap();
     await screen.findAllByText("Weekly standup");
-    expect(screen.queryByRole("button", { name: "Pause" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Pause" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Resume" })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Board"), "board-work");
+    await user.click(screen.getAllByRole("button", { name: "Pause Weekly standup" })[0]);
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Pause" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Pause Weekly standup" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("tab", { name: "Active" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Board")).toHaveValue("board-work");
+  });
+
+  it("keeps the row unchanged when pause fails", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([]);
+      return page([series()]);
+    });
+    stopRecurrence.mockRejectedValue(new ApiError("Could not pause", 500));
+    wrap();
+    await user.click((await screen.findAllByRole("button", { name: "Pause Weekly standup" }))[0]);
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Pause" }));
+    await waitFor(() => {
+      expect(notifyApiError).toHaveBeenCalled();
+    });
+    expect(screen.getAllByRole("button", { name: "Pause Weekly standup" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Weekly standup").length).toBeGreaterThan(0);
+  });
+
+  it("shows a 409 resume error from the backend", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") {
+        return page([series({ id: "series-stopped", title: "Old chore", status: "stopped" })]);
+      }
+      return page([]);
+    });
+    resumeRecurrence.mockRejectedValue(
+      new ApiError("This series has no remaining occurrences to resume.", 409),
+    );
+    wrap();
+    await user.click(await screen.findByRole("tab", { name: "Stopped" }));
+    await user.click((await screen.findAllByRole("button", { name: "Resume Old chore" }))[0]);
+    await waitFor(() => {
+      expect(notifyApiError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "This series has no remaining occurrences to resume.",
+          status: 409,
+        }),
+        "Could not resume recurring task",
+      );
+    });
+    expect(screen.getAllByRole("button", { name: "Resume Old chore" }).length).toBeGreaterThan(0);
+  });
+
+  it("disables Resume on an archived board and explains why", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") {
+        return page([
+          series({
+            id: "series-archived",
+            title: "Old chore",
+            status: "stopped",
+            board_archived: true,
+            board_name: "Legacy",
+          }),
+        ]);
+      }
+      return page([]);
+    });
+    wrap();
+    await user.click(await screen.findByRole("tab", { name: "Stopped" }));
+    const buttons = await screen.findAllByRole("button", { name: "Resume Old chore" });
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription(
+        "Restore the board before resuming this recurring task.",
+      );
+    }
+    expect(
+      screen.getAllByText("Restore the board before resuming this recurring task.").length,
+    ).toBeGreaterThan(0);
+    expect(resumeRecurrence).not.toHaveBeenCalled();
+  });
+
+  it("does not allow a second Pause while the first request is pending", async () => {
+    const user = userEvent.setup();
+    let resolveStop: ((value: unknown) => void) | undefined;
+    stopRecurrence.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStop = resolve;
+        }),
+    );
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([]);
+      return page([series()]);
+    });
+    wrap();
+    await user.click((await screen.findAllByRole("button", { name: "Pause Weekly standup" }))[0]);
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Pause" }));
+    await waitFor(() => {
+      expect(screen.getAllByText("Pausing...").length).toBeGreaterThan(0);
+    });
+    const pendingButtons = screen.getAllByRole("button", { name: "Pause Weekly standup" });
+    for (const button of pendingButtons) {
+      expect(button).toBeDisabled();
+    }
+    await user.click(pendingButtons[0]);
+    expect(stopRecurrence).toHaveBeenCalledTimes(1);
+    resolveStop?.({ id: "series-1", status: "stopped" });
+  });
+
+  it("shows Pause on mobile cards", async () => {
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([]);
+      return page([series()]);
+    });
+    wrap();
+    const cards = await screen.findAllByRole("listitem");
+    expect(within(cards[0]).getByRole("button", { name: "Pause Weekly standup" })).toBeInTheDocument();
+  });
+
+  it("shows Resume on mobile cards", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") {
+        return page([series({ id: "series-stopped", title: "Old chore", status: "stopped" })]);
+      }
+      return page([]);
+    });
+    wrap();
+    await user.click(await screen.findByRole("tab", { name: "Stopped" }));
+    const cards = await screen.findAllByRole("listitem");
+    expect(within(cards[0]).getByRole("button", { name: "Resume Old chore" })).toBeInTheDocument();
   });
 
   it("shows a board-specific empty state", async () => {

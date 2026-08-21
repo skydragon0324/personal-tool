@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
 import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
+import { recurrenceKeys } from "@/features/recurrence/api/recurrence-queries";
 import { todayKeys } from "@/features/today/api/today-queries";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
@@ -21,6 +22,7 @@ export function useTaskMutations(
     void queryClient.invalidateQueries({ queryKey: todayKeys.all });
     void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     void queryClient.invalidateQueries({ queryKey: boardKeys.views(params.boardId) });
+    void queryClient.invalidateQueries({ queryKey: recurrenceKeys.all });
   }
 
   const create = useMutation({

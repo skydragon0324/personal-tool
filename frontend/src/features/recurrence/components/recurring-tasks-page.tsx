@@ -2,13 +2,14 @@
 
 import { Button, Loader, Skeleton, Text } from "@mantine/core";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { activeBoards, useBoards } from "@/features/board/hooks/use-boards";
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
 import { PageHeader } from "@/features/shell/components/page-header";
 import { formatLongDate } from "@/lib/dates";
 
+import { useRecurrenceSeriesActions } from "../hooks/use-recurrence-series-actions";
 import { useRecurrenceSeriesList, useRecurrenceSeriesSummary } from "../hooks/use-recurrence-series";
 import type {
   RecurrenceSeriesListItem,
@@ -16,6 +17,7 @@ import type {
   RecurrenceSeriesTab,
 } from "../types";
 import { formatRecurrenceRule } from "../utils/format-recurrence";
+import { PauseRecurrenceDialog } from "./pause-recurrence-dialog";
 
 const PAGE_SIZES: RecurrenceSeriesPageSize[] = [25, 50, 100];
 
@@ -45,7 +47,39 @@ export function RecurringTasksPage() {
   );
   const listQuery = useRecurrenceSeriesList(listParams);
   const summary = useRecurrenceSeriesSummary(boardId || undefined);
+  const { pause, resume } = useRecurrenceSeriesActions();
+  const [pendingPause, setPendingPause] = useState<RecurrenceSeriesListItem | null>(null);
   const data = listQuery.data;
+
+  const pendingSeriesId = pause.isPending
+    ? pause.variables?.seriesId
+    : resume.isPending
+      ? resume.variables?.seriesId
+      : undefined;
+  const pendingKind = pause.isPending ? "pause" : resume.isPending ? "resume" : null;
+
+  function closePauseDialog() {
+    setPendingPause(null);
+  }
+
+  function confirmPause() {
+    if (!pendingPause || pause.isPending) return;
+    const series = pendingPause;
+    pause.mutate(
+      { seriesId: series.id, boardId: series.board_id },
+      { onSettled: () => setPendingPause(null) },
+    );
+  }
+
+  function requestPause(item: RecurrenceSeriesListItem) {
+    if (pendingSeriesId === item.id) return;
+    setPendingPause(item);
+  }
+
+  function requestResume(item: RecurrenceSeriesListItem) {
+    if (pendingSeriesId === item.id || item.board_archived) return;
+    resume.mutate({ seriesId: item.id, boardId: item.board_id });
+  }
 
   useEffect(() => {
     if (!data) return;
@@ -131,12 +165,22 @@ export function RecurringTasksPage() {
               data={data}
               summaryActive={summary.activeCount}
               summaryStopped={summary.stoppedCount}
+              pendingSeriesId={pendingSeriesId}
+              pendingKind={pendingKind}
+              onPause={requestPause}
+              onResume={requestResume}
               onPrevious={() => setOffset(Math.max(0, offset - limit))}
               onNext={() => setOffset(offset + limit)}
             />
           ) : null}
         </div>
       </div>
+      <PauseRecurrenceDialog
+        title={pendingPause?.title ?? null}
+        submitting={pause.isPending}
+        onConfirm={confirmPause}
+        onClose={closePauseDialog}
+      />
     </div>
   );
 }
@@ -287,6 +331,10 @@ function Results({
   data,
   summaryActive,
   summaryStopped,
+  pendingSeriesId,
+  pendingKind,
+  onPause,
+  onResume,
   onPrevious,
   onNext,
 }: {
@@ -296,6 +344,10 @@ function Results({
   data: { items: RecurrenceSeriesListItem[]; total: number; offset: number; limit: number };
   summaryActive: number;
   summaryStopped: number;
+  pendingSeriesId?: string;
+  pendingKind: "pause" | "resume" | null;
+  onPause: (item: RecurrenceSeriesListItem) => void;
+  onResume: (item: RecurrenceSeriesListItem) => void;
   onPrevious: () => void;
   onNext: () => void;
 }) {
@@ -318,8 +370,20 @@ function Results({
 
   return (
     <div className="space-y-4">
-      <SeriesTable items={data.items} />
-      <SeriesCards items={data.items} />
+      <SeriesTable
+        items={data.items}
+        pendingSeriesId={pendingSeriesId}
+        pendingKind={pendingKind}
+        onPause={onPause}
+        onResume={onResume}
+      />
+      <SeriesCards
+        items={data.items}
+        pendingSeriesId={pendingSeriesId}
+        pendingKind={pendingKind}
+        onPause={onPause}
+        onResume={onResume}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Text size="sm" c="dimmed">
           Showing {from}–{to} of {data.total}
@@ -397,10 +461,22 @@ function EmptyCopy({ title, body }: { title: string; body: string }) {
   );
 }
 
-function SeriesTable({ items }: { items: RecurrenceSeriesListItem[] }) {
+function SeriesTable({
+  items,
+  pendingSeriesId,
+  pendingKind,
+  onPause,
+  onResume,
+}: {
+  items: RecurrenceSeriesListItem[];
+  pendingSeriesId?: string;
+  pendingKind: "pause" | "resume" | null;
+  onPause: (item: RecurrenceSeriesListItem) => void;
+  onResume: (item: RecurrenceSeriesListItem) => void;
+}) {
   return (
     <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[920px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-[var(--app-border)] text-xs text-[var(--app-text-muted)]">
             <th className="py-2 pr-3 font-medium">Task</th>
@@ -408,7 +484,8 @@ function SeriesTable({ items }: { items: RecurrenceSeriesListItem[] }) {
             <th className="py-2 pr-3 font-medium">Repeat</th>
             <th className="py-2 pr-3 font-medium">Next occurrence</th>
             <th className="py-2 pr-3 font-medium">Progress</th>
-            <th className="py-2 font-medium">Status</th>
+            <th className="py-2 pr-3 font-medium">Status</th>
+            <th className="py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -425,8 +502,17 @@ function SeriesTable({ items }: { items: RecurrenceSeriesListItem[] }) {
               <td className="py-3 pr-3">
                 <ProgressCounts item={item} />
               </td>
-              <td className="py-3">
+              <td className="py-3 pr-3">
                 <StatusBadges item={item} />
+              </td>
+              <td className="py-3">
+                <SeriesActions
+                  item={item}
+                  pending={pendingSeriesId === item.id}
+                  pendingKind={pendingSeriesId === item.id ? pendingKind : null}
+                  onPause={onPause}
+                  onResume={onResume}
+                />
               </td>
             </tr>
           ))}
@@ -436,7 +522,19 @@ function SeriesTable({ items }: { items: RecurrenceSeriesListItem[] }) {
   );
 }
 
-function SeriesCards({ items }: { items: RecurrenceSeriesListItem[] }) {
+function SeriesCards({
+  items,
+  pendingSeriesId,
+  pendingKind,
+  onPause,
+  onResume,
+}: {
+  items: RecurrenceSeriesListItem[];
+  pendingSeriesId?: string;
+  pendingKind: "pause" | "resume" | null;
+  onPause: (item: RecurrenceSeriesListItem) => void;
+  onResume: (item: RecurrenceSeriesListItem) => void;
+}) {
   return (
     <ul className="space-y-3 md:hidden">
       {items.map((item) => (
@@ -451,10 +549,72 @@ function SeriesCards({ items }: { items: RecurrenceSeriesListItem[] }) {
             <p>{nextOccurrenceLabel(item)}</p>
             <ProgressCounts item={item} />
             <StatusBadges item={item} />
+            <SeriesActions
+              item={item}
+              pending={pendingSeriesId === item.id}
+              pendingKind={pendingSeriesId === item.id ? pendingKind : null}
+              onPause={onPause}
+              onResume={onResume}
+            />
           </div>
         </li>
       ))}
     </ul>
+  );
+}
+
+function SeriesActions({
+  item,
+  pending,
+  pendingKind,
+  onPause,
+  onResume,
+}: {
+  item: RecurrenceSeriesListItem;
+  pending: boolean;
+  pendingKind: "pause" | "resume" | null;
+  onPause: (item: RecurrenceSeriesListItem) => void;
+  onResume: (item: RecurrenceSeriesListItem) => void;
+}) {
+  if (item.status === "active") {
+    return (
+      <Button
+        size="xs"
+        variant="light"
+        disabled={pending}
+        loading={pending && pendingKind === "pause"}
+        onClick={() => onPause(item)}
+        aria-label={`Pause ${item.title}`}
+      >
+        {pending && pendingKind === "pause" ? "Pausing..." : "Pause"}
+      </Button>
+    );
+  }
+
+  if (item.status !== "stopped") return null;
+
+  const blockedByArchive = item.board_archived;
+  const hintId = useId();
+  return (
+    <div className="flex min-w-[9.5rem] flex-col items-start gap-1">
+      <Button
+        size="xs"
+        variant="light"
+        disabled={pending || blockedByArchive}
+        loading={pending && pendingKind === "resume"}
+        onClick={() => onResume(item)}
+        aria-label={`Resume ${item.title}`}
+        aria-describedby={blockedByArchive ? hintId : undefined}
+        title={blockedByArchive ? "Restore the board before resuming this recurring task." : undefined}
+      >
+        {pending && pendingKind === "resume" ? "Resuming..." : "Resume"}
+      </Button>
+      {blockedByArchive ? (
+        <p id={hintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
+          Restore the board before resuming this recurring task.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
