@@ -114,7 +114,7 @@ def get_board_view(
         from app.services.recurrence_service import fill_user_series
 
         fill_user_series(db, user_id, start=range_start, end=range_end, board_id=board.id)
-        db.flush()
+        db.commit()
 
     columns = sorted(
         [column for column in board.columns if column.archived_at is None],

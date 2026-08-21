@@ -129,7 +129,7 @@ def _next_position(db: Session, column_id: uuid.UUID) -> int:
     max_pos = db.scalar(
         select(func.coalesce(func.max(Task.position), -1)).where(Task.column_id == column_id)
     )
-    return int(max_pos or -1) + 1
+    return int(max_pos if max_pos is not None else -1) + 1
 
 
 def _clone_content(content: dict | None) -> dict | None:
