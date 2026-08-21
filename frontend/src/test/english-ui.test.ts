@@ -250,5 +250,12 @@ describe("English UI copy", () => {
       "utf8",
     );
     expect(drawer).toContain("Stop repeating");
+    const taskForm = readFileSync(
+      join(SRC_ROOT, "features/tasks/components/task-form.tsx"),
+      "utf8",
+    );
+    expect(taskForm).toContain("Stop repeating?");
+    expect(taskForm).toContain("This series will stop repeating. Existing tasks are kept.");
+    expect(taskForm).toContain("if (recurrence === null)");
   });
 });

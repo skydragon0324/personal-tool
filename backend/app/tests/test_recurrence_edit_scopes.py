@@ -600,3 +600,611 @@ def test_duration_and_template_propagate_to_future_generated(edit_board) -> None
     assert generated.start_date == future
     assert generated.due_date == date(2026, 10, 25)
     assert generated.id != selected.id
+
+
+def _weekly_rule(*, weekday: int = 4) -> RecurrenceInput:
+    """Match TaskForm `buildRecurrenceInput` for Repeat: Weekly."""
+    return RecurrenceInput(freq="weekly", interval=1, weekdays=[weekday])
+
+
+def _form_payload(
+    *,
+    title: str,
+    start: date,
+    due: date,
+    category_id: UUID,
+    edit_scope: str,
+    recurrence: RecurrenceInput | None,
+    priority: Priority = Priority.medium,
+    content: dict | None = None,
+    links: list[TaskLinkInput] | None = None,
+) -> TaskUpdate:
+    """Reproduce the full PATCH body TaskForm always sends on save."""
+    return TaskUpdate(
+        title=title,
+        description=None,
+        content=content,
+        start_date=start,
+        due_date=due,
+        priority=priority,
+        category_id=category_id,
+        links=links or [],
+        edit_scope=edit_scope,  # type: ignore[arg-type]
+        recurrence=recurrence,
+    )
+
+
+def _attached_dates(engine: Engine, series_id: UUID) -> dict[UUID, tuple[date, date, date]]:
+    with independent_session(engine) as db:
+        rows = list(
+            db.scalars(
+                select(Task).where(
+                    Task.recurrence_series_id == series_id,
+                    Task.is_detached.is_(False),
+                    Task.completed_at.is_(None),
+                )
+            ).all()
+        )
+        return {
+            item.id: (item.original_occurrence_date, item.occurrence_date, item.start_date)
+            for item in rows
+            if item.original_occurrence_date and item.occurrence_date
+        }
+
+
+def _series_ids_on_board(engine: Engine, board_id: UUID) -> set[UUID]:
+    with independent_session(engine) as db:
+        return set(db.scalars(select(TaskRecurrenceSeries.id).where(TaskRecurrenceSeries.board_id == board_id)).all())
+
+
+def test_form_payload_title_only_this_and_future_does_not_split(edit_board) -> None:
+    engine, board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    first = _occurrence(engine, series_id, FRIDAY)
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    later = _occurrence(engine, series_id, THIRD_FRIDAY)
+    before_ids = {first.id, selected.id, later.id}
+    before_series = _series_ids_on_board(engine, board_id)
+
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Renamed",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="this_and_future",
+            recurrence=_weekly_rule(weekday=4),
+        ),
+    )
+
+    after_series = _series_ids_on_board(engine, board_id)
+    assert after_series == before_series
+    with independent_session(engine) as db:
+        assert db.get(Task, first.id) is not None
+        assert db.get(Task, selected.id) is not None
+        assert db.get(Task, later.id) is not None
+        assert {first.id, selected.id, later.id} == before_ids
+        first_row = db.get(Task, first.id)
+        selected_row = db.get(Task, selected.id)
+        later_row = db.get(Task, later.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert first_row is not None and selected_row is not None and later_row is not None and series is not None
+        assert first_row.title == "Weekly"
+        assert selected_row.title == "Renamed"
+        assert later_row.title == "Renamed"
+        assert selected_row.recurrence_series_id == series_id
+        assert later_row.recurrence_series_id == series_id
+        assert series.freq == "weekly"
+        assert series.weekdays == [4]
+        assert series.dtstart == FRIDAY
+        assert selected_row.original_occurrence_date == selected_row.occurrence_date == selected_row.start_date == NEXT_FRIDAY
+
+
+def test_form_payload_title_only_series_does_not_purge_or_remap(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    before = _attached_dates(engine, series_id)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Series rename",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="series",
+            recurrence=_weekly_rule(weekday=4),
+        ),
+    )
+    after = _attached_dates(engine, series_id)
+    assert after.keys() == before.keys()
+    assert after == before
+    with independent_session(engine) as db:
+        series = db.get(TaskRecurrenceSeries, series_id)
+        selected_row = db.get(Task, selected.id)
+        assert series is not None and selected_row is not None
+        assert series.title == "Series rename"
+        assert selected_row.title == "Series rename"
+        assert selected_row.original_occurrence_date == NEXT_FRIDAY
+        assert selected_row.start_date == NEXT_FRIDAY
+        assert selected_row.occurrence_date == NEXT_FRIDAY
+
+
+def test_form_payload_series_friday_to_monday_keeps_history_and_aligns_dates(edit_board) -> None:
+    engine, _board_id, column_id, done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Friday")
+    first = _occurrence(engine, series_id, FRIDAY)
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    later = _occurrence(engine, series_id, THIRD_FRIDAY)
+    _complete(engine, first.id, done_id, first.version)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Friday",
+            start=MONDAY,
+            due=MONDAY,
+            category_id=category_id,
+            edit_scope="series",
+            recurrence=_weekly_rule(weekday=0),
+        ),
+    )
+    with independent_session(engine) as db:
+        completed = db.get(Task, first.id)
+        selected_row = db.get(Task, selected.id)
+        later_row = db.get(Task, later.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert completed is not None and selected_row is not None and series is not None
+        assert later_row is None
+        assert completed.completed_at is not None
+        assert completed.original_occurrence_date == FRIDAY
+        assert completed.start_date == FRIDAY
+        assert completed.recurrence_series_id == series_id
+        assert series.freq == "weekly"
+        assert series.weekdays == [0]
+        assert series.dtstart == FRIDAY
+        open_rows = list(
+            db.scalars(
+                select(Task).where(
+                    Task.recurrence_series_id == series_id,
+                    Task.completed_at.is_(None),
+                    Task.is_detached.is_(False),
+                )
+            ).all()
+        )
+        assert open_rows
+        for item in open_rows:
+            assert item.original_occurrence_date == item.occurrence_date == item.start_date
+            assert item.original_occurrence_date is not None
+            assert item.original_occurrence_date.weekday() == 0
+        assert selected_row.original_occurrence_date == selected_row.start_date
+        assert selected_row.original_occurrence_date is not None
+        assert selected_row.original_occurrence_date.weekday() == 0
+
+
+def test_form_payload_this_and_future_friday_to_monday_splits_once(edit_board) -> None:
+    engine, board_id, column_id, done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Friday")
+    first = _occurrence(engine, series_id, FRIDAY)
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    later = _occurrence(engine, series_id, THIRD_FRIDAY)
+    _complete(engine, first.id, done_id, first.version)
+    result = _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Monday",
+            start=MONDAY,
+            due=MONDAY,
+            category_id=category_id,
+            edit_scope="this_and_future",
+            recurrence=_weekly_rule(weekday=0),
+        ),
+    )
+    assert result.recurrence is not None
+    new_series_id = result.recurrence.series_id
+    assert new_series_id != series_id
+    with independent_session(engine) as db:
+        old_series = db.get(TaskRecurrenceSeries, series_id)
+        new_series = db.get(TaskRecurrenceSeries, new_series_id)
+        selected_row = db.get(Task, selected.id)
+        later_row = db.get(Task, later.id)
+        first_row = db.get(Task, first.id)
+        assert old_series is not None and new_series is not None and selected_row is not None and first_row is not None
+        assert old_series.until_date == date(2026, 8, 27)
+        assert new_series.dtstart == MONDAY
+        assert new_series.weekdays == [0]
+        assert later_row is None
+        assert selected_row.recurrence_series_id == new_series_id
+        assert first_row.recurrence_series_id == series_id
+        new_dates = [
+            item.original_occurrence_date
+            for item in db.scalars(select(Task).where(Task.recurrence_series_id == new_series_id)).all()
+        ]
+        assert len(new_dates) == len(set(new_dates))
+        assert all(item is not None and item.weekday() == 0 for item in new_dates)
+        assert selected_row.original_occurrence_date == selected_row.occurrence_date == selected_row.start_date
+    assert len(_series_ids_on_board(engine, board_id)) == 2
+
+
+def test_far_future_occurrence_survives_unchanged_series_form_edit(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    far = date(2028, 1, 7)
+    assert far.weekday() == 4
+    with independent_session(engine) as db:
+        recurrence_service.generate_for_request(db, BOOTSTRAP_USER_ID, series_id, far, far)
+    far_task = _occurrence(engine, series_id, far)
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Still weekly",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="series",
+            recurrence=_weekly_rule(weekday=4),
+        ),
+    )
+    with independent_session(engine) as db:
+        persisted = db.get(Task, far_task.id)
+        assert persisted is not None
+        assert persisted.original_occurrence_date == far
+        assert persisted.start_date == far
+        assert persisted.occurrence_date == far
+        assert persisted.title == "Still weekly"
+
+
+def test_form_payload_generation_after_edit_is_idempotent(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Renamed",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="this_and_future",
+            recurrence=_weekly_rule(weekday=4),
+        ),
+    )
+    with independent_session(engine) as db:
+        first = recurrence_service.generate_for_request(
+            db, BOOTSTRAP_USER_ID, series_id, FRIDAY, date(2026, 10, 23)
+        )
+        assert first.created >= 0
+    with independent_session(engine) as db:
+        second = recurrence_service.generate_for_request(
+            db, BOOTSTRAP_USER_ID, series_id, FRIDAY, date(2026, 10, 23)
+        )
+        assert second.created == 0
+        rows = list(db.scalars(select(Task).where(Task.recurrence_series_id == series_id)).all())
+        originals = [item.original_occurrence_date for item in rows]
+        assert len(originals) == len(set(originals))
+
+
+def test_form_payload_unchanged_this_does_not_detach(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title=selected.title,
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="this",
+            recurrence=_weekly_rule(weekday=4),
+        ),
+    )
+    with independent_session(engine) as db:
+        row = db.get(Task, selected.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert row is not None and series is not None
+        assert row.is_detached is False
+        assert row.title == "Weekly"
+        assert series.title == "Weekly"
+        assert series.weekdays == [4]
+
+
+def test_form_payload_title_change_this_does_detach(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Only this",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="this",
+            recurrence=_weekly_rule(weekday=4),
+        ),
+    )
+    with independent_session(engine) as db:
+        row = db.get(Task, selected.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert row is not None and series is not None
+        assert row.is_detached is True
+        assert row.title == "Only this"
+        assert series.title == "Weekly"
+
+
+def test_form_payload_cannot_cross_user_or_board(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Private")
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    other_id = None
+    other_board_id = None
+    try:
+        with independent_session(engine) as db:
+            other = User(
+                email=f"form-other-{uuid4().hex[:8]}@example.com",
+                display_name="Other",
+                password_hash="x",
+                timezone="UTC",
+            )
+            db.add(other)
+            db.commit()
+            db.refresh(other)
+            other_id = other.id
+            other_board = board_service.create_board(
+                db, BOOTSTRAP_USER_ID, BoardCreate(name=f"Recur edit other {uuid4().hex[:8]}")
+            )
+            db.commit()
+            other_board_id = other_board.id
+            other_category = db.scalar(select(Category).where(Category.board_id == other_board_id))
+            assert other_category is not None
+            other_category_id = other_category.id
+        payload = _form_payload(
+            title="Stolen",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="series",
+            recurrence=_weekly_rule(weekday=4),
+        )
+        with independent_session(engine) as db:
+            with pytest.raises(HTTPException) as exc:
+                task_service.update_task(db, other_id, selected.id, payload)
+            assert exc.value.status_code == 404
+        with pytest.raises(HTTPException) as exc:
+            _patch(
+                engine,
+                selected.id,
+                _form_payload(
+                    title="Private",
+                    start=selected.start_date,
+                    due=selected.due_date,
+                    category_id=other_category_id,
+                    edit_scope="this_and_future",
+                    recurrence=_weekly_rule(weekday=4),
+                ),
+            )
+        assert exc.value.status_code == 422
+        with independent_session(engine) as db:
+            task = db.get(Task, selected.id)
+            assert task is not None
+            assert task.title == "Private"
+            assert task.category_id == category_id
+    finally:
+        if other_board_id is not None:
+            _delete_board(engine, other_board_id)
+        if other_id is not None:
+            with independent_session(engine) as db:
+                row = db.get(User, other_id)
+                if row is not None:
+                    db.delete(row)
+                    db.commit()
+
+
+def _monthly_rule() -> RecurrenceInput:
+    """Match TaskForm monthly preset: month_day is inferred from start_date."""
+    return RecurrenceInput(freq="monthly", interval=1)
+
+
+def _yearly_rule() -> RecurrenceInput:
+    """Match TaskForm yearly preset: month and day are inferred from start_date."""
+    return RecurrenceInput(freq="yearly", interval=1)
+
+
+SEPTEMBER_15 = date(2026, 9, 15)
+SEPTEMBER_21 = date(2026, 9, 21)
+OCTOBER_15 = date(2026, 10, 15)
+YEARLY_MONTH_ERROR = "Yearly month cannot be changed for the entire series"
+
+
+def test_form_payload_explicit_null_stops_repeating(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(engine, column_id=column_id, category_id=category_id, title="Weekly")
+    selected = _occurrence(engine, series_id, NEXT_FRIDAY)
+    before = _dates(engine, series_id)
+    assert before
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title=selected.title,
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="this",
+            recurrence=None,
+        ),
+    )
+    with independent_session(engine) as db:
+        row = db.get(Task, selected.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert row is not None and series is not None
+        assert series.status == "stopped"
+        assert row.is_detached is False
+        assert row.recurrence_series_id == series_id
+        assert row.title == "Weekly"
+    assert _dates(engine, series_id) == before
+    with independent_session(engine) as db:
+        generated = recurrence_service.generate_for_request(
+            db, BOOTSTRAP_USER_ID, series_id, FRIDAY, date(2026, 10, 23)
+        )
+        assert generated.created == 0
+
+
+def test_form_payload_unchanged_monthly_is_not_a_rule_change(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(
+        engine,
+        column_id=column_id,
+        category_id=category_id,
+        title="Monthly",
+        start=FRIDAY,
+        recurrence=_monthly_rule(),
+    )
+    selected = _occurrence(engine, series_id, SEPTEMBER_21)
+    before = _dates(engine, series_id)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Monthly",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="series",
+            recurrence=_monthly_rule(),
+        ),
+    )
+    with independent_session(engine) as db:
+        row = db.get(Task, selected.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert row is not None and series is not None
+        assert series.freq == "monthly"
+        assert series.month_day == 21
+        assert series.dtstart == FRIDAY
+        assert row.original_occurrence_date == SEPTEMBER_21
+        assert row.start_date == SEPTEMBER_21
+        assert row.is_detached is False
+    assert _dates(engine, series_id) == before
+
+
+def test_form_payload_monthly_day_change_is_detected(edit_board) -> None:
+    engine, board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(
+        engine,
+        column_id=column_id,
+        category_id=category_id,
+        title="Monthly",
+        start=FRIDAY,
+        recurrence=_monthly_rule(),
+    )
+    selected = _occurrence(engine, series_id, SEPTEMBER_21)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Monthly",
+            start=SEPTEMBER_15,
+            due=SEPTEMBER_15,
+            category_id=category_id,
+            edit_scope="this_and_future",
+            recurrence=_monthly_rule(),
+        ),
+    )
+    with independent_session(engine) as db:
+        old_series = db.get(TaskRecurrenceSeries, series_id)
+        selected_row = db.get(Task, selected.id)
+        assert old_series is not None and selected_row is not None
+        assert old_series.until_date == date(2026, 9, 20)
+        assert old_series.month_day == 21
+        new_series = db.get(TaskRecurrenceSeries, selected_row.recurrence_series_id)
+        assert new_series is not None
+        assert new_series.id != series_id
+        assert new_series.freq == "monthly"
+        assert new_series.month_day == 15
+        assert new_series.dtstart == OCTOBER_15
+        assert selected_row.original_occurrence_date == OCTOBER_15
+        assert selected_row.start_date == OCTOBER_15
+        assert selected_row.is_detached is False
+    assert len(_series_ids_on_board(engine, board_id)) == 2
+
+
+def test_form_payload_unchanged_yearly_is_not_a_rule_change(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(
+        engine,
+        column_id=column_id,
+        category_id=category_id,
+        title="Yearly",
+        start=FRIDAY,
+        recurrence=_yearly_rule(),
+    )
+    selected = _occurrence(engine, series_id, FRIDAY)
+    before = _dates(engine, series_id)
+    _patch(
+        engine,
+        selected.id,
+        _form_payload(
+            title="Yearly",
+            start=selected.start_date,
+            due=selected.due_date,
+            category_id=category_id,
+            edit_scope="series",
+            recurrence=_yearly_rule(),
+        ),
+    )
+    with independent_session(engine) as db:
+        row = db.get(Task, selected.id)
+        series = db.get(TaskRecurrenceSeries, series_id)
+        assert row is not None and series is not None
+        assert series.freq == "yearly"
+        assert series.month_day == 21
+        assert series.dtstart == FRIDAY
+        assert series.dtstart.month == 8
+        assert row.original_occurrence_date == FRIDAY
+        assert row.is_detached is False
+    assert _dates(engine, series_id) == before
+
+
+def test_form_payload_yearly_month_change_series_returns_validation_error(edit_board) -> None:
+    engine, _board_id, column_id, _done_id, category_id = edit_board
+    series_id = _create_series(
+        engine,
+        column_id=column_id,
+        category_id=category_id,
+        title="Yearly",
+        start=FRIDAY,
+        recurrence=_yearly_rule(),
+    )
+    selected = _occurrence(engine, series_id, FRIDAY)
+    with pytest.raises(HTTPException) as exc:
+        _patch(
+            engine,
+            selected.id,
+            _form_payload(
+                title="Yearly",
+                start=SEPTEMBER_15,
+                due=SEPTEMBER_15,
+                category_id=category_id,
+                edit_scope="series",
+                recurrence=_yearly_rule(),
+            ),
+        )
+    assert exc.value.status_code == 422
+    assert YEARLY_MONTH_ERROR in str(exc.value.detail)
+    with independent_session(engine) as db:
+        series = db.get(TaskRecurrenceSeries, series_id)
+        row = db.get(Task, selected.id)
+        assert series is not None and row is not None
+        assert series.dtstart == FRIDAY
+        assert series.month_day == 21
+        assert row.original_occurrence_date == FRIDAY

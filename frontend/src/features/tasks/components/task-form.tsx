@@ -101,6 +101,7 @@ export function TaskForm({
   const [untilDate, setUntilDate] = useState<string | null>(null);
   const [occurrenceCount, setOccurrenceCount] = useState(10);
   const [pendingScopePayload, setPendingScopePayload] = useState<TaskCreate | null>(null);
+  const [pendingStopPayload, setPendingStopPayload] = useState<TaskCreate | null>(null);
   const [taskStartDate, setTaskStartDate] = useState(initial?.start_date ?? todayISO());
   const [taskDueDate, setTaskDueDate] = useState(initial?.due_date ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -325,6 +326,10 @@ export function TaskForm({
         recurrence,
       };
       if (initial?.recurrence?.series_id) {
+        if (recurrence === null) {
+          setPendingStopPayload(payload);
+          return;
+        }
         setPendingScopePayload(payload);
         return;
       }
@@ -749,6 +754,39 @@ export function TaskForm({
           void submitPayload(next);
         }}
       />
+      <Modal
+        opened={pendingStopPayload !== null}
+        onClose={() => setPendingStopPayload(null)}
+        title="Stop repeating?"
+        size="sm"
+      >
+        <Stack>
+          <Text size="sm">
+            This series will stop repeating. Existing tasks are kept.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" type="button" onClick={() => setPendingStopPayload(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={submitting}
+              onClick={() => {
+                if (!pendingStopPayload) return;
+                const next: TaskCreate = {
+                  ...pendingStopPayload,
+                  recurrence: null,
+                };
+                delete next.edit_scope;
+                setPendingStopPayload(null);
+                void submitPayload(next);
+              }}
+            >
+              Stop repeating
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </form>
   );
 }

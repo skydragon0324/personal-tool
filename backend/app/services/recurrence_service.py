@@ -602,8 +602,137 @@ def _priority_value(priority: object) -> str:
     return priority.value if hasattr(priority, "value") else str(priority)
 
 
-def _rule_dates(series: TaskRecurrenceSeries, *, until: date) -> set[date]:
-    return set(list_occurrence_dates(series, until=until, after=series.dtstart))
+def _normalized_weekdays(weekdays: list[int] | None, *, freq: str, dtstart: date) -> tuple[int, ...]:
+    days = sorted({int(day) for day in (weekdays or []) if 0 <= int(day) <= 6})
+    if freq == "weekly" and not days:
+        days = [dtstart.weekday()]
+    if freq != "weekly":
+        return ()
+    return tuple(days)
+
+
+def _normalized_month_day(month_day: int | None, *, freq: str, dtstart: date) -> int | None:
+    if freq not in {"monthly", "yearly"}:
+        return None
+    return int(month_day) if month_day is not None else dtstart.day
+
+
+def _rule_signature(
+    *,
+    freq: str,
+    interval: int,
+    weekdays: list[int] | None,
+    month_day: int | None,
+    until_date: date | None,
+    occurrence_limit: int | None,
+    dtstart: date,
+) -> tuple[object, ...]:
+    return (
+        freq,
+        int(interval),
+        _normalized_weekdays(weekdays, freq=freq, dtstart=dtstart),
+        _normalized_month_day(month_day, freq=freq, dtstart=dtstart),
+        dtstart.month if freq == "yearly" else None,
+        until_date,
+        occurrence_limit,
+    )
+
+
+def _recurrence_rule_changed(
+    series: TaskRecurrenceSeries,
+    rule: RecurrenceInput | None,
+    *,
+    incoming_dtstart: date | None = None,
+) -> bool:
+    if rule is None:
+        return False
+    incoming_anchor = incoming_dtstart or series.dtstart
+    current = _rule_signature(
+        freq=series.freq,
+        interval=series.interval,
+        weekdays=list(series.weekdays or []),
+        month_day=series.month_day,
+        until_date=series.until_date,
+        occurrence_limit=series.occurrence_limit,
+        dtstart=series.dtstart,
+    )
+    incoming = _rule_signature(
+        freq=rule.freq,
+        interval=rule.interval,
+        weekdays=list(rule.weekdays or []),
+        month_day=rule.month_day,
+        until_date=rule.until_date,
+        occurrence_limit=rule.occurrence_limit,
+        dtstart=incoming_anchor,
+    )
+    return current != incoming
+
+
+def _prepared_rule(payload: TaskUpdate) -> RecurrenceInput:
+    assert payload.recurrence is not None
+    rule = payload.recurrence.model_copy()
+    if rule.freq in ("monthly", "yearly") and rule.month_day is None and payload.start_date is not None:
+        rule.month_day = payload.start_date.day
+    return rule
+
+
+def _link_tuples(links: list | None) -> list[tuple[str, str, int]]:
+    result: list[tuple[str, str, int]] = []
+    for item in links or []:
+        link = item if isinstance(item, TaskLinkInput) else TaskLinkInput.model_validate(item)
+        result.append((link.label.strip(), link.url, link.position))
+    return result
+
+
+def _occurrence_fields_changed(task: Task, payload: TaskUpdate) -> bool:
+    data = payload.model_dump(exclude_unset=True)
+    if "title" in data and data["title"] is not None and data["title"].strip() != task.title:
+        return True
+    if "start_date" in data and data["start_date"] is not None and data["start_date"] != task.start_date:
+        return True
+    if "due_date" in data and data["due_date"] is not None and data["due_date"] != task.due_date:
+        return True
+    if "priority" in data and data["priority"] is not None and _priority_value(data["priority"]) != task.priority:
+        return True
+    if "category_id" in data and data["category_id"] is not None and data["category_id"] != task.category_id:
+        return True
+    if "content" in data and data["content"] != task.content:
+        return True
+    if "links" in data and data["links"] is not None:
+        current = [(link.label, link.url, link.position) for link in task.links]
+        incoming = _link_tuples(data["links"])
+        if current != incoming:
+            return True
+    return False
+
+
+def _date_matches_rule(series: TaskRecurrenceSeries, occurrence: date | None) -> bool:
+    if occurrence is None:
+        return False
+    dates = list_occurrence_dates(series, until=occurrence)
+    return bool(dates) and dates[-1] == occurrence
+
+
+def _first_occurrence_on_or_after(series: TaskRecurrenceSeries, start: date) -> date:
+    until = start + timedelta(days=365 * NEXT_SEARCH_YEARS)
+    dates = list_occurrence_dates(series, until=until, after=start)
+    if not dates:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recurrence rule has no available occurrence date for this task",
+        )
+    return dates[0]
+
+
+def _align_attached_occurrence(task: Task, series: TaskRecurrenceSeries) -> None:
+    if task.is_detached:
+        return
+    original = task.original_occurrence_date or task.start_date
+    task.original_occurrence_date = original
+    task.occurrence_date = original
+    task.start_date = original
+    task.due_date = original + timedelta(days=series.duration_days)
+    task.occurrence_index = occurrence_index_for(series, original)
 
 
 def _purge_open_attached(
@@ -612,14 +741,13 @@ def _purge_open_attached(
     *,
     on_or_after: date | None = None,
     keep_ids: set[uuid.UUID] | None = None,
-    valid_dates: set[date] | None = None,
+    only_invalid_for: TaskRecurrenceSeries | None = None,
 ) -> None:
     keep = keep_ids or set()
     for item in _open_attached(db, series_id, on_or_after=on_or_after):
         if item.id in keep:
             continue
-        original = item.original_occurrence_date
-        if valid_dates is not None and original in valid_dates:
+        if only_invalid_for is not None and _date_matches_rule(only_invalid_for, item.original_occurrence_date):
             continue
         _delete_task_row(db, item, delete_files=True)
 
@@ -745,20 +873,15 @@ def _occupied_originals(db: Session, series_id: uuid.UUID) -> set[date]:
 
 def _remap_to_valid_date(db: Session, series: TaskRecurrenceSeries, task: Task) -> None:
     original = task.original_occurrence_date or task.start_date
-    until = max(calendar_today(series.timezone) + timedelta(days=365), original)
-    valid = list_occurrence_dates(series, until=until, after=series.dtstart)
     occupied = _occupied_originals(db, series.id) - {original}
-    for candidate in valid:
-        if candidate < original and candidate in occupied:
+    until = original + timedelta(days=365 * NEXT_SEARCH_YEARS)
+    for candidate in list_occurrence_dates(series, until=until, after=original):
+        if candidate in occupied:
             continue
-        if candidate not in occupied or candidate == original:
-            task.original_occurrence_date = candidate
-            task.occurrence_date = candidate
-            task.start_date = candidate
-            task.due_date = candidate + timedelta(days=series.duration_days)
-            task.occurrence_index = occurrence_index_for(series, candidate)
-            task.is_detached = False
-            return
+        task.original_occurrence_date = candidate
+        _align_attached_occurrence(task, series)
+        task.is_detached = False
+        return
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail="Recurrence rule has no available occurrence date for this task",
@@ -794,12 +917,8 @@ def _split_series_with_new_rule(
     payload: TaskUpdate,
 ) -> TaskRecurrenceSeries:
     split_point = task.original_occurrence_date or task.start_date
-    new_dtstart = payload.start_date if payload.start_date is not None else split_point
-    if new_dtstart < split_point:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="start_date cannot be before the selected occurrence",
-        )
+    requested = payload.start_date if payload.start_date is not None else split_point
+    rule = _prepared_rule(payload)
     _end_old_series(series, split_point)
     _purge_open_attached(db, series.id, on_or_after=split_point, keep_ids={task.id})
 
@@ -819,22 +938,19 @@ def _split_series_with_new_rule(
         version=1,
     )
     _sync_template_from_payload(db, new_series, payload, task)
-    assert payload.recurrence is not None
-    _apply_rule(new_series, payload.recurrence, new_dtstart)
+    _apply_rule(new_series, rule, requested)
     db.add(new_series)
     db.flush()
     _copy_child_templates(series, new_series, copy_links=payload.links is None)
 
     task.recurrence_series_id = new_series.id
     task.is_detached = False
-    _apply_fields_to_task(db, task, payload, shift_dates=True)
-    task.original_occurrence_date = new_dtstart
-    task.start_date = payload.start_date or new_dtstart
-    task.occurrence_date = task.start_date
-    task.due_date = payload.due_date if payload.due_date is not None else task.start_date + timedelta(
-        days=new_series.duration_days
-    )
-    task.occurrence_index = 1
+    _apply_fields_to_task(db, task, payload, shift_dates=False)
+    floor = requested if requested >= split_point else split_point
+    anchor = _first_occurrence_on_or_after(new_series, floor)
+    new_series.dtstart = anchor
+    task.original_occurrence_date = anchor
+    _align_attached_occurrence(task, new_series)
     _fill_horizon(db, new_series)
     return new_series
 
@@ -853,27 +969,29 @@ def update_with_scope(
 
     scope = payload.edit_scope or "this"
     series = get_series_for_user(db, user_id, task.recurrence_series_id, for_update=True)
+    explicit_stop = "recurrence" in payload.model_fields_set and payload.recurrence is None
     if payload.category_id is not None:
         column = get_column_or_404(db, user_id, task.column_id)
         ensure_category_on_board(db, payload.category_id, column.board_id)
 
+    if explicit_stop:
+        series.status = "stopped"
+        scope = "series"
+        rule_changed = False
+    else:
+        rule_changed = _recurrence_rule_changed(
+            series, payload.recurrence, incoming_dtstart=payload.start_date
+        )
+
     if scope == "this":
-        if payload.recurrence is not None:
+        if rule_changed:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Changing the repeat rule requires This and following tasks or All tasks in the series",
             )
+        fields_changed = _occurrence_fields_changed(task, payload)
         _apply_fields_to_task(db, task, payload, shift_dates=True)
-        field_set = payload.model_fields_set & {
-            "title",
-            "content",
-            "start_date",
-            "due_date",
-            "priority",
-            "category_id",
-            "links",
-        }
-        if field_set:
+        if fields_changed:
             task.is_detached = True
         db.commit()
         return to_detail(get_task_for_user(db, user_id, task_id, with_details=True))
@@ -882,26 +1000,34 @@ def update_with_scope(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid edit_scope")
 
     original = task.original_occurrence_date or task.start_date
-    if scope == "this_and_future" and payload.recurrence is not None:
-        _split_series_with_new_rule(db, series, task, payload)
+    if scope == "this_and_future" and rule_changed:
+        new_series = _split_series_with_new_rule(db, series, task, payload)
+        _align_attached_occurrence(task, new_series)
         db.commit()
         return to_detail(get_task_for_user(db, user_id, task_id, with_details=True))
 
     _sync_template_from_payload(db, series, payload, task)
-    if payload.recurrence is not None and scope == "series":
-        _apply_rule(series, payload.recurrence, series.dtstart)
-        today = calendar_today(series.timezone)
-        until = today + timedelta(days=max(HORIZON_DAYS, 365))
-        valid = _rule_dates(series, until=until)
-        _purge_open_attached(db, series.id, keep_ids={task.id}, valid_dates=valid)
-        if task.original_occurrence_date not in valid:
+    if scope == "series" and rule_changed:
+        assert payload.recurrence is not None
+        incoming_month = (payload.start_date or series.dtstart).month
+        if payload.recurrence.freq == "yearly" and incoming_month != series.dtstart.month:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Yearly month cannot be changed for the entire series because it is stored "
+                    "as the series start date. Use This and following tasks to start a new yearly series."
+                ),
+            )
+        rule = _prepared_rule(payload)
+        _apply_rule(series, rule, series.dtstart)
+        _purge_open_attached(db, series.id, keep_ids={task.id}, only_invalid_for=series)
+        if not _date_matches_rule(series, task.original_occurrence_date):
             _remap_to_valid_date(db, series, task)
         _fill_horizon(db, series)
 
-    shift_selected_dates = scope == "this_and_future" or payload.recurrence is not None
-    _apply_fields_to_task(db, task, payload, shift_dates=shift_selected_dates)
-    if not shift_selected_dates:
-        task.due_date = task.start_date + timedelta(days=series.duration_days)
+    _apply_fields_to_task(db, task, payload, shift_dates=False)
+    if not task.is_detached:
+        _align_attached_occurrence(task, series)
 
     targets = _open_attached(
         db,
@@ -912,6 +1038,8 @@ def update_with_scope(
         if item.id == task.id:
             continue
         _apply_template_to_open_task(db, item, payload, duration_days=series.duration_days)
+        if not item.is_detached:
+            _align_attached_occurrence(item, series)
     series.updated_at = datetime.now(UTC)
     db.commit()
     return to_detail(get_task_for_user(db, user_id, task_id, with_details=True))
