@@ -39,8 +39,14 @@ def calendar_today(timezone_name: str | None) -> date:
     return datetime.now(zone).date()
 
 
-def get_series_for_user(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> TaskRecurrenceSeries:
-    series = db.scalar(
+def get_series_for_user(
+    db: Session,
+    user_id: uuid.UUID,
+    series_id: uuid.UUID,
+    *,
+    for_update: bool = False,
+) -> TaskRecurrenceSeries:
+    query = (
         select(TaskRecurrenceSeries)
         .where(TaskRecurrenceSeries.id == series_id, TaskRecurrenceSeries.user_id == user_id)
         .options(
@@ -49,6 +55,9 @@ def get_series_for_user(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -
             selectinload(TaskRecurrenceSeries.exceptions),
         )
     )
+    if for_update:
+        query = query.with_for_update()
+    series = db.scalar(query)
     if series is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurrence series not found")
     return series
@@ -483,7 +492,11 @@ def _open_attached(db: Session, series_id: uuid.UUID, *, on_or_after: date | Non
             Task.completed_at.is_(None),
             BoardColumn.is_done.is_(False),
         )
-        .options(selectinload(Task.links), selectinload(Task.subtasks))
+        .options(
+            selectinload(Task.links),
+            selectinload(Task.subtasks),
+            selectinload(Task.attachments),
+        )
         .with_for_update()
     )
     if on_or_after is not None:
@@ -585,13 +598,69 @@ def delete_with_scope(
     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid delete_scope")
 
 
-def _sync_template_from_payload(series: TaskRecurrenceSeries, payload: TaskUpdate, task: Task) -> None:
+def _priority_value(priority: object) -> str:
+    return priority.value if hasattr(priority, "value") else str(priority)
+
+
+def _rule_dates(series: TaskRecurrenceSeries, *, until: date) -> set[date]:
+    return set(list_occurrence_dates(series, until=until, after=series.dtstart))
+
+
+def _purge_open_attached(
+    db: Session,
+    series_id: uuid.UUID,
+    *,
+    on_or_after: date | None = None,
+    keep_ids: set[uuid.UUID] | None = None,
+    valid_dates: set[date] | None = None,
+) -> None:
+    keep = keep_ids or set()
+    for item in _open_attached(db, series_id, on_or_after=on_or_after):
+        if item.id in keep:
+            continue
+        original = item.original_occurrence_date
+        if valid_dates is not None and original in valid_dates:
+            continue
+        _delete_task_row(db, item, delete_files=True)
+
+
+def _replace_link_templates(db: Session, series: TaskRecurrenceSeries, links: list[TaskLinkInput]) -> None:
+    series.link_templates.clear()
+    db.flush()
+    for item in links:
+        series.link_templates.append(
+            TaskRecurrenceLinkTemplate(label=item.label.strip(), url=item.url, position=item.position)
+        )
+
+
+def _replace_task_links(db: Session, task: Task, links: list) -> None:
+    task.links.clear()
+    db.flush()
+    for item in links:
+        link = TaskLinkInput.model_validate(item)
+        task.links.append(TaskLink(label=link.label.strip(), url=link.url, position=link.position))
+
+
+def _copy_child_templates(source: TaskRecurrenceSeries, target: TaskRecurrenceSeries, *, copy_links: bool) -> None:
+    if copy_links:
+        for item in source.link_templates:
+            target.link_templates.append(
+                TaskRecurrenceLinkTemplate(label=item.label, url=item.url, position=item.position)
+            )
+    for item in source.subtask_templates:
+        target.subtask_templates.append(
+            TaskRecurrenceSubtaskTemplate(title=item.title, position=item.position)
+        )
+
+
+def _sync_template_from_payload(
+    db: Session, series: TaskRecurrenceSeries, payload: TaskUpdate, task: Task
+) -> None:
     data = payload.model_dump(exclude_unset=True)
     if "title" in data and data["title"] is not None:
         series.title = data["title"].strip()
     if "priority" in data and data["priority"] is not None:
-        priority = data["priority"]
-        series.priority = priority.value if hasattr(priority, "value") else priority
+        series.priority = _priority_value(data["priority"])
     if "category_id" in data and data["category_id"] is not None:
         series.category_id = data["category_id"]
     if "content" in data:
@@ -601,14 +670,10 @@ def _sync_template_from_payload(series: TaskRecurrenceSeries, payload: TaskUpdat
     next_due = payload.due_date if payload.due_date is not None else task.due_date
     series.duration_days = (next_due - next_start).days
     if payload.links is not None:
-        series.link_templates.clear()
-        for item in payload.links:
-            series.link_templates.append(
-                TaskRecurrenceLinkTemplate(label=item.label.strip(), url=item.url, position=item.position)
-            )
+        _replace_link_templates(db, series, payload.links)
 
 
-def _apply_fields_to_task(task: Task, payload: TaskUpdate) -> None:
+def _apply_fields_to_task(db: Session, task: Task, payload: TaskUpdate, *, shift_dates: bool) -> None:
     data = payload.model_dump(exclude_unset=True)
     data.pop("recurrence", None)
     data.pop("edit_scope", None)
@@ -621,32 +686,157 @@ def _apply_fields_to_task(task: Task, payload: TaskUpdate) -> None:
     if "title" in data and data["title"] is not None:
         data["title"] = data["title"].strip()
     if "priority" in data and data["priority"] is not None:
-        priority = data["priority"]
-        data["priority"] = priority.value if hasattr(priority, "value") else priority
-    next_start = new_start if new_start is not None else task.start_date
-    next_due = new_due if new_due is not None else task.due_date
-    if next_start > next_due:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="start_date must be on or before due_date",
-        )
-    if new_start is not None:
-        task.start_date = new_start
-        task.occurrence_date = new_start
-    if new_due is not None:
-        task.due_date = new_due
+        data["priority"] = _priority_value(data["priority"])
+    if shift_dates:
+        next_start = new_start if new_start is not None else task.start_date
+        next_due = new_due if new_due is not None else task.due_date
+        if next_start > next_due:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="start_date must be on or before due_date",
+            )
+        if new_start is not None:
+            task.start_date = new_start
+            task.occurrence_date = new_start
+        if new_due is not None:
+            task.due_date = new_due
     for key, value in data.items():
         setattr(task, key, value)
     if content_provided:
         validate_content_urls(content)
         task.content = content
         task.content_text = extract_text_from_content(content) if content else None
+    if payload.category_id is not None:
+        task.category_id = payload.category_id
     if links_payload is not None:
-        task.links.clear()
-        for item in links_payload:
-            link = TaskLinkInput.model_validate(item)
-            task.links.append(TaskLink(label=link.label.strip(), url=link.url, position=link.position))
+        _replace_task_links(db, task, links_payload)
     task.updated_at = datetime.now(UTC)
+
+
+def _apply_template_to_open_task(db: Session, task: Task, payload: TaskUpdate, *, duration_days: int) -> None:
+    if payload.title is not None:
+        task.title = payload.title.strip()
+    if payload.priority is not None:
+        task.priority = _priority_value(payload.priority)
+    if payload.category_id is not None:
+        task.category_id = payload.category_id
+    if payload.content is not None:
+        cloned = uncheck_checklist(payload.content)
+        task.content = cloned
+        task.content_text = extract_text_from_content(cloned) if cloned else None
+    if payload.links is not None:
+        _replace_task_links(db, task, payload.links)
+    task.due_date = task.start_date + timedelta(days=duration_days)
+    task.updated_at = datetime.now(UTC)
+
+
+def _occupied_originals(db: Session, series_id: uuid.UUID) -> set[date]:
+    return {
+        item
+        for item in db.scalars(
+            select(Task.original_occurrence_date).where(
+                Task.recurrence_series_id == series_id,
+                Task.original_occurrence_date.is_not(None),
+            )
+        ).all()
+        if item is not None
+    }
+
+
+def _remap_to_valid_date(db: Session, series: TaskRecurrenceSeries, task: Task) -> None:
+    original = task.original_occurrence_date or task.start_date
+    until = max(calendar_today(series.timezone) + timedelta(days=365), original)
+    valid = list_occurrence_dates(series, until=until, after=series.dtstart)
+    occupied = _occupied_originals(db, series.id) - {original}
+    for candidate in valid:
+        if candidate < original and candidate in occupied:
+            continue
+        if candidate not in occupied or candidate == original:
+            task.original_occurrence_date = candidate
+            task.occurrence_date = candidate
+            task.start_date = candidate
+            task.due_date = candidate + timedelta(days=series.duration_days)
+            task.occurrence_index = occurrence_index_for(series, candidate)
+            task.is_detached = False
+            return
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Recurrence rule has no available occurrence date for this task",
+    )
+
+
+def _end_old_series(series: TaskRecurrenceSeries, split_point: date) -> None:
+    old_until = split_point - timedelta(days=1)
+    if old_until >= series.dtstart:
+        series.until_date = old_until
+        series.occurrence_limit = None
+    else:
+        series.status = "stopped"
+    series.updated_at = datetime.now(UTC)
+
+
+def _fill_horizon(db: Session, series: TaskRecurrenceSeries) -> None:
+    today = calendar_today(series.timezone)
+    generate_series_window(
+        db,
+        series,
+        start=today,
+        end=today + timedelta(days=HORIZON_DAYS),
+        ensure_next=True,
+        strict=False,
+    )
+
+
+def _split_series_with_new_rule(
+    db: Session,
+    series: TaskRecurrenceSeries,
+    task: Task,
+    payload: TaskUpdate,
+) -> TaskRecurrenceSeries:
+    split_point = task.original_occurrence_date or task.start_date
+    new_dtstart = payload.start_date if payload.start_date is not None else split_point
+    if new_dtstart < split_point:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="start_date cannot be before the selected occurrence",
+        )
+    _end_old_series(series, split_point)
+    _purge_open_attached(db, series.id, on_or_after=split_point, keep_ids={task.id})
+
+    new_series = TaskRecurrenceSeries(
+        user_id=series.user_id,
+        board_id=series.board_id,
+        default_column_id=series.default_column_id,
+        category_id=payload.category_id or series.category_id,
+        title=(payload.title or series.title).strip() if payload.title else series.title,
+        priority=series.priority,
+        content=uncheck_checklist(payload.content) if payload.content is not None else series.content,
+        content_text=series.content_text,
+        content_schema_version=series.content_schema_version,
+        duration_days=series.duration_days,
+        timezone=series.timezone,
+        status="active",
+        version=1,
+    )
+    _sync_template_from_payload(db, new_series, payload, task)
+    assert payload.recurrence is not None
+    _apply_rule(new_series, payload.recurrence, new_dtstart)
+    db.add(new_series)
+    db.flush()
+    _copy_child_templates(series, new_series, copy_links=payload.links is None)
+
+    task.recurrence_series_id = new_series.id
+    task.is_detached = False
+    _apply_fields_to_task(db, task, payload, shift_dates=True)
+    task.original_occurrence_date = new_dtstart
+    task.start_date = payload.start_date or new_dtstart
+    task.occurrence_date = task.start_date
+    task.due_date = payload.due_date if payload.due_date is not None else task.start_date + timedelta(
+        days=new_series.duration_days
+    )
+    task.occurrence_index = 1
+    _fill_horizon(db, new_series)
+    return new_series
 
 
 def update_with_scope(
@@ -662,7 +852,7 @@ def update_with_scope(
         return update_task(db, user_id, task_id, payload)
 
     scope = payload.edit_scope or "this"
-    series = get_series_for_user(db, user_id, task.recurrence_series_id)
+    series = get_series_for_user(db, user_id, task.recurrence_series_id, for_update=True)
     if payload.category_id is not None:
         column = get_column_or_404(db, user_id, task.column_id)
         ensure_category_on_board(db, payload.category_id, column.board_id)
@@ -673,9 +863,7 @@ def update_with_scope(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Changing the repeat rule requires This and following tasks or All tasks in the series",
             )
-        _apply_fields_to_task(task, payload)
-        if payload.category_id is not None:
-            task.category_id = payload.category_id
+        _apply_fields_to_task(db, task, payload, shift_dates=True)
         field_set = payload.model_fields_set & {
             "title",
             "content",
@@ -690,96 +878,40 @@ def update_with_scope(
         db.commit()
         return to_detail(get_task_for_user(db, user_id, task_id, with_details=True))
 
+    if scope not in {"this_and_future", "series"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid edit_scope")
+
     original = task.original_occurrence_date or task.start_date
     if scope == "this_and_future" and payload.recurrence is not None:
-        new_rule = payload.recurrence
-        old_until = original - timedelta(days=1)
-        if old_until >= series.dtstart:
-            series.until_date = old_until
-            series.occurrence_limit = None
-        else:
-            series.status = "stopped"
-        series.updated_at = datetime.now(UTC)
-        future_open = _open_attached(db, series.id, on_or_after=original)
-        new_series = TaskRecurrenceSeries(
-            user_id=series.user_id,
-            board_id=series.board_id,
-            default_column_id=series.default_column_id,
-            category_id=payload.category_id or series.category_id,
-            title=(payload.title or series.title).strip() if payload.title else series.title,
-            priority=series.priority,
-            content=uncheck_checklist(payload.content) if payload.content is not None else series.content,
-            content_text=series.content_text,
-            content_schema_version=series.content_schema_version,
-            duration_days=series.duration_days,
-            timezone=series.timezone,
-            status="active",
-            version=1,
-        )
-        _sync_template_from_payload(new_series, payload, task)
-        _apply_rule(new_series, new_rule, original)
-        db.add(new_series)
-        db.flush()
-        for item in series.link_templates:
-            new_series.link_templates.append(
-                TaskRecurrenceLinkTemplate(label=item.label, url=item.url, position=item.position)
-            )
-        for item in series.subtask_templates:
-            new_series.subtask_templates.append(
-                TaskRecurrenceSubtaskTemplate(title=item.title, position=item.position)
-            )
-        task.recurrence_series_id = new_series.id
-        task.is_detached = False
-        _apply_fields_to_task(task, payload)
-        task.original_occurrence_date = original
-        task.occurrence_index = 1
-        for item in future_open:
-            if item.id == task.id:
-                continue
-            item.recurrence_series_id = new_series.id
-        today = calendar_today(new_series.timezone)
-        generate_series_window(
-            db,
-            new_series,
-            start=today,
-            end=today + timedelta(days=HORIZON_DAYS),
-            ensure_next=True,
-            strict=False,
-        )
+        _split_series_with_new_rule(db, series, task, payload)
         db.commit()
         return to_detail(get_task_for_user(db, user_id, task_id, with_details=True))
+
+    _sync_template_from_payload(db, series, payload, task)
+    if payload.recurrence is not None and scope == "series":
+        _apply_rule(series, payload.recurrence, series.dtstart)
+        today = calendar_today(series.timezone)
+        until = today + timedelta(days=max(HORIZON_DAYS, 365))
+        valid = _rule_dates(series, until=until)
+        _purge_open_attached(db, series.id, keep_ids={task.id}, valid_dates=valid)
+        if task.original_occurrence_date not in valid:
+            _remap_to_valid_date(db, series, task)
+        _fill_horizon(db, series)
+
+    shift_selected_dates = scope == "this_and_future" or payload.recurrence is not None
+    _apply_fields_to_task(db, task, payload, shift_dates=shift_selected_dates)
+    if not shift_selected_dates:
+        task.due_date = task.start_date + timedelta(days=series.duration_days)
 
     targets = _open_attached(
         db,
         series.id,
         on_or_after=original if scope == "this_and_future" else None,
     )
-    _sync_template_from_payload(series, payload, task)
-    if payload.recurrence is not None and scope == "series":
-        _apply_rule(series, payload.recurrence, series.dtstart)
-    if payload.category_id is not None:
-        task.category_id = payload.category_id
-    _apply_fields_to_task(task, payload)
     for item in targets:
         if item.id == task.id:
             continue
-        if payload.title is not None:
-            item.title = payload.title.strip()
-        if payload.priority is not None:
-            item.priority = payload.priority.value
-        if payload.category_id is not None:
-            item.category_id = payload.category_id
-        if payload.content is not None:
-            cloned = uncheck_checklist(payload.content)
-            item.content = cloned
-            item.content_text = extract_text_from_content(cloned) if cloned else None
-        item.due_date = item.start_date + timedelta(days=series.duration_days)
-        item.updated_at = datetime.now(UTC)
+        _apply_template_to_open_task(db, item, payload, duration_days=series.duration_days)
     series.updated_at = datetime.now(UTC)
-    if payload.recurrence is not None and scope == "series":
-        today = calendar_today(series.timezone)
-        generate_series_window(
-            db, series, start=today, end=today + timedelta(days=HORIZON_DAYS), ensure_next=True, strict=False
-        )
     db.commit()
     return to_detail(get_task_for_user(db, user_id, task_id, with_details=True))
