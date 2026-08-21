@@ -72,8 +72,46 @@ class RecurrenceSeriesRead(BaseModel):
     status: RecurrenceStatus
     dtstart: date
     generated_through: date | None
+    next_occurrence_date: date | None = None
     open_count: int
     completed_count: int
+    detached_count: int = 0
+
+
+class RecurrenceSeriesListItem(BaseModel):
+    id: uuid.UUID
+    board_id: uuid.UUID
+    board_name: str
+    board_archived: bool
+    default_column_id: uuid.UUID | None
+    default_column_name: str | None
+    category_id: uuid.UUID
+    category_name: str
+    title: str
+    priority: str
+    timezone: str
+    freq: RecurrenceFreq
+    interval: int
+    weekdays: list[int]
+    month_day: int | None
+    start_date: date
+    end_date: date | None
+    occurrence_limit: int | None
+    status: RecurrenceStatus
+    generated_through: date | None
+    next_occurrence_date: date | None
+    open_occurrence_count: int
+    completed_occurrence_count: int
+    detached_occurrence_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class RecurrenceSeriesListResponse(BaseModel):
+    items: list[RecurrenceSeriesListItem]
+    total: int
+    offset: int
+    limit: int
 
 
 class RecurrenceGenerateRequest(BaseModel):

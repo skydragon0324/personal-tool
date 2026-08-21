@@ -5,18 +5,24 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Board, BoardColumn, Task, TaskLink, TaskSubtask, User
+from app.models import Board, BoardColumn, Category, Task, TaskLink, TaskSubtask, User
 from app.models.task_recurrence import (
     TaskRecurrenceException,
     TaskRecurrenceLinkTemplate,
     TaskRecurrenceSeries,
     TaskRecurrenceSubtaskTemplate,
 )
-from app.schemas.recurrence import RecurrenceGenerateResult, RecurrenceInput, RecurrenceSeriesRead
+from app.schemas.recurrence import (
+    RecurrenceGenerateResult,
+    RecurrenceInput,
+    RecurrenceSeriesListItem,
+    RecurrenceSeriesListResponse,
+    RecurrenceSeriesRead,
+)
 from app.schemas.task import TaskCreate, TaskDetailRead, TaskLinkInput, TaskUpdate
 from app.services.board_service import get_column_or_404
 from app.services.category_service import ensure_category_on_board
@@ -63,23 +69,83 @@ def get_series_for_user(
     return series
 
 
-def read_series(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> RecurrenceSeriesRead:
-    series = get_series_for_user(db, user_id, series_id)
-    open_count = db.scalar(
-        select(func.count())
-        .select_from(Task)
-        .join(BoardColumn, BoardColumn.id == Task.column_id)
-        .where(
-            Task.recurrence_series_id == series.id,
-            Task.completed_at.is_(None),
-            BoardColumn.is_done.is_(False),
+def next_occurrence_date(
+    series: TaskRecurrenceSeries,
+    *,
+    today: date | None = None,
+    exception_dates: set[date] | None = None,
+) -> date | None:
+    if series.status != "active":
+        return None
+    return _next_rule_occurrence(series, today=today, exception_dates=exception_dates)
+
+
+def _next_rule_occurrence(
+    series: TaskRecurrenceSeries,
+    *,
+    today: date | None = None,
+    exception_dates: set[date] | None = None,
+) -> date | None:
+    today = today or calendar_today(series.timezone)
+    exceptions = exception_dates if exception_dates is not None else set()
+    search_end = today + timedelta(days=365 * NEXT_SEARCH_YEARS)
+    after = max(today, series.dtstart)
+    for item in list_occurrence_dates(series, until=search_end, after=after):
+        if item not in exceptions:
+            return item
+    return None
+
+
+def _task_counts_by_series(
+    db: Session, series_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int, int]]:
+    if not series_ids:
+        return {}
+    open_expr = case((and_(Task.completed_at.is_(None), BoardColumn.is_done.is_(False)), 1), else_=0)
+    completed_expr = case((or_(Task.completed_at.is_not(None), BoardColumn.is_done.is_(True)), 1), else_=0)
+    detached_expr = case((Task.is_detached.is_(True), 1), else_=0)
+    rows = db.execute(
+        select(
+            Task.recurrence_series_id,
+            func.coalesce(func.sum(open_expr), 0),
+            func.coalesce(func.sum(completed_expr), 0),
+            func.coalesce(func.sum(detached_expr), 0),
         )
-    )
-    completed_count = db.scalar(
-        select(func.count())
-        .select_from(Task)
-        .where(Task.recurrence_series_id == series.id, Task.completed_at.is_not(None))
-    )
+        .join(BoardColumn, BoardColumn.id == Task.column_id)
+        .where(Task.recurrence_series_id.in_(series_ids))
+        .group_by(Task.recurrence_series_id)
+    ).all()
+    return {
+        series_id: (int(open_count), int(completed_count), int(detached_count))
+        for series_id, open_count, completed_count, detached_count in rows
+        if series_id is not None
+    }
+
+
+def _exception_dates_by_series(
+    db: Session, series_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, set[date]]:
+    mapped: dict[uuid.UUID, set[date]] = {series_id: set() for series_id in series_ids}
+    if not series_ids:
+        return mapped
+    rows = db.execute(
+        select(TaskRecurrenceException.series_id, TaskRecurrenceException.original_occurrence_date).where(
+            TaskRecurrenceException.series_id.in_(series_ids)
+        )
+    ).all()
+    for series_id, original in rows:
+        mapped.setdefault(series_id, set()).add(original)
+    return mapped
+
+
+def _to_series_read(
+    series: TaskRecurrenceSeries,
+    *,
+    open_count: int,
+    completed_count: int,
+    detached_count: int,
+    next_date: date | None,
+) -> RecurrenceSeriesRead:
     return RecurrenceSeriesRead(
         id=series.id,
         board_id=series.board_id,
@@ -98,15 +164,183 @@ def read_series(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> Recurr
         status=series.status,  # type: ignore[arg-type]
         dtstart=series.dtstart,
         generated_through=series.generated_through,
-        open_count=int(open_count or 0),
-        completed_count=int(completed_count or 0),
+        next_occurrence_date=next_date,
+        open_count=open_count,
+        completed_count=completed_count,
+        detached_count=detached_count,
     )
 
 
-def stop_series(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> RecurrenceSeriesRead:
+def read_series(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> RecurrenceSeriesRead:
     series = get_series_for_user(db, user_id, series_id)
+    counts = _task_counts_by_series(db, [series.id]).get(series.id, (0, 0, 0))
+    exceptions = {item.original_occurrence_date for item in (series.exceptions or [])}
+    return _to_series_read(
+        series,
+        open_count=counts[0],
+        completed_count=counts[1],
+        detached_count=counts[2],
+        next_date=next_occurrence_date(series, exception_dates=exceptions),
+    )
+
+
+def list_series(
+    db: Session,
+    user_id: uuid.UUID,
+    *,
+    board_id: uuid.UUID | None = None,
+    status: str | None = None,
+    offset: int = 0,
+    limit: int = 50,
+) -> RecurrenceSeriesListResponse:
+    query = (
+        select(TaskRecurrenceSeries, Board, BoardColumn, Category)
+        .join(Board, Board.id == TaskRecurrenceSeries.board_id)
+        .outerjoin(BoardColumn, BoardColumn.id == TaskRecurrenceSeries.default_column_id)
+        .join(Category, Category.id == TaskRecurrenceSeries.category_id)
+        .where(TaskRecurrenceSeries.user_id == user_id)
+    )
+    if board_id is not None:
+        query = query.where(TaskRecurrenceSeries.board_id == board_id)
+    if status is not None:
+        query = query.where(TaskRecurrenceSeries.status == status)
+    rows = list(db.execute(query).all())
+    series_ids = [series.id for series, _board, _column, _category in rows]
+    counts = _task_counts_by_series(db, series_ids)
+    exceptions = _exception_dates_by_series(db, series_ids)
+
+    items: list[RecurrenceSeriesListItem] = []
+    for series, board, column, category in rows:
+        open_count, completed_count, detached_count = counts.get(series.id, (0, 0, 0))
+        next_date = next_occurrence_date(series, exception_dates=exceptions.get(series.id, set()))
+        items.append(
+            RecurrenceSeriesListItem(
+                id=series.id,
+                board_id=series.board_id,
+                board_name=board.name,
+                board_archived=board.archived_at is not None,
+                default_column_id=series.default_column_id,
+                default_column_name=column.name if column is not None else None,
+                category_id=series.category_id,
+                category_name=category.name,
+                title=series.title,
+                priority=series.priority,
+                timezone=series.timezone,
+                freq=series.freq,  # type: ignore[arg-type]
+                interval=series.interval,
+                weekdays=list(series.weekdays or []),
+                month_day=series.month_day,
+                start_date=series.dtstart,
+                end_date=series.until_date,
+                occurrence_limit=series.occurrence_limit,
+                status=series.status,  # type: ignore[arg-type]
+                generated_through=series.generated_through,
+                next_occurrence_date=next_date,
+                open_occurrence_count=open_count,
+                completed_occurrence_count=completed_count,
+                detached_occurrence_count=detached_count,
+                created_at=series.created_at,
+                updated_at=series.updated_at,
+            )
+        )
+
+    items.sort(
+        key=lambda item: (
+            0 if item.status == "active" and item.next_occurrence_date is not None else 1,
+            item.next_occurrence_date or date.max,
+            -item.updated_at.timestamp(),
+            str(item.id),
+        )
+    )
+    total = len(items)
+    page = items[offset : offset + limit]
+    return RecurrenceSeriesListResponse(items=page, total=total, offset=offset, limit=limit)
+
+
+def _assert_can_resume(db: Session, series: TaskRecurrenceSeries) -> None:
+    board = db.get(Board, series.board_id)
+    if board is None or board.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recurrence cannot resume because the board is archived or unavailable",
+        )
+    if series.default_column_id is not None:
+        column = db.get(BoardColumn, series.default_column_id)
+        if (
+            column is None
+            or column.board_id != series.board_id
+            or column.archived_at is not None
+            or column.is_done
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Recurrence cannot resume because the starting status is unavailable",
+            )
+    else:
+        fallback = db.scalar(
+            select(BoardColumn).where(
+                BoardColumn.board_id == series.board_id,
+                BoardColumn.archived_at.is_(None),
+                BoardColumn.is_done.is_(False),
+            )
+        )
+        if fallback is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Recurrence cannot resume because the starting status is unavailable",
+            )
+    category = db.get(Category, series.category_id)
+    if category is None or category.board_id != series.board_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recurrence cannot resume because the category is not on this board",
+        )
+    exceptions = {item.original_occurrence_date for item in (series.exceptions or [])}
+    if _next_rule_occurrence(series, exception_dates=exceptions) is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recurrence cannot resume because there is no remaining occurrence",
+        )
+
+
+def stop_series(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> RecurrenceSeriesRead:
+    series = get_series_for_user(db, user_id, series_id, for_update=True)
+    if series.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Archived recurrence series cannot be stopped",
+        )
+    if series.status == "stopped":
+        return read_series(db, user_id, series_id)
     series.status = "stopped"
     series.updated_at = datetime.now(UTC)
+    series.version += 1
+    db.commit()
+    return read_series(db, user_id, series_id)
+
+
+def resume_series(db: Session, user_id: uuid.UUID, series_id: uuid.UUID) -> RecurrenceSeriesRead:
+    series = get_series_for_user(db, user_id, series_id, for_update=True)
+    if series.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Archived recurrence series cannot be resumed",
+        )
+    if series.status == "active":
+        return read_series(db, user_id, series_id)
+    _assert_can_resume(db, series)
+    series.status = "active"
+    series.updated_at = datetime.now(UTC)
+    series.version += 1
+    today = calendar_today(series.timezone)
+    generate_series_window(
+        db,
+        series,
+        start=today,
+        end=today + timedelta(days=HORIZON_DAYS),
+        ensure_next=True,
+        strict=True,
+    )
     db.commit()
     return read_series(db, user_id, series_id)
 
