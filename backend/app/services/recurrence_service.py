@@ -504,27 +504,36 @@ def _open_attached(db: Session, series_id: uuid.UUID, *, on_or_after: date | Non
     return list(db.scalars(query).all())
 
 
-def _compact_column(db: Session, column_id: uuid.UUID, old_position: int) -> None:
-    from sqlalchemy import update
+def _renumber_columns(db: Session, column_ids: set[uuid.UUID]) -> None:
+    for column_id in column_ids:
+        rows = list(
+            db.scalars(
+                select(Task).where(Task.column_id == column_id).order_by(Task.position, Task.id)
+            ).all()
+        )
+        for index, row in enumerate(rows):
+            if row.position != index:
+                row.position = index
+        db.flush()
 
-    db.execute(
-        update(Task)
-        .where(Task.column_id == column_id, Task.position > old_position)
-        .values(position=Task.position - 1)
-    )
+
+def _delete_storage_keys(storage_keys: list[str]) -> None:
+    if not storage_keys:
+        return
+    storage = get_storage()
+    for key in storage_keys:
+        storage.delete(key)
 
 
-def _delete_task_row(db: Session, task: Task, *, delete_files: bool) -> None:
+def _delete_task_row(db: Session, task: Task, *, delete_files: bool) -> tuple[list[str], uuid.UUID]:
     column_id = task.column_id
-    old_position = task.position
     storage_keys = [attachment.storage_key for attachment in (task.attachments or [])]
     db.delete(task)
     db.flush()
-    _compact_column(db, column_id, old_position)
     if delete_files:
-        storage = get_storage()
-        for key in storage_keys:
-            storage.delete(key)
+        _delete_storage_keys(storage_keys)
+        return [], column_id
+    return storage_keys, column_id
 
 
 def _add_exception(db: Session, series_id: uuid.UUID, original: date) -> None:
@@ -536,6 +545,12 @@ def _add_exception(db: Session, series_id: uuid.UUID, original: date) -> None:
     )
     if existing is None:
         db.add(TaskRecurrenceException(series_id=series_id, original_occurrence_date=original))
+
+
+def _collect_delete(db: Session, task: Task, keys: list[str], columns: set[uuid.UUID]) -> None:
+    storage_keys, column_id = _delete_task_row(db, task, delete_files=False)
+    keys.extend(storage_keys)
+    columns.add(column_id)
 
 
 def delete_with_scope(
@@ -553,8 +568,14 @@ def delete_with_scope(
         delete_task(db, user_id, task_id)
         return
 
-    series = get_series_for_user(db, user_id, task.recurrence_series_id)
+    if delete_scope not in {"this", "this_and_future", "series"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid delete_scope")
+
+    series = get_series_for_user(db, user_id, task.recurrence_series_id, for_update=True)
     completed = _is_completed(task)
+    original = task.original_occurrence_date or task.start_date
+    keys: list[str] = []
+    columns: set[uuid.UUID] = set()
 
     if delete_scope == "this":
         if completed and not confirm_completed:
@@ -562,40 +583,41 @@ def delete_with_scope(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Deleting a completed repeating task requires confirm_completed=true",
             )
-        original = task.original_occurrence_date or task.start_date
-        if not completed:
-            _add_exception(db, series.id, original)
-        _delete_task_row(db, task, delete_files=True)
+        _add_exception(db, series.id, original)
+        _collect_delete(db, task, keys, columns)
+        _renumber_columns(db, columns)
         db.commit()
+        _delete_storage_keys(keys)
         return
 
     if delete_scope == "this_and_future":
-        original = task.original_occurrence_date or task.start_date
-        cutoff = original - timedelta(days=1)
-        series.until_date = cutoff if cutoff >= series.dtstart else series.dtstart
         if original <= series.dtstart:
             series.status = "stopped"
         else:
-            series.until_date = cutoff
+            series.until_date = original - timedelta(days=1)
         series.occurrence_limit = None
         future_open = _open_attached(db, series.id, on_or_after=original)
+        deleted_ids: set[uuid.UUID] = set()
         for item in future_open:
             _add_exception(db, series.id, item.original_occurrence_date or item.start_date)
-            _delete_task_row(db, item, delete_files=True)
+            _collect_delete(db, item, keys, columns)
+            deleted_ids.add(item.id)
+        if task.id not in deleted_ids and task.is_detached:
+            _add_exception(db, series.id, original)
+            _collect_delete(db, task, keys, columns)
         series.updated_at = datetime.now(UTC)
+        _renumber_columns(db, columns)
         db.commit()
+        _delete_storage_keys(keys)
         return
 
-    if delete_scope == "series":
-        series.status = "stopped"
-        open_tasks = _open_attached(db, series.id)
-        for item in open_tasks:
-            _delete_task_row(db, item, delete_files=True)
-        series.updated_at = datetime.now(UTC)
-        db.commit()
-        return
-
-    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid delete_scope")
+    series.status = "stopped"
+    for item in _open_attached(db, series.id):
+        _collect_delete(db, item, keys, columns)
+    series.updated_at = datetime.now(UTC)
+    _renumber_columns(db, columns)
+    db.commit()
+    _delete_storage_keys(keys)
 
 
 def _priority_value(priority: object) -> str:
@@ -744,12 +766,14 @@ def _purge_open_attached(
     only_invalid_for: TaskRecurrenceSeries | None = None,
 ) -> None:
     keep = keep_ids or set()
+    columns: set[uuid.UUID] = set()
     for item in _open_attached(db, series_id, on_or_after=on_or_after):
         if item.id in keep:
             continue
         if only_invalid_for is not None and _date_matches_rule(only_invalid_for, item.original_occurrence_date):
             continue
-        _delete_task_row(db, item, delete_files=True)
+        columns.add(_delete_task_row(db, item, delete_files=True)[1])
+    _renumber_columns(db, columns)
 
 
 def _replace_link_templates(db: Session, series: TaskRecurrenceSeries, links: list[TaskLinkInput]) -> None:

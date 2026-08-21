@@ -52,13 +52,21 @@ export function RecurrenceScopeDialog({
             This completed task will be permanently removed. Other repeats are kept.
           </Text>
         ) : null}
+        {isDelete && !completed ? (
+          <Text size="sm" mt="sm">
+            Completed and individually customized tasks are kept.
+          </Text>
+        ) : null}
         <Radio.Group name="scope" defaultValue="this" mt="md">
           <Stack gap="xs">
             <Radio value="this" label="This task only" />
             {!completed ? (
               <>
                 <Radio value="this_and_future" label="This and following tasks" />
-                <Radio value="series" label="All tasks in the series" />
+                <Radio
+                  value="series"
+                  label={isDelete ? "All unfinished tasks in the series" : "All tasks in the series"}
+                />
               </>
             ) : null}
           </Stack>

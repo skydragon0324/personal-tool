@@ -243,7 +243,9 @@ describe("English UI copy", () => {
     expect(scope).toContain("This is a repeating task.");
     expect(scope).toContain("This task only");
     expect(scope).toContain("This and following tasks");
+    expect(scope).toContain("All unfinished tasks in the series");
     expect(scope).toContain("All tasks in the series");
+    expect(scope).toContain("Completed and individually customized tasks are kept.");
     expect(scope).toContain("This completed task will be permanently removed. Other repeats are kept.");
     const drawer = readFileSync(
       join(SRC_ROOT, "features/tasks/components/task-detail-drawer.tsx"),
