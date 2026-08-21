@@ -48,6 +48,14 @@ class Task(Base):
         Index("ix_tasks_due_priority", "due_date", "priority"),
         Index("ix_tasks_start_due", "start_date", "due_date"),
         Index("ix_tasks_content_text", "content_text"),
+        Index("ix_tasks_series_occurrence_date", "recurrence_series_id", "occurrence_date"),
+        Index(
+            "uq_tasks_series_original_occurrence",
+            "recurrence_series_id",
+            "original_occurrence_date",
+            unique=True,
+            postgresql_where=text("recurrence_series_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -18,6 +18,11 @@ from app.models import (  # noqa: E402, F401
     Note,
     ScheduleEntry,
     Task,
+    TaskRecurrenceAttachmentRef,
+    TaskRecurrenceException,
+    TaskRecurrenceLinkTemplate,
+    TaskRecurrenceSeries,
+    TaskRecurrenceSubtaskTemplate,
     User,
     UserSession,
 )
