@@ -19,15 +19,17 @@ from app.models.task_recurrence import (
 from app.schemas.recurrence import (
     RecurrenceGenerateResult,
     RecurrenceInput,
+    RecurrenceSeriesLinkRead,
     RecurrenceSeriesListItem,
     RecurrenceSeriesListResponse,
     RecurrenceSeriesRead,
+    RecurrenceSeriesUpdate,
 )
 from app.schemas.task import TaskCreate, TaskDetailRead, TaskLinkInput, TaskUpdate
 from app.services.board_service import get_column_or_404
 from app.services.category_service import ensure_category_on_board
 from app.services.content_utils import extract_text_from_content, uncheck_checklist, validate_content_urls
-from app.services.ownership import get_task_for_user
+from app.services.ownership import get_column_for_user, get_task_for_user
 from app.services.recurrence_dates import list_occurrence_dates, occurrence_index_for
 from app.services.storage import get_storage
 from app.services.task_serializers import to_detail
@@ -168,6 +170,18 @@ def _to_series_read(
         open_count=open_count,
         completed_count=completed_count,
         detached_count=detached_count,
+        version=series.version,
+        content=series.content,
+        content_schema_version=series.content_schema_version,
+        links=[
+            RecurrenceSeriesLinkRead(
+                id=item.id,
+                label=item.label,
+                url=item.url,
+                position=item.position,
+            )
+            for item in sorted(series.link_templates or [], key=lambda link: (link.position, str(link.id)))
+        ],
     )
 
 
@@ -480,6 +494,7 @@ def generate_series_window(
     end: date,
     ensure_next: bool = True,
     strict: bool = False,
+    bump_version: bool = True,
 ) -> RecurrenceGenerateResult:
     if series.status != "active":
         return RecurrenceGenerateResult(created=0, skipped=0)
@@ -524,7 +539,8 @@ def generate_series_window(
 
     series.generated_through = max(end + timedelta(days=1), series.generated_through or end)
     series.updated_at = datetime.now(UTC)
-    series.version += 1
+    if bump_version:
+        series.version += 1
     return RecurrenceGenerateResult(created=created, skipped=skipped)
 
 
@@ -998,16 +1014,21 @@ def _purge_open_attached(
     on_or_after: date | None = None,
     keep_ids: set[uuid.UUID] | None = None,
     only_invalid_for: TaskRecurrenceSeries | None = None,
-) -> None:
+    delete_files: bool = True,
+) -> list[str]:
     keep = keep_ids or set()
     columns: set[uuid.UUID] = set()
+    keys: list[str] = []
     for item in _open_attached(db, series_id, on_or_after=on_or_after):
         if item.id in keep:
             continue
         if only_invalid_for is not None and _date_matches_rule(only_invalid_for, item.original_occurrence_date):
             continue
-        columns.add(_delete_task_row(db, item, delete_files=True)[1])
+        storage_keys, column_id = _delete_task_row(db, item, delete_files=delete_files)
+        keys.extend(storage_keys)
+        columns.add(column_id)
     _renumber_columns(db, columns)
+    return keys
 
 
 def _replace_link_templates(db: Session, series: TaskRecurrenceSeries, links: list[TaskLinkInput]) -> None:
@@ -1156,7 +1177,7 @@ def _end_old_series(series: TaskRecurrenceSeries, split_point: date) -> None:
     series.updated_at = datetime.now(UTC)
 
 
-def _fill_horizon(db: Session, series: TaskRecurrenceSeries) -> None:
+def _fill_horizon(db: Session, series: TaskRecurrenceSeries, *, bump_version: bool = True) -> None:
     today = calendar_today(series.timezone)
     generate_series_window(
         db,
@@ -1165,7 +1186,195 @@ def _fill_horizon(db: Session, series: TaskRecurrenceSeries) -> None:
         end=today + timedelta(days=HORIZON_DAYS),
         ensure_next=True,
         strict=False,
+        bump_version=bump_version,
     )
+
+
+def _current_rule(series: TaskRecurrenceSeries) -> RecurrenceInput:
+    return RecurrenceInput(
+        freq=series.freq,  # type: ignore[arg-type]
+        interval=series.interval,
+        weekdays=list(series.weekdays or []),
+        month_day=series.month_day,
+        until_date=series.until_date,
+        occurrence_limit=series.occurrence_limit,
+    )
+
+
+def _series_links_changed(series: TaskRecurrenceSeries, links: list[TaskLinkInput]) -> bool:
+    current = [(item.label, item.url, item.position) for item in series.link_templates]
+    incoming = _link_tuples(links)
+    return current != incoming
+
+
+def _apply_series_template_to_open(
+    db: Session,
+    task: Task,
+    series: TaskRecurrenceSeries,
+    changed: set[str],
+    *,
+    align_dates: bool,
+) -> None:
+    if "title" in changed:
+        task.title = series.title
+    if "priority" in changed:
+        task.priority = series.priority
+    if "category_id" in changed:
+        task.category_id = series.category_id
+    if "content" in changed:
+        cloned = uncheck_checklist(series.content)
+        task.content = cloned
+        task.content_text = extract_text_from_content(cloned) if cloned else None
+        task.content_schema_version = series.content_schema_version
+    if "links" in changed:
+        _replace_task_links(
+            db,
+            task,
+            [
+                TaskLinkInput(label=item.label, url=item.url, position=item.position)
+                for item in series.link_templates
+            ],
+        )
+    if align_dates or "duration_days" in changed:
+        _align_attached_occurrence(task, series)
+    task.updated_at = datetime.now(UTC)
+
+
+def _validate_series_default_column(
+    db: Session,
+    user_id: uuid.UUID,
+    series: TaskRecurrenceSeries,
+    column_id: uuid.UUID,
+) -> BoardColumn:
+    column = get_column_for_user(db, user_id, column_id)
+    if column.board_id != series.board_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Starting status does not belong to this board",
+        )
+    if column.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot use an archived status as the starting status",
+        )
+    if column.is_done:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot use a completed status as the starting status",
+        )
+    return column
+
+
+def update_series(
+    db: Session,
+    user_id: uuid.UUID,
+    series_id: uuid.UUID,
+    payload: RecurrenceSeriesUpdate,
+) -> RecurrenceSeriesRead:
+    series = get_series_for_user(db, user_id, series_id, for_update=True)
+    board = db.get(Board, series.board_id)
+    if series.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Archived recurrence series cannot be edited",
+        )
+    if board is None or board.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recurring tasks on an archived board cannot be edited",
+        )
+    if series.version != payload.expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recurrence series version is stale; refresh and try again",
+        )
+
+    fields = payload.model_fields_set
+    if "content" in fields:
+        validate_content_urls(payload.content)
+    if payload.category_id is not None:
+        ensure_category_on_board(db, payload.category_id, series.board_id)
+    if "default_column_id" in fields and payload.default_column_id is not None:
+        _validate_series_default_column(db, user_id, series, payload.default_column_id)
+
+    incoming_links: list[TaskLinkInput] | None
+    if "links" not in fields:
+        incoming_links = None
+    elif payload.links is None:
+        incoming_links = []
+    else:
+        incoming_links = [TaskLinkInput.model_validate(item.model_dump()) for item in payload.links]
+    incoming_dtstart = payload.dtstart if "dtstart" in fields and payload.dtstart is not None else series.dtstart
+    incoming_rule = payload.recurrence if payload.recurrence is not None else _current_rule(series)
+    rule_or_start_changed = False
+    if "dtstart" in fields and payload.dtstart is not None and payload.dtstart != series.dtstart:
+        rule_or_start_changed = True
+    if payload.recurrence is not None and _recurrence_rule_changed(
+        series, payload.recurrence, incoming_dtstart=incoming_dtstart
+    ):
+        rule_or_start_changed = True
+
+    changed: set[str] = set()
+    if payload.title is not None and payload.title != series.title:
+        changed.add("title")
+    if payload.priority is not None and payload.priority != series.priority:
+        changed.add("priority")
+    if "content" in fields and uncheck_checklist(payload.content) != series.content:
+        changed.add("content")
+    if payload.category_id is not None and payload.category_id != series.category_id:
+        changed.add("category_id")
+    if "default_column_id" in fields and payload.default_column_id != series.default_column_id:
+        changed.add("default_column_id")
+    if payload.duration_days is not None and payload.duration_days != series.duration_days:
+        changed.add("duration_days")
+    if incoming_links is not None and _series_links_changed(series, incoming_links):
+        changed.add("links")
+    if rule_or_start_changed:
+        changed.add("rule")
+
+    if not changed:
+        return read_series(db, user_id, series_id)
+
+    if "title" in changed and payload.title is not None:
+        series.title = payload.title
+    if "priority" in changed and payload.priority is not None:
+        series.priority = payload.priority
+    if "content" in changed:
+        series.content = uncheck_checklist(payload.content)
+        series.content_text = extract_text_from_content(series.content) if series.content else None
+    if "category_id" in changed and payload.category_id is not None:
+        series.category_id = payload.category_id
+    if "default_column_id" in changed:
+        series.default_column_id = payload.default_column_id
+    if "duration_days" in changed and payload.duration_days is not None:
+        series.duration_days = payload.duration_days
+    if "links" in changed and incoming_links is not None:
+        _replace_link_templates(db, series, incoming_links)
+
+    storage_keys: list[str] = []
+    if rule_or_start_changed:
+        _apply_rule(series, incoming_rule, incoming_dtstart)
+        storage_keys.extend(_purge_open_attached(db, series.id, only_invalid_for=series, delete_files=False))
+
+    template_changed = bool(changed - {"default_column_id", "rule"})
+    if template_changed or rule_or_start_changed:
+        for item in _open_attached(db, series.id):
+            _apply_series_template_to_open(
+                db,
+                item,
+                series,
+                changed,
+                align_dates=rule_or_start_changed,
+            )
+
+    if rule_or_start_changed and series.status == "active":
+        _fill_horizon(db, series, bump_version=False)
+
+    series.updated_at = datetime.now(UTC)
+    series.version += 1
+    db.commit()
+    _delete_storage_keys(storage_keys)
+    return read_series(db, user_id, series_id)
 
 
 def _split_series_with_new_rule(

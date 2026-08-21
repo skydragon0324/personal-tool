@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.services.url_validation import validate_http_url
+
 RecurrenceFreq = Literal["daily", "weekly", "monthly", "yearly"]
 RecurrenceStatus = Literal["active", "stopped", "archived"]
 EditScope = Literal["this", "this_and_future", "series"]
@@ -54,6 +56,27 @@ class RecurrenceRead(BaseModel):
     occurrence_index: int | None = None
 
 
+class RecurrenceSeriesLinkRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    label: str
+    url: str
+    position: int
+
+
+class RecurrenceSeriesLinkInput(BaseModel):
+    id: uuid.UUID | None = None
+    label: str = Field(min_length=1, max_length=200)
+    url: str = Field(min_length=1, max_length=2000)
+    position: int = Field(ge=0)
+
+    @field_validator("url")
+    @classmethod
+    def _url(cls, value: str) -> str:
+        return validate_http_url(value)
+
+
 class RecurrenceSeriesRead(BaseModel):
     id: uuid.UUID
     board_id: uuid.UUID
@@ -76,6 +99,49 @@ class RecurrenceSeriesRead(BaseModel):
     open_count: int
     completed_count: int
     detached_count: int = 0
+    version: int = 1
+    content: dict[str, Any] | None = None
+    content_schema_version: int = 1
+    links: list[RecurrenceSeriesLinkRead] = Field(default_factory=list)
+
+
+class RecurrenceSeriesUpdate(BaseModel):
+    expected_version: int = Field(ge=1)
+    title: str | None = Field(default=None, max_length=160)
+    priority: Literal["low", "medium", "high"] | None = None
+    content: dict[str, Any] | None = None
+    category_id: uuid.UUID | None = None
+    default_column_id: uuid.UUID | None = None
+    duration_days: int | None = Field(default=None, ge=0)
+    dtstart: date | None = None
+    recurrence: RecurrenceInput | None = None
+    links: list[RecurrenceSeriesLinkInput] | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Title is required")
+        return cleaned
+
+    @model_validator(mode="after")
+    def _no_pause_via_null_recurrence(self) -> "RecurrenceSeriesUpdate":
+        if "recurrence" in self.model_fields_set and self.recurrence is None:
+            raise ValueError("Use the stop endpoint to pause a recurring series")
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("Title is required")
+        if "priority" in self.model_fields_set and self.priority is None:
+            raise ValueError("Priority is required")
+        if "category_id" in self.model_fields_set and self.category_id is None:
+            raise ValueError("Category is required")
+        if "duration_days" in self.model_fields_set and self.duration_days is None:
+            raise ValueError("duration_days is required")
+        if "dtstart" in self.model_fields_set and self.dtstart is None:
+            raise ValueError("dtstart is required")
+        return self
 
 
 class RecurrenceSeriesListItem(BaseModel):

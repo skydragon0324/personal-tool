@@ -10,6 +10,7 @@ from app.schemas.recurrence import (
     RecurrenceGenerateResult,
     RecurrenceSeriesListResponse,
     RecurrenceSeriesRead,
+    RecurrenceSeriesUpdate,
     RecurrenceStatus,
 )
 from app.services import recurrence_service
@@ -39,6 +40,16 @@ def list_series(
 @router.get("/{series_id}", response_model=RecurrenceSeriesRead)
 def get_series(series_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> RecurrenceSeriesRead:
     return recurrence_service.read_series(db, user.id, series_id)
+
+
+@router.patch("/{series_id}", response_model=RecurrenceSeriesRead)
+def update_series(
+    series_id: UUID,
+    payload: RecurrenceSeriesUpdate,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> RecurrenceSeriesRead:
+    return recurrence_service.update_series(db, user.id, series_id, payload)
 
 
 @router.post("/{series_id}/stop", response_model=RecurrenceSeriesRead)
