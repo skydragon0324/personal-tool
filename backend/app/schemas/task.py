@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.category import CategorySummary
+from app.schemas.recurrence import EditScope, RecurrenceInput, RecurrenceRead
 from app.services.url_validation import validate_http_url
 
 
@@ -85,6 +86,7 @@ class TaskSummaryRead(BaseModel):
     subtask_total: int = 0
     subtask_completed: int = 0
     category: CategorySummary
+    recurrence: RecurrenceRead | None = None
 
 
 class TaskDetailRead(BaseModel):
@@ -109,6 +111,7 @@ class TaskDetailRead(BaseModel):
     attachments: list[TaskAttachmentRead]
     subtasks: list[SubtaskRead] = Field(default_factory=list)
     category: CategorySummary
+    recurrence: RecurrenceRead | None = None
 
 
 class SubtaskCreate(BaseModel):
@@ -154,6 +157,7 @@ class TaskCreate(BaseModel):
     due_date: date
     priority: Priority = Priority.medium
     links: list[TaskLinkInput] = Field(default_factory=list)
+    recurrence: RecurrenceInput | None = None
 
     @model_validator(mode="after")
     def _dates(self) -> "TaskCreate":
@@ -173,6 +177,8 @@ class TaskUpdate(BaseModel):
     priority: Priority | None = None
     category_id: uuid.UUID | None = None
     links: list[TaskLinkInput] | None = None
+    edit_scope: EditScope | None = None
+    recurrence: RecurrenceInput | None = None
 
     @model_validator(mode="after")
     def _dates(self) -> "TaskUpdate":

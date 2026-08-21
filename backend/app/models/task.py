@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.task_attachment import TaskAttachment
     from app.models.task_link import TaskLink
+    from app.models.task_recurrence import TaskRecurrenceSeries
     from app.models.task_subtask import TaskSubtask
 
 
@@ -71,6 +73,18 @@ class Task(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recurrence_series_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("task_recurrence_series.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    occurrence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    original_occurrence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    occurrence_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_detached: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -80,6 +94,9 @@ class Task(Base):
 
     column: Mapped[BoardColumn] = relationship("BoardColumn", back_populates="tasks")
     category: Mapped[Category] = relationship("Category", back_populates="tasks")
+    recurrence_series: Mapped[TaskRecurrenceSeries | None] = relationship(
+        "TaskRecurrenceSeries", back_populates="occurrences"
+    )
     links: Mapped[list[TaskLink]] = relationship(
         "TaskLink",
         back_populates="task",

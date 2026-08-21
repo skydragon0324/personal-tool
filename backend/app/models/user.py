@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.note import Note
     from app.models.schedule_entry import ScheduleEntry
     from app.models.schedule_occurrence_state import ScheduleOccurrenceState
+    from app.models.task_recurrence import TaskRecurrenceSeries
     from app.models.user_session import UserSession
 
 
@@ -56,6 +57,11 @@ class User(Base):
     )
     schedule_occurrence_states: Mapped[list[ScheduleOccurrenceState]] = relationship(
         "ScheduleOccurrenceState",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    task_recurrence_series: Mapped[list[TaskRecurrenceSeries]] = relationship(
+        "TaskRecurrenceSeries",
         back_populates="user",
         cascade="all, delete-orphan",
     )

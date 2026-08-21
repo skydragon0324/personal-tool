@@ -1,14 +1,26 @@
-from fastapi import APIRouter
-
-from app.api.v1 import auth, boards, columns, dashboard, health, notes, schedule, tasks, today
-
-api_router = APIRouter(prefix="/api/v1")
-api_router.include_router(health.router)
-api_router.include_router(auth.router)
-api_router.include_router(dashboard.router)
-api_router.include_router(today.router)
-api_router.include_router(boards.router)
-api_router.include_router(columns.router)
-api_router.include_router(notes.router)
-api_router.include_router(schedule.router)
-api_router.include_router(tasks.router)
+from fastapi import APIRouter
+
+from app.api.v1 import (
+    auth,
+    boards,
+    columns,
+    dashboard,
+    health,
+    notes,
+    schedule,
+    task_recurrence,
+    tasks,
+    today,
+)
+
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(health.router)
+api_router.include_router(auth.router)
+api_router.include_router(dashboard.router)
+api_router.include_router(today.router)
+api_router.include_router(boards.router)
+api_router.include_router(columns.router)
+api_router.include_router(notes.router)
+api_router.include_router(schedule.router)
+api_router.include_router(task_recurrence.router)
+api_router.include_router(tasks.router)

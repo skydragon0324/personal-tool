@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, Drawer, Group, Loader, Menu, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Button, Drawer, Group, Loader, Menu, Stack, Text } from "@mantine/core";
 import { useEffect, useState } from "react";
 
 import type {
@@ -16,6 +16,7 @@ import { PriorityBadge } from "./priority-badge";
 import { SubtaskList } from "./subtask-list";
 import { TaskContentViewer } from "./task-content-viewer";
 import { TaskForm } from "./task-form";
+import { recurrenceLabel } from "./recurrence-fields";
 import { formatDateTime, formatTaskPeriod } from "@/lib/dates";
 
 interface TaskDetailDrawerProps {
@@ -31,7 +32,12 @@ interface TaskDetailDrawerProps {
   onUploadFile?: (taskId: string, file: File) => Promise<{ download_url: string | null }>;
   onPatchContent?: (taskId: string, content: TiptapJSON) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
-  onDelete: (taskId: string, title: string) => void;
+  onDelete: (
+    taskId: string,
+    title: string,
+    meta?: { repeating?: boolean; completed?: boolean },
+  ) => void;
+  onStopRepeat?: (seriesId: string) => Promise<void> | void;
 }
 
 export function TaskDetailDrawer({
@@ -48,6 +54,7 @@ export function TaskDetailDrawer({
   onPatchContent,
   onDeleteAttachment,
   onDelete,
+  onStopRepeat,
 }: TaskDetailDrawerProps) {
   const detailQuery = useTaskDetail(taskId);
   const task = detailQuery.data ?? null;
@@ -112,6 +119,7 @@ export function TaskDetailDrawer({
           <Group>
             <CategoryBadge category={task.category} />
             <PriorityBadge priority={task.priority} />
+            {task.recurrence ? <Badge variant="light">{recurrenceLabel(task.recurrence)}</Badge> : null}
           </Group>
           <Text size="sm">{formatTaskPeriod(task.start_date, task.due_date)}</Text>
           <Text size="xs" c="dimmed">
@@ -166,7 +174,24 @@ export function TaskDetailDrawer({
                 <Button variant="default">More</Button>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item color="red" onClick={() => onDelete(task.id, task.title)}>
+                {task.recurrence?.status === "active" && onStopRepeat ? (
+                  <Menu.Item
+                    onClick={() => {
+                      void onStopRepeat(task.recurrence!.series_id);
+                    }}
+                  >
+                    Stop repeating
+                  </Menu.Item>
+                ) : null}
+                <Menu.Item
+                  color="red"
+                  onClick={() =>
+                    onDelete(task.id, task.title, {
+                      repeating: Boolean(task.recurrence?.series_id),
+                      completed: Boolean(task.completed_at),
+                    })
+                  }
+                >
                   Delete
                 </Menu.Item>
               </Menu.Dropdown>

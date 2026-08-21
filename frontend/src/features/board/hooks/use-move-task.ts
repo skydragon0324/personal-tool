@@ -3,6 +3,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api-client";
+import { todayKeys } from "@/features/today/api/today-queries";
+import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
 import type { BoardQueryParams, BoardView, TaskMove, TaskSummary } from "../types";
@@ -92,6 +94,9 @@ export function useMoveTask(params: BoardQueryParams) {
         current ? applyDetailToView(current, task) : current,
       );
       await queryClient.invalidateQueries({ queryKey: key });
+      await queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      await queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      await queryClient.invalidateQueries({ queryKey: boardKeys.views(params.boardId) });
     },
   });
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.core.config import get_settings
 from app.models import Task, TaskAttachment
 from app.schemas.category import CategorySummary
+from app.schemas.recurrence import RecurrenceRead
 from app.schemas.task import (
     TaskAttachmentRead,
     TaskDetailRead,
@@ -11,6 +12,26 @@ from app.schemas.task import (
     SubtaskRead,
 )
 from app.services.content_utils import content_preview, count_checklist_items
+
+
+def recurrence_from_task(task: Task) -> RecurrenceRead | None:
+    series = getattr(task, "recurrence_series", None)
+    if series is None or task.recurrence_series_id is None:
+        return None
+    return RecurrenceRead(
+        series_id=series.id,
+        status=series.status,  # type: ignore[arg-type]
+        freq=series.freq,  # type: ignore[arg-type]
+        interval=series.interval,
+        weekdays=list(series.weekdays or []),
+        month_day=series.month_day,
+        until_date=series.until_date,
+        occurrence_limit=series.occurrence_limit,
+        occurrence_date=task.occurrence_date,
+        original_occurrence_date=task.original_occurrence_date,
+        is_detached=bool(task.is_detached),
+        occurrence_index=task.occurrence_index,
+    )
 
 
 def _subtask_progress(task: Task) -> tuple[int, int]:
@@ -43,6 +64,7 @@ def to_summary(task: Task) -> TaskSummaryRead:
         subtask_completed=subtask_completed,
         subtask_total=subtask_total,
         category=CategorySummary.model_validate(task.category),
+        recurrence=recurrence_from_task(task),
     )
 
 
@@ -86,4 +108,5 @@ def to_detail(task: Task) -> TaskDetailRead:
             for item in sorted(task.subtasks or [], key=lambda subtask: subtask.position)
         ],
         category=CategorySummary.model_validate(task.category),
+        recurrence=recurrence_from_task(task),
     )

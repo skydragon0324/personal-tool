@@ -81,6 +81,26 @@ def validate_content_urls(content: dict[str, Any] | None) -> None:
     walk(content)
 
 
+def uncheck_checklist(content: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return a deep copy of Tiptap JSON with every taskItem unchecked."""
+    if not content:
+        return content
+
+    def clone(node: Any) -> Any:
+        if isinstance(node, dict):
+            copied = {key: clone(value) for key, value in node.items()}
+            if copied.get("type") == "taskItem":
+                attrs = dict(copied.get("attrs") or {})
+                attrs["checked"] = False
+                copied["attrs"] = attrs
+            return copied
+        if isinstance(node, list):
+            return [clone(item) for item in node]
+        return node
+
+    return clone(content)
+
+
 def description_to_paragraph_doc(description: str) -> dict[str, Any]:
     """Legacy plain description as a simple Tiptap paragraph document."""
     return {

@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
+import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
 import { todayKeys } from "@/features/today/api/today-queries";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
@@ -15,6 +16,13 @@ export function useTaskMutations(
   const queryClient = useQueryClient();
   const key = boardKeys.view(params);
 
+  function invalidateRelated() {
+    void queryClient.invalidateQueries({ queryKey: key });
+    void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+    void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+    void queryClient.invalidateQueries({ queryKey: boardKeys.views(params.boardId) });
+  }
+
   const create = useMutation({
     mutationFn: (payload: TaskCreate) => taskMutations.create(payload),
     onSuccess: (task) => {
@@ -24,8 +32,7 @@ export function useTaskMutations(
           current ? applyDetailToView(current, task) : current,
         );
       }
-      void queryClient.invalidateQueries({ queryKey: key });
-      void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      invalidateRelated();
     },
   });
 
@@ -45,16 +52,29 @@ export function useTaskMutations(
           current ? applyDetailToView(current, task) : current,
         );
       }
-      void queryClient.invalidateQueries({ queryKey: key });
-      void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      invalidateRelated();
     },
   });
 
   const remove = useMutation({
-    mutationFn: (taskId: string) => taskMutations.remove(taskId),
+    mutationFn: ({
+      taskId,
+      deleteScope,
+      confirmCompleted,
+    }: {
+      taskId: string;
+      deleteScope?: string;
+      confirmCompleted?: boolean;
+    }) => taskMutations.remove(taskId, { deleteScope, confirmCompleted }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: key });
-      await queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      invalidateRelated();
+    },
+  });
+
+  const stopRecurrence = useMutation({
+    mutationFn: (seriesId: string) => taskMutations.stopRecurrence(seriesId),
+    onSuccess: () => {
+      invalidateRelated();
     },
   });
 
@@ -85,5 +105,5 @@ export function useTaskMutations(
     },
   });
 
-  return { create, update, remove, uploadAttachment, deleteAttachment };
+  return { create, update, remove, stopRecurrence, uploadAttachment, deleteAttachment };
 }

@@ -8,6 +8,13 @@ from app.models.schedule_occurrence_state import ScheduleOccurrenceState
 from app.models.task import Task
 from app.models.task_attachment import TaskAttachment
 from app.models.task_link import TaskLink
+from app.models.task_recurrence import (
+    TaskRecurrenceAttachmentRef,
+    TaskRecurrenceException,
+    TaskRecurrenceLinkTemplate,
+    TaskRecurrenceSeries,
+    TaskRecurrenceSubtaskTemplate,
+)
 from app.models.task_subtask import TaskSubtask
 from app.models.user import User
 from app.models.user_session import UserSession
@@ -23,6 +30,11 @@ __all__ = [
     "Task",
     "TaskLink",
     "TaskAttachment",
+    "TaskRecurrenceAttachmentRef",
+    "TaskRecurrenceException",
+    "TaskRecurrenceLinkTemplate",
+    "TaskRecurrenceSeries",
+    "TaskRecurrenceSubtaskTemplate",
     "TaskSubtask",
     "User",
     "UserSession",

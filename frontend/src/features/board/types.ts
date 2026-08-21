@@ -35,6 +35,35 @@ export interface TaskLinkInput {
   position: number;
 }
 
+export type RecurrenceFreq = "daily" | "weekly" | "monthly" | "yearly";
+export type RecurrenceStatus = "active" | "stopped" | "archived";
+export type EditScope = "this" | "this_and_future" | "series";
+export type DeleteScope = "this" | "this_and_future" | "series";
+
+export interface RecurrenceInput {
+  freq: RecurrenceFreq;
+  interval?: number;
+  weekdays?: number[];
+  month_day?: number | null;
+  until_date?: string | null;
+  occurrence_limit?: number | null;
+}
+
+export interface RecurrenceRead {
+  series_id: string;
+  status: RecurrenceStatus;
+  freq: RecurrenceFreq;
+  interval: number;
+  weekdays: number[];
+  month_day: number | null;
+  until_date: string | null;
+  occurrence_limit: number | null;
+  occurrence_date: string | null;
+  original_occurrence_date: string | null;
+  is_detached: boolean;
+  occurrence_index: number | null;
+}
+
 export interface TaskAttachment {
   id: string;
   original_name: string;
@@ -66,6 +95,7 @@ export interface TaskSummary {
   subtask_total: number;
   subtask_completed: number;
   category: Category;
+  recurrence?: RecurrenceRead | null;
 }
 
 export interface TaskSubtask {
@@ -98,6 +128,7 @@ export interface TaskDetail {
   attachments: TaskAttachment[];
   subtasks: TaskSubtask[];
   category: Category;
+  recurrence?: RecurrenceRead | null;
 }
 
 export interface BoardColumn {
@@ -190,6 +221,8 @@ export interface TaskCreate {
   due_date: string;
   priority?: Priority;
   links?: TaskLinkInput[];
+  recurrence?: RecurrenceInput | null;
+  edit_scope?: EditScope;
 }
 
 export interface TaskUpdate {
@@ -201,6 +234,8 @@ export interface TaskUpdate {
   priority?: Priority;
   category_id?: string;
   links?: TaskLinkInput[];
+  edit_scope?: EditScope;
+  recurrence?: RecurrenceInput | null;
 }
 
 export interface TaskMove {

@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api-client";
 import { todayISO } from "@/lib/dates";
 
 export const dashboardKeys = {
+  all: ["dashboard"] as const,
   summary: (today: string) => ["dashboard", "summary", today] as const,
 };
 

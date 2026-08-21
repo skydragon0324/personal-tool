@@ -171,8 +171,26 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
 
-  deleteTask: (taskId: string) =>
-    request<void>(`/api/v1/tasks/${taskId}`, { method: "DELETE" }),
+  deleteTask: (
+    taskId: string,
+    options?: { deleteScope?: string; confirmCompleted?: boolean },
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.deleteScope) params.set("delete_scope", options.deleteScope);
+    if (options?.confirmCompleted) params.set("confirm_completed", "true");
+    const query = params.toString();
+    return request<void>(`/api/v1/tasks/${taskId}${query ? `?${query}` : ""}`, {
+      method: "DELETE",
+    });
+  },
+
+  getRecurrenceSeries: (seriesId: string) =>
+    request<{ status: string }>(`/api/v1/task-recurrence/${seriesId}`),
+
+  stopRecurrence: (seriesId: string) =>
+    request<{ status: string }>(`/api/v1/task-recurrence/${seriesId}/stop`, {
+      method: "POST",
+    }),
 
   uploadAttachment: (taskId: string, file: File) => {
     const body = new FormData();

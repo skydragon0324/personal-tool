@@ -110,6 +110,12 @@ def get_board_view(
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
 
+    if range_start is not None and range_end is not None and date_field == "due_date" and not unbounded:
+        from app.services.recurrence_service import fill_user_series
+
+        fill_user_series(db, user_id, start=range_start, end=range_end, board_id=board.id)
+        db.flush()
+
     columns = sorted(
         [column for column in board.columns if column.archived_at is None],
         key=lambda c: c.position,
@@ -127,6 +133,7 @@ def get_board_view(
                 selectinload(Task.attachments),
                 selectinload(Task.category),
                 selectinload(Task.subtasks),
+                selectinload(Task.recurrence_series),
             )
             .order_by(Task.position)
         )

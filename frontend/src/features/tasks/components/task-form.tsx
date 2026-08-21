@@ -29,6 +29,7 @@ import {
 import type { Editor } from "@tiptap/react";
 
 import type {
+  EditScope,
   Priority,
   TaskCreate,
   TaskDetail,
@@ -38,6 +39,15 @@ import type {
 import { useCategories, useCreateCategory } from "@/features/board/hooks/use-categories";
 import { todayISO } from "@/lib/dates";
 import { CategoryCombobox } from "./category-combobox";
+import {
+  RecurrenceFields,
+  buildRecurrenceInput,
+  presetFromRecurrence,
+  type RepeatEnd,
+  type RepeatPreset,
+  type RepeatUnit,
+} from "./recurrence-fields";
+import { RecurrenceScopeDialog } from "./recurrence-scope-dialog";
 import { descriptionToDoc } from "../utils/description-to-doc";
 import {
   createPendingImageId,
@@ -83,6 +93,14 @@ export function TaskForm({
 }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
+  const [repeatPreset, setRepeatPreset] = useState<RepeatPreset>("none");
+  const [customInterval, setCustomInterval] = useState(1);
+  const [customUnit, setCustomUnit] = useState<RepeatUnit>("weeks");
+  const [customWeekdays, setCustomWeekdays] = useState<number[]>([0, 1, 2, 3, 4]);
+  const [repeatEnd, setRepeatEnd] = useState<RepeatEnd>("never");
+  const [untilDate, setUntilDate] = useState<string | null>(null);
+  const [occurrenceCount, setOccurrenceCount] = useState(10);
+  const [pendingScopePayload, setPendingScopePayload] = useState<TaskCreate | null>(null);
   const [taskStartDate, setTaskStartDate] = useState(initial?.start_date ?? todayISO());
   const [taskDueDate, setTaskDueDate] = useState(initial?.due_date ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -120,6 +138,14 @@ export function TaskForm({
         })),
       );
       setSavedTaskId(initial.id);
+      setRepeatPreset(presetFromRecurrence(initial.recurrence));
+      setCustomInterval(initial.recurrence?.interval ?? 1);
+      setCustomWeekdays(initial.recurrence?.weekdays?.length ? initial.recurrence.weekdays : [0, 1, 2, 3, 4]);
+      setRepeatEnd(
+        initial.recurrence?.until_date ? "date" : initial.recurrence?.occurrence_limit ? "count" : "never",
+      );
+      setUntilDate(initial.recurrence?.until_date ?? null);
+      setOccurrenceCount(initial.recurrence?.occurrence_limit ?? 10);
     } else {
       setTitle("");
       setPriority("medium");
@@ -129,6 +155,8 @@ export function TaskForm({
       setContent(null);
       setLinks([]);
       setSavedTaskId(null);
+      setRepeatPreset("none");
+      setRepeatEnd("never");
     }
     setPendingFiles([]);
     setPendingImages([]);
@@ -271,21 +299,45 @@ export function TaskForm({
     }
     try {
       const persistableContent = sanitizeContentForPersist(content);
+      const recurrence = buildRecurrenceInput({
+        preset: repeatPreset,
+        startDate: taskStartDate,
+        customInterval,
+        customUnit,
+        customWeekdays,
+        end: repeatEnd,
+        untilDate,
+        occurrenceCount,
+      });
+      const payload: TaskCreate = {
+        column_id: initial?.column_id ?? columnId,
+        category_id: categoryId,
+        title: title.trim(),
+        description: null,
+        content: persistableContent,
+        start_date: taskStartDate,
+        due_date: taskDueDate,
+        priority,
+        links: links.map((link, index) => ({
+          ...link,
+          position: index,
+        })),
+        recurrence,
+      };
+      if (initial?.recurrence?.series_id) {
+        setPendingScopePayload(payload);
+        return;
+      }
+      await submitPayload(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the task.");
+    }
+  }
+
+  async function submitPayload(payload: TaskCreate) {
+    try {
       const created = await onSubmit(
-        {
-          column_id: initial?.column_id ?? columnId,
-          category_id: categoryId,
-          title: title.trim(),
-          description: null,
-          content: persistableContent,
-          start_date: taskStartDate,
-          due_date: taskDueDate,
-          priority,
-          links: links.map((link, index) => ({
-            ...link,
-            position: index,
-          })),
-        },
+        payload,
         pendingFiles.map((item) => item.file),
         savedTaskId ?? initial?.id ?? undefined,
       );
@@ -362,6 +414,22 @@ export function TaskForm({
               valueFormat="MMM D, YYYY"
             />
           </SimpleGrid>
+          <RecurrenceFields
+            preset={repeatPreset}
+            onPresetChange={setRepeatPreset}
+            customInterval={customInterval}
+            onCustomIntervalChange={setCustomInterval}
+            customUnit={customUnit}
+            onCustomUnitChange={setCustomUnit}
+            customWeekdays={customWeekdays}
+            onCustomWeekdaysChange={setCustomWeekdays}
+            end={repeatEnd}
+            onEndChange={setRepeatEnd}
+            untilDate={untilDate}
+            onUntilDateChange={setUntilDate}
+            occurrenceCount={occurrenceCount}
+            onOccurrenceCountChange={setOccurrenceCount}
+          />
           <Select
               label="Priority"
               data={[
@@ -664,6 +732,23 @@ export function TaskForm({
           </Group>
         </Stack>
       </Modal>
+      <RecurrenceScopeDialog
+        open={pendingScopePayload !== null}
+        mode="edit"
+        taskTitle={title}
+        submitting={submitting}
+        onClose={() => setPendingScopePayload(null)}
+        onConfirm={(scope) => {
+          if (!pendingScopePayload) return;
+          const next: TaskCreate = {
+            ...pendingScopePayload,
+            edit_scope: scope as EditScope,
+            recurrence: scope === "this" ? undefined : pendingScopePayload.recurrence,
+          };
+          setPendingScopePayload(null);
+          void submitPayload(next);
+        }}
+      />
     </form>
   );
 }

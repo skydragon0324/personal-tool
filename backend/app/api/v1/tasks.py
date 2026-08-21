@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -53,8 +53,20 @@ def move_task(
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> Response:
-    task_service.delete_task(db, user.id, task_id)
+def delete_task(
+    task_id: UUID,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+    delete_scope: str = Query(default="this"),
+    confirm_completed: bool = Query(default=False),
+) -> Response:
+    task_service.delete_task(
+        db,
+        user.id,
+        task_id,
+        delete_scope=delete_scope,
+        confirm_completed=confirm_completed,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

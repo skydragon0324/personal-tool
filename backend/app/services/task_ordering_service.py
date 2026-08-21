@@ -143,6 +143,10 @@ def move_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: Task
     task.version += 1
     task.updated_at = datetime.now(UTC)
     task.completed_at = datetime.now(UTC) if target_column.is_done else None
+    if target_column.is_done:
+        from app.services.recurrence_service import ensure_next_after_completion
+
+        ensure_next_after_completion(db, task)
 
     db.commit()
     return to_detail(_reload(db, user_id, task_id))

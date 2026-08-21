@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
+import { RecurrenceScopeDialog } from "@/features/tasks/components/recurrence-scope-dialog";
 import { TaskDetailDrawer } from "@/features/tasks/components/task-detail-drawer";
 import { TaskDialog } from "@/features/tasks/components/task-dialog";
 import { ApiError } from "@/lib/api-client";
@@ -107,7 +108,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   const { data, isLoading, isError, error, refetch } = useBoard(query);
   const categoriesQuery = useCategories(boardId);
   const moveTask = useMoveTask(query);
-  const { create, update, remove, uploadAttachment, deleteAttachment } = useTaskMutations(
+  const { create, update, remove, stopRecurrence, uploadAttachment, deleteAttachment } = useTaskMutations(
     query,
     {
       shouldApplyToView: (task) =>
@@ -123,7 +124,12 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   const [createColumnId, setCreateColumnId] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
-  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
+  const [deleting, setDeleting] = useState<{
+    id: string;
+    title: string;
+    repeating?: boolean;
+    completed?: boolean;
+  } | null>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusTab, setStatusTab] = useState<"active" | "archived">("active");
@@ -230,6 +236,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           priority: payload.priority,
           category_id: payload.category_id,
           links: payload.links,
+          edit_scope: payload.edit_scope,
+          recurrence: payload.recurrence,
         },
       });
       if (pendingFiles.length) {
@@ -261,6 +269,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         priority: payload.priority,
         category_id: payload.category_id,
         links: payload.links,
+        edit_scope: payload.edit_scope,
+        recurrence: payload.recurrence,
       } satisfies TaskUpdate,
     });
     if (pendingFiles.length) {
@@ -270,9 +280,16 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     return updated;
   }
 
-  async function handleDelete() {
+  async function handleDelete(
+    scope: "this" | "this_and_future" | "series" = "this",
+    confirmCompleted = false,
+  ) {
     if (!deleting) return;
-    await remove.mutateAsync(deleting.id);
+    await remove.mutateAsync({
+      taskId: deleting.id,
+      deleteScope: deleting.repeating ? scope : "this",
+      confirmCompleted,
+    });
     if (viewingId === deleting.id) setViewingId(null);
     setDeleting(null);
   }
@@ -452,7 +469,14 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
             setViewingId(task.id);
             setDetailMode(mode);
           }}
-          onDelete={setDeleting}
+          onDelete={(task) =>
+            setDeleting({
+              id: task.id,
+              title: task.title,
+              repeating: Boolean(task.recurrence?.series_id),
+              completed: Boolean(task.completed_at),
+            })
+          }
         />
       ) : null}
 
@@ -509,16 +533,44 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           if (!viewingId) return;
           await deleteAttachment.mutateAsync({ taskId: viewingId, attachmentId });
         }}
-        onDelete={(taskId, title) => setDeleting({ id: taskId, title })}
+        onDelete={(taskId, title, meta) => {
+          setDeleting({
+            id: taskId,
+            title,
+            repeating: Boolean(meta?.repeating),
+            completed: Boolean(meta?.completed),
+          });
+        }}
+        onStopRepeat={
+          viewingId
+            ? async (seriesId) => {
+                await stopRecurrence.mutateAsync(seriesId);
+              }
+            : undefined
+        }
       />
 
-      <DeleteTaskDialog
-        open={deleting !== null}
-        taskTitle={deleting?.title ?? ""}
-        submitting={remove.isPending}
-        onClose={() => setDeleting(null)}
-        onConfirm={() => void handleDelete()}
-      />
+      {deleting?.repeating ? (
+        <RecurrenceScopeDialog
+          open
+          mode="delete"
+          taskTitle={deleting.title}
+          completed={Boolean(deleting.completed)}
+          submitting={remove.isPending}
+          onClose={() => setDeleting(null)}
+          onConfirm={(scope, confirmCompleted) =>
+            void handleDelete(scope, Boolean(confirmCompleted || deleting.completed))
+          }
+        />
+      ) : (
+        <DeleteTaskDialog
+          open={deleting !== null}
+          taskTitle={deleting?.title ?? ""}
+          submitting={remove.isPending}
+          onClose={() => setDeleting(null)}
+          onConfirm={() => void handleDelete()}
+        />
+      )}
 
       <StatusManagerModal
         opened={statusOpen}

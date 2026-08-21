@@ -43,6 +43,10 @@ def _replace_links(db: Session, task: Task, links: list[TaskLinkInput]) -> None:
 
 
 def create_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDetailRead:
+    if payload.recurrence is not None:
+        from app.services.recurrence_service import create_recurring_task
+
+        return create_recurring_task(db, user_id, payload)
     column = get_column_or_404(db, user_id, payload.column_id)
     ensure_category_on_board(db, payload.category_id, column.board_id)
 
@@ -81,8 +85,14 @@ def get_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskDetailR
 
 def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDetailRead:
     task = get_task_for_user(db, user_id, task_id, for_update=True)
+    if task.recurrence_series_id is not None:
+        from app.services.recurrence_service import update_with_scope
+
+        return update_with_scope(db, user_id, task_id, payload)
 
     data = payload.model_dump(exclude_unset=True)
+    data.pop("edit_scope", None)
+    data.pop("recurrence", None)
     links_payload = data.pop("links", None)
     new_due = data.pop("due_date", None)
     new_start = data.pop("start_date", None)
@@ -138,8 +148,26 @@ def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: Ta
     return to_detail(_load_task(db, user_id, task_id))
 
 
-def delete_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> None:
-    task = _load_task(db, user_id, task_id)
+def delete_task(
+    db: Session,
+    user_id: uuid.UUID,
+    task_id: uuid.UUID,
+    *,
+    delete_scope: str = "this",
+    confirm_completed: bool = False,
+) -> None:
+    task = get_task_for_user(db, user_id, task_id, with_details=True)
+    if task.recurrence_series_id is not None:
+        from app.services.recurrence_service import delete_with_scope
+
+        delete_with_scope(
+            db,
+            user_id,
+            task_id,
+            delete_scope=delete_scope,
+            confirm_completed=confirm_completed,
+        )
+        return
     column_id = task.column_id
     old_position = task.position
     storage_keys = [attachment.storage_key for attachment in task.attachments]

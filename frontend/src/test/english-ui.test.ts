@@ -228,5 +228,27 @@ describe("English UI copy", () => {
     );
     expect(subtasks).toContain("Add a subtask");
     expect(subtasks).toContain("void handleCreate()");
+    const recurrence = readFileSync(
+      join(SRC_ROOT, "features/tasks/components/recurrence-fields.tsx"),
+      "utf8",
+    );
+    expect(recurrence).toContain("Does not repeat");
+    expect(recurrence).toContain("Weekdays");
+    expect(recurrence).toContain("If a month has fewer days, that month is skipped.");
+    expect(recurrence).toContain("February 29 is skipped in non-leap years.");
+    const scope = readFileSync(
+      join(SRC_ROOT, "features/tasks/components/recurrence-scope-dialog.tsx"),
+      "utf8",
+    );
+    expect(scope).toContain("This is a repeating task.");
+    expect(scope).toContain("This task only");
+    expect(scope).toContain("This and following tasks");
+    expect(scope).toContain("All tasks in the series");
+    expect(scope).toContain("This completed task will be permanently removed. Other repeats are kept.");
+    const drawer = readFileSync(
+      join(SRC_ROOT, "features/tasks/components/task-detail-drawer.tsx"),
+      "utf8",
+    );
+    expect(drawer).toContain("Stop repeating");
   });
 });

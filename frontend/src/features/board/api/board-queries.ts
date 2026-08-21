@@ -55,6 +55,7 @@ export function applyDetailToView(view: BoardView, task: TaskDetail): BoardView 
     subtask_total: task.subtasks?.length ?? 0,
     subtask_completed: task.subtasks?.filter((item) => item.is_completed).length ?? 0,
     category: task.category,
+    recurrence: task.recurrence ?? null,
   };
 
   // Counts will refresh on invalidate; approximate from detail when possible
