@@ -121,6 +121,10 @@ describe("Boards dashboard", () => {
   it("renders four panels and keeps New/Manage in the header", () => {
     wrap(createElement(BoardsDashboardPage));
     expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recurring tasks" })).toHaveAttribute(
+      "href",
+      "/boards/recurring",
+    );
     expect(screen.getByRole("button", { name: "New board" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage boards" })).toBeInTheDocument();
     const grid = screen.getByLabelText("Boards dashboard");

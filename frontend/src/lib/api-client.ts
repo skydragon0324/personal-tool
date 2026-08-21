@@ -187,6 +187,20 @@ export const apiClient = {
   getRecurrenceSeries: (seriesId: string) =>
     request<{ status: string }>(`/api/v1/task-recurrence/${seriesId}`),
 
+  listRecurrenceSeries: (
+    params: import("@/features/recurrence/types").RecurrenceSeriesListParams = {},
+  ) => {
+    const search = new URLSearchParams();
+    if (params.board_id) search.set("board_id", params.board_id);
+    if (params.status) search.set("status", params.status);
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
+    if (params.limit !== undefined) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return request<import("@/features/recurrence/types").RecurrenceSeriesListResponse>(
+      `/api/v1/task-recurrence${query ? `?${query}` : ""}`,
+    );
+  },
+
   stopRecurrence: (seriesId: string) =>
     request<{ status: string }>(`/api/v1/task-recurrence/${seriesId}/stop`, {
       method: "POST",

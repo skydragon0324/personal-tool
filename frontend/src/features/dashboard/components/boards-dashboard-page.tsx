@@ -34,6 +34,9 @@ export function BoardsDashboardPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title="Boards">
+        <Button variant="light" component={Link} href="/boards/recurring">
+          Recurring tasks
+        </Button>
         <Button onClick={() => chrome?.openNewBoard()}>New board</Button>
         <Button variant="light" onClick={() => chrome?.openManageBoards()}>
           Manage boards

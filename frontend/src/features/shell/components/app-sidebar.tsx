@@ -11,7 +11,7 @@ import { useBoards, activeBoards } from "@/features/board/hooks/use-boards";
 import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons";
 
 import { boardsGroupExpanded, readBoardsNavCollapsed, writeBoardsNavCollapsed } from "../utils/boards-nav";
-import { boardIdFromPath, sectionFromPath } from "../utils/navigation";
+import { boardIdFromPath, isBoardsIndexPath, sectionFromPath } from "../utils/navigation";
 import { NavIcon } from "./nav-icons";
 import { useWorkspaceChrome } from "./workspace-chrome";
 
@@ -25,7 +25,7 @@ export function AppSidebar() {
   const boards = activeBoards(boardsQuery.data);
   const currentBoardId = boardIdFromPath(pathname);
   const section = sectionFromPath(pathname);
-  const boardsParentActive = pathname === "/boards";
+  const boardsParentActive = isBoardsIndexPath(pathname);
   const [storedCollapsed, setStoredCollapsed] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
 

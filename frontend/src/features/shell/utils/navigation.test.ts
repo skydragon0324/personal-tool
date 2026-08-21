@@ -23,12 +23,16 @@ describe("application navigation", () => {
     expect(isBoardsPath("/boards")).toBe(true);
     expect(isBoardDetailPath("/boards")).toBe(false);
     expect(isBoardDetailPath("/boards/abc")).toBe(true);
+    expect(isBoardDetailPath("/boards/recurring")).toBe(false);
     expect(boardIdFromPath("/boards/abc")).toBe("abc");
+    expect(boardIdFromPath("/boards/recurring")).toBeUndefined();
+    expect(sectionFromPath("/boards/recurring")).toBe("boards");
+    expect(isBoardsPath("/boards/recurring")).toBe(true);
   });
 
   it("expands boards by default on board routes unless the user collapsed them", () => {
     expect(boardsGroupExpanded("/boards/abc", null)).toBe(true);
-    expect(boardsGroupExpanded("/boards", null)).toBe(true);
+    expect(boardsGroupExpanded("/boards/recurring", null)).toBe(true);
     expect(boardsGroupExpanded("/notepad", null)).toBe(false);
     expect(boardsGroupExpanded("/inbox", null)).toBe(false);
     expect(boardsGroupExpanded("/boards/abc", true)).toBe(false);

@@ -49,6 +49,7 @@ describe("English UI copy", () => {
     expect(sidebar).not.toContain("Inbox");
     expect(sidebar).not.toContain("New board");
     expect(sidebar).not.toContain("Manage boards");
+    expect(sidebar).not.toContain("Recurring tasks");
     expect(sidebar).toContain("Boards");
     expect(sidebar).toContain("Notepad");
     expect(sidebar).toContain("Schedule");
@@ -152,9 +153,24 @@ describe("English UI copy", () => {
     expect(dashboard).toContain("Active boards");
     expect(dashboard).toContain("New board");
     expect(dashboard).toContain("Manage boards");
+    expect(dashboard).toContain("Recurring tasks");
     expect(dashboard).toContain("DashboardGrid");
     expect(dashboard).toContain("Due today");
     expect(dashboard).toContain("Overdue");
+    const recurring = readFileSync(
+      join(SRC_ROOT, "features/recurrence/components/recurring-tasks-page.tsx"),
+      "utf8",
+    );
+    expect(recurring).toContain("Recurring tasks");
+    expect(recurring).toContain("Manage repeating work across your boards.");
+    expect(recurring).toContain("Back to boards");
+    expect(recurring).toContain("No future occurrence");
+    expect(recurring).toContain("Customized");
+    expect(recurring).toContain("Reset filters");
+    expect(recurring).toContain("No recurring tasks yet");
+    expect(recurring).not.toContain("Pause");
+    expect(recurring).not.toContain("Resume");
+    expect(recurring).not.toContain("Delete");
     expect(header).toContain("Create a status first");
     const newBoard = readFileSync(
       join(SRC_ROOT, "features/board/components/new-board-modal.tsx"),
