@@ -28,3 +28,7 @@ class ResizeObserverStub {
 
 window.ResizeObserver = ResizeObserverStub;
 
+Element.prototype.scrollIntoView = function scrollIntoView() {
+  return undefined;
+};
+

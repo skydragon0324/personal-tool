@@ -215,6 +215,15 @@ export const apiClient = {
       { method: "POST" },
     ),
 
+  updateRecurrenceSeries: (
+    seriesId: string,
+    payload: import("@/features/recurrence/types").RecurrenceSeriesUpdatePayload,
+  ) =>
+    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
+      `/api/v1/task-recurrence/${seriesId}`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+
   uploadAttachment: (taskId: string, file: File) => {
     const body = new FormData();
     body.append("file", file);

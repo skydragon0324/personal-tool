@@ -7,7 +7,7 @@ import type { RecurrenceInput, RecurrenceRead } from "@/features/board/types";
 import { weekdayIndex } from "@/features/schedule/utils/schedule-time";
 
 export type RepeatPreset = "none" | "daily" | "weekdays" | "weekly" | "monthly" | "yearly" | "custom";
-export type RepeatUnit = "days" | "weeks" | "months";
+export type RepeatUnit = "days" | "weeks" | "months" | "years";
 export type RepeatEnd = "never" | "date" | "count";
 
 const WEEKDAYS = [
@@ -43,6 +43,16 @@ export function recurrenceLabel(recurrence: RecurrenceRead): string {
   return "Repeats on a custom schedule";
 }
 
+export function repeatUnitFromRecurrence(
+  recurrence: RecurrenceRead | RecurrenceInput | null | undefined,
+): RepeatUnit {
+  if (!recurrence) return "weeks";
+  if (recurrence.freq === "daily") return "days";
+  if (recurrence.freq === "weekly") return "weeks";
+  if (recurrence.freq === "monthly") return "months";
+  return "years";
+}
+
 export function buildRecurrenceInput({
   preset,
   startDate,
@@ -71,7 +81,14 @@ export function buildRecurrenceInput({
   else if (preset === "monthly") rule = { freq: "monthly", interval: 1 };
   else if (preset === "yearly") rule = { freq: "yearly", interval: 1 };
   else {
-    const freq = customUnit === "days" ? "daily" : customUnit === "weeks" ? "weekly" : "monthly";
+    const freq =
+      customUnit === "days"
+        ? "daily"
+        : customUnit === "weeks"
+          ? "weekly"
+          : customUnit === "months"
+            ? "monthly"
+            : "yearly";
     rule = {
       freq,
       interval: Math.max(1, customInterval),
@@ -98,6 +115,7 @@ export function RecurrenceFields({
   onUntilDateChange,
   occurrenceCount,
   onOccurrenceCountChange,
+  allowNone = true,
 }: {
   preset: RepeatPreset;
   onPresetChange: (value: RepeatPreset) => void;
@@ -113,7 +131,17 @@ export function RecurrenceFields({
   onUntilDateChange: (value: string | null) => void;
   occurrenceCount: number;
   onOccurrenceCountChange: (value: number) => void;
+  allowNone?: boolean;
 }) {
+  const presetOptions = [
+    ...(allowNone ? [{ value: "none", label: "Does not repeat" }] : []),
+    { value: "daily", label: "Daily" },
+    { value: "weekdays", label: "Weekdays" },
+    { value: "weekly", label: "Weekly" },
+    { value: "monthly", label: "Monthly" },
+    { value: "yearly", label: "Yearly" },
+    { value: "custom", label: "Custom" },
+  ];
   return (
     <Stack gap="sm">
       <Select
@@ -122,15 +150,7 @@ export function RecurrenceFields({
         onChange={(value) => {
           if (value) onPresetChange(value as RepeatPreset);
         }}
-        data={[
-          { value: "none", label: "Does not repeat" },
-          { value: "daily", label: "Daily" },
-          { value: "weekdays", label: "Weekdays" },
-          { value: "weekly", label: "Weekly" },
-          { value: "monthly", label: "Monthly" },
-          { value: "yearly", label: "Yearly" },
-          { value: "custom", label: "Custom" },
-        ]}
+        data={presetOptions}
       />
       {preset === "monthly" || preset === "yearly" ? (
         <Text size="xs" c="dimmed">
@@ -159,6 +179,7 @@ export function RecurrenceFields({
                 { value: "days", label: "days" },
                 { value: "weeks", label: "weeks" },
                 { value: "months", label: "months" },
+                { value: "years", label: "years" },
               ]}
             />
           </Group>

@@ -174,8 +174,9 @@ describe("English UI copy", () => {
     expect(recurring).toContain("Pausing...");
     expect(recurring).toContain("Resuming...");
     expect(recurring).toContain("Restore the board before resuming this recurring task.");
+    expect(recurring).toContain("Restore the board before editing this recurring task.");
+    expect(recurring).toContain("Edit");
     expect(recurring).not.toContain("Delete");
-    expect(recurring).not.toContain(">Edit<");
     const pauseDialog = readFileSync(
       join(SRC_ROOT, "features/recurrence/components/pause-recurrence-dialog.tsx"),
       "utf8",
@@ -192,6 +193,11 @@ describe("English UI copy", () => {
     expect(actionsHook).toContain("Recurring task resumed");
     expect(actionsHook).toContain("Could not pause recurring task");
     expect(actionsHook).toContain("Could not resume recurring task");
+    const updateHook = readFileSync(
+      join(SRC_ROOT, "features/recurrence/hooks/use-update-recurrence-series.ts"),
+      "utf8",
+    );
+    expect(updateHook).toContain("Recurring task updated");
     expect(header).toContain("Create a status first");
     const newBoard = readFileSync(
       join(SRC_ROOT, "features/board/components/new-board-modal.tsx"),
@@ -270,6 +276,27 @@ describe("English UI copy", () => {
       "utf8",
     );
     expect(recurrence).toContain("Does not repeat");
+    expect(recurrence).toContain("allowNone");
+    expect(recurrence).toContain("years");
+    const seriesEdit = readFileSync(
+      join(SRC_ROOT, "features/recurrence/components/recurring-series-edit-form.tsx"),
+      "utf8",
+    );
+    expect(seriesEdit).toContain("Pause or resume this series from the recurring tasks list.");
+    expect(seriesEdit).toContain("This status is used for newly generated tasks. Existing tasks will not move.");
+    expect(seriesEdit).toContain("Each occurrence is due this many days after it starts.");
+    expect(seriesEdit).toContain("Automatic — first available status");
+    expect(seriesEdit).toContain("No changes to save.");
+    expect(seriesEdit).toContain("This recurring task changed elsewhere.");
+    expect(seriesEdit).toContain("Reload latest");
+    expect(seriesEdit).not.toContain("Does not repeat");
+    expect(seriesEdit).not.toContain("Delete series");
+    const seriesModal = readFileSync(
+      join(SRC_ROOT, "features/recurrence/components/recurring-series-edit-modal.tsx"),
+      "utf8",
+    );
+    expect(seriesModal).toContain("Edit recurring task");
+    expect(seriesModal).toContain("Could not load recurring task.");
     expect(recurrence).toContain("Weekdays");
     expect(recurrence).toContain("If a month has fewer days, that month is skipped.");
     expect(recurrence).toContain("February 29 is skipped in non-leap years.");
@@ -296,5 +323,7 @@ describe("English UI copy", () => {
     expect(taskForm).toContain("Stop repeating?");
     expect(taskForm).toContain("This series will stop repeating. Existing tasks are kept.");
     expect(taskForm).toContain("if (recurrence === null)");
+    expect(taskForm).not.toContain("allowNone={false}");
+    expect(seriesEdit).toContain("allowNone={false}");
   });
 });

@@ -18,6 +18,7 @@ import type {
 } from "../types";
 import { formatRecurrenceRule } from "../utils/format-recurrence";
 import { PauseRecurrenceDialog } from "./pause-recurrence-dialog";
+import { RecurringSeriesEditModal } from "./recurring-series-edit-modal";
 
 const PAGE_SIZES: RecurrenceSeriesPageSize[] = [25, 50, 100];
 
@@ -49,6 +50,7 @@ export function RecurringTasksPage() {
   const summary = useRecurrenceSeriesSummary(boardId || undefined);
   const { pause, resume } = useRecurrenceSeriesActions();
   const [pendingPause, setPendingPause] = useState<RecurrenceSeriesListItem | null>(null);
+  const [editingSeries, setEditingSeries] = useState<RecurrenceSeriesListItem | null>(null);
   const data = listQuery.data;
 
   const pendingSeriesId = pause.isPending
@@ -79,6 +81,11 @@ export function RecurringTasksPage() {
   function requestResume(item: RecurrenceSeriesListItem) {
     if (pendingSeriesId === item.id || item.board_archived) return;
     resume.mutate({ seriesId: item.id, boardId: item.board_id });
+  }
+
+  function requestEdit(item: RecurrenceSeriesListItem) {
+    if (item.board_archived) return;
+    setEditingSeries(item);
   }
 
   useEffect(() => {
@@ -169,6 +176,7 @@ export function RecurringTasksPage() {
               pendingKind={pendingKind}
               onPause={requestPause}
               onResume={requestResume}
+              onEdit={requestEdit}
               onPrevious={() => setOffset(Math.max(0, offset - limit))}
               onNext={() => setOffset(offset + limit)}
             />
@@ -180,6 +188,11 @@ export function RecurringTasksPage() {
         submitting={pause.isPending}
         onConfirm={confirmPause}
         onClose={closePauseDialog}
+      />
+      <RecurringSeriesEditModal
+        seriesId={editingSeries?.id ?? null}
+        boardId={editingSeries?.board_id ?? null}
+        onClose={() => setEditingSeries(null)}
       />
     </div>
   );
@@ -335,6 +348,7 @@ function Results({
   pendingKind,
   onPause,
   onResume,
+  onEdit,
   onPrevious,
   onNext,
 }: {
@@ -348,6 +362,7 @@ function Results({
   pendingKind: "pause" | "resume" | null;
   onPause: (item: RecurrenceSeriesListItem) => void;
   onResume: (item: RecurrenceSeriesListItem) => void;
+  onEdit: (item: RecurrenceSeriesListItem) => void;
   onPrevious: () => void;
   onNext: () => void;
 }) {
@@ -376,6 +391,7 @@ function Results({
         pendingKind={pendingKind}
         onPause={onPause}
         onResume={onResume}
+        onEdit={onEdit}
       />
       <SeriesCards
         items={data.items}
@@ -383,6 +399,7 @@ function Results({
         pendingKind={pendingKind}
         onPause={onPause}
         onResume={onResume}
+        onEdit={onEdit}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Text size="sm" c="dimmed">
@@ -467,16 +484,18 @@ function SeriesTable({
   pendingKind,
   onPause,
   onResume,
+  onEdit,
 }: {
   items: RecurrenceSeriesListItem[];
   pendingSeriesId?: string;
   pendingKind: "pause" | "resume" | null;
   onPause: (item: RecurrenceSeriesListItem) => void;
   onResume: (item: RecurrenceSeriesListItem) => void;
+  onEdit: (item: RecurrenceSeriesListItem) => void;
 }) {
   return (
     <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-[var(--app-border)] text-xs text-[var(--app-text-muted)]">
             <th className="py-2 pr-3 font-medium">Task</th>
@@ -512,6 +531,7 @@ function SeriesTable({
                   pendingKind={pendingSeriesId === item.id ? pendingKind : null}
                   onPause={onPause}
                   onResume={onResume}
+                  onEdit={onEdit}
                 />
               </td>
             </tr>
@@ -528,12 +548,14 @@ function SeriesCards({
   pendingKind,
   onPause,
   onResume,
+  onEdit,
 }: {
   items: RecurrenceSeriesListItem[];
   pendingSeriesId?: string;
   pendingKind: "pause" | "resume" | null;
   onPause: (item: RecurrenceSeriesListItem) => void;
   onResume: (item: RecurrenceSeriesListItem) => void;
+  onEdit: (item: RecurrenceSeriesListItem) => void;
 }) {
   return (
     <ul className="space-y-3 md:hidden">
@@ -555,6 +577,7 @@ function SeriesCards({
               pendingKind={pendingSeriesId === item.id ? pendingKind : null}
               onPause={onPause}
               onResume={onResume}
+              onEdit={onEdit}
             />
           </div>
         </li>
@@ -569,50 +592,85 @@ function SeriesActions({
   pendingKind,
   onPause,
   onResume,
+  onEdit,
 }: {
   item: RecurrenceSeriesListItem;
   pending: boolean;
   pendingKind: "pause" | "resume" | null;
   onPause: (item: RecurrenceSeriesListItem) => void;
   onResume: (item: RecurrenceSeriesListItem) => void;
+  onEdit: (item: RecurrenceSeriesListItem) => void;
 }) {
-  const hintId = useId();
+  const editHintId = useId();
+  const resumeHintId = useId();
+  const blockedByArchive = item.board_archived;
+  const editButton = (
+    <Button
+      size="xs"
+      variant="light"
+      disabled={blockedByArchive}
+      onClick={() => onEdit(item)}
+      aria-label={`Edit ${item.title}`}
+      aria-describedby={blockedByArchive ? editHintId : undefined}
+      title={blockedByArchive ? "Restore the board before editing this recurring task." : undefined}
+    >
+      Edit
+    </Button>
+  );
+
   if (item.status === "active") {
     return (
-      <Button
-        size="xs"
-        variant="light"
-        disabled={pending}
-        loading={pending && pendingKind === "pause"}
-        onClick={() => onPause(item)}
-        aria-label={`Pause ${item.title}`}
-      >
-        {pending && pendingKind === "pause" ? "Pausing..." : "Pause"}
-      </Button>
+      <div className="flex min-w-[10rem] flex-col items-start gap-1">
+        <div className="flex flex-wrap gap-2">
+          {editButton}
+          <Button
+            size="xs"
+            variant="light"
+            disabled={pending}
+            loading={pending && pendingKind === "pause"}
+            onClick={() => onPause(item)}
+            aria-label={`Pause ${item.title}`}
+          >
+            {pending && pendingKind === "pause" ? "Pausing..." : "Pause"}
+          </Button>
+        </div>
+        {blockedByArchive ? (
+          <p id={editHintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
+            Restore the board before editing this recurring task.
+          </p>
+        ) : null}
+      </div>
     );
   }
 
   if (item.status !== "stopped") return null;
 
-  const blockedByArchive = item.board_archived;
   return (
-    <div className="flex min-w-[9.5rem] flex-col items-start gap-1">
-      <Button
-        size="xs"
-        variant="light"
-        disabled={pending || blockedByArchive}
-        loading={pending && pendingKind === "resume"}
-        onClick={() => onResume(item)}
-        aria-label={`Resume ${item.title}`}
-        aria-describedby={blockedByArchive ? hintId : undefined}
-        title={blockedByArchive ? "Restore the board before resuming this recurring task." : undefined}
-      >
-        {pending && pendingKind === "resume" ? "Resuming..." : "Resume"}
-      </Button>
+    <div className="flex min-w-[10rem] flex-col items-start gap-1">
+      <div className="flex flex-wrap gap-2">
+        {editButton}
+        <Button
+          size="xs"
+          variant="light"
+          disabled={pending || blockedByArchive}
+          loading={pending && pendingKind === "resume"}
+          onClick={() => onResume(item)}
+          aria-label={`Resume ${item.title}`}
+          aria-describedby={blockedByArchive ? resumeHintId : undefined}
+          title={blockedByArchive ? "Restore the board before resuming this recurring task." : undefined}
+        >
+          {pending && pendingKind === "resume" ? "Resuming..." : "Resume"}
+        </Button>
+      </div>
       {blockedByArchive ? (
-        <p id={hintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
-          Restore the board before resuming this recurring task.
-        </p>
+        <>
+          <p id={editHintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
+            Restore the board before editing this recurring task.
+          </p>
+          <p id={resumeHintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
+            Restore the board before resuming this recurring task.
+          </p>
+        </>
       ) : null}
     </div>
   );

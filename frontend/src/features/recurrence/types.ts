@@ -1,4 +1,4 @@
-import type { Priority, RecurrenceFreq, RecurrenceStatus } from "@/features/board/types";
+import type { Priority, RecurrenceFreq, RecurrenceInput, RecurrenceStatus, TiptapJSON } from "@/features/board/types";
 
 export type RecurrenceSeriesStatus = RecurrenceStatus;
 export type RecurrenceSeriesTab = "active" | "stopped";
@@ -69,4 +69,35 @@ export interface RecurrenceSeriesRead {
   open_count: number;
   completed_count: number;
   detached_count: number;
+  version: number;
+  content: TiptapJSON | null;
+  content_schema_version: number;
+  links: RecurrenceSeriesLink[];
+}
+
+export interface RecurrenceSeriesLink {
+  id: string;
+  label: string;
+  url: string;
+  position: number;
+}
+
+export interface RecurrenceSeriesLinkInput {
+  id?: string;
+  label: string;
+  url: string;
+  position: number;
+}
+
+export interface RecurrenceSeriesUpdatePayload {
+  expected_version: number;
+  title?: string;
+  priority?: Priority;
+  content?: TiptapJSON | null;
+  category_id?: string;
+  default_column_id?: string | null;
+  duration_days?: number;
+  dtstart?: string;
+  recurrence?: RecurrenceInput;
+  links?: RecurrenceSeriesLinkInput[];
 }

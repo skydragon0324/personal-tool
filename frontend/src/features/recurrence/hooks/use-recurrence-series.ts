@@ -12,6 +12,14 @@ export function useRecurrenceSeriesList(params: RecurrenceSeriesListParams) {
   });
 }
 
+export function useRecurrenceSeriesDetail(seriesId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: recurrenceKeys.detail(seriesId),
+    queryFn: () => apiClient.getRecurrenceSeries(seriesId),
+    enabled: enabled && Boolean(seriesId),
+  });
+}
+
 /**
  * Summary cards use two extra list requests that share the board filter and
  * ignore the table page:

@@ -13,6 +13,10 @@ import { RecurringTasksPage } from "./recurring-tasks-page";
 const listRecurrenceSeries = vi.fn();
 const stopRecurrence = vi.fn();
 const resumeRecurrence = vi.fn();
+const getRecurrenceSeries = vi.fn();
+const updateRecurrenceSeries = vi.fn();
+const listCategories = vi.fn();
+const listColumns = vi.fn();
 const notifyApiError = vi.fn();
 const notifySuccess = vi.fn();
 
@@ -30,6 +34,10 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
       listRecurrenceSeries: (...args: unknown[]) => listRecurrenceSeries(...args),
       stopRecurrence: (...args: unknown[]) => stopRecurrence(...args),
       resumeRecurrence: (...args: unknown[]) => resumeRecurrence(...args),
+      getRecurrenceSeries: (...args: unknown[]) => getRecurrenceSeries(...args),
+      updateRecurrenceSeries: (...args: unknown[]) => updateRecurrenceSeries(...args),
+      listCategories: (...args: unknown[]) => listCategories(...args),
+      listColumns: (...args: unknown[]) => listColumns(...args),
     },
   };
 });
@@ -37,6 +45,10 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
 vi.mock("@/lib/notify", () => ({
   notifyApiError: (...args: unknown[]) => notifyApiError(...args),
   notifySuccess: (...args: unknown[]) => notifySuccess(...args),
+}));
+
+vi.mock("@/features/tasks/components/task-rich-text-editor", () => ({
+  TaskRichTextEditor: () => createElement("div", { "data-testid": "rich-text" }, "editor"),
 }));
 
 vi.mock("@/features/board/hooks/use-boards", () => ({
@@ -118,10 +130,43 @@ describe("Recurring tasks page", () => {
     listRecurrenceSeries.mockReset();
     stopRecurrence.mockReset();
     resumeRecurrence.mockReset();
+    getRecurrenceSeries.mockReset();
+    updateRecurrenceSeries.mockReset();
+    listCategories.mockReset();
+    listColumns.mockReset();
     notifyApiError.mockReset();
     notifySuccess.mockReset();
     stopRecurrence.mockResolvedValue({ id: "series-1", status: "stopped" });
     resumeRecurrence.mockResolvedValue({ id: "series-1", status: "active" });
+    getRecurrenceSeries.mockResolvedValue({
+      id: "series-1",
+      board_id: "board-work",
+      default_column_id: "col-todo",
+      category_id: "cat-1",
+      title: "Weekly standup",
+      priority: "high",
+      duration_days: 0,
+      timezone: "UTC",
+      freq: "weekly",
+      interval: 1,
+      weekdays: [4],
+      month_day: null,
+      until_date: null,
+      occurrence_limit: null,
+      status: "active",
+      dtstart: "2026-08-21",
+      generated_through: null,
+      next_occurrence_date: "2026-08-21",
+      open_count: 1,
+      completed_count: 0,
+      detached_count: 0,
+      version: 2,
+      content: null,
+      content_schema_version: 1,
+      links: [],
+    });
+    listCategories.mockResolvedValue([]);
+    listColumns.mockResolvedValue([]);
   });
 
   it("shows a loading state", () => {
@@ -358,6 +403,7 @@ describe("Recurring tasks page", () => {
     wrap();
     await screen.findAllByText("Weekly standup");
     expect(screen.getAllByRole("button", { name: "Pause Weekly standup" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Edit Weekly standup" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Resume Weekly standup" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Delete$/ })).not.toBeInTheDocument();
@@ -365,6 +411,7 @@ describe("Recurring tasks page", () => {
     await user.click(screen.getByRole("tab", { name: "Stopped" }));
     expect(await screen.findAllByText("Old chore")).not.toHaveLength(0);
     expect(screen.getAllByRole("button", { name: "Resume Old chore" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Edit Old chore" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Pause Old chore" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Delete$/ })).not.toBeInTheDocument();
@@ -523,6 +570,40 @@ describe("Recurring tasks page", () => {
     expect(resumeRecurrence).not.toHaveBeenCalled();
   });
 
+  it("disables Edit on an archived board and explains why", async () => {
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([]);
+      return page([series({ board_archived: true, board_name: "Legacy" })]);
+    });
+    wrap();
+    const buttons = await screen.findAllByRole("button", { name: "Edit Weekly standup" });
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription(
+        "Restore the board before editing this recurring task.",
+      );
+    }
+    expect(
+      screen.getAllByText("Restore the board before editing this recurring task.").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("opens the series editor from Edit without calling Pause or Resume", async () => {
+    const user = userEvent.setup();
+    listRecurrenceSeries.mockImplementation(async (params: { status?: string }) => {
+      if (params.status === "stopped") return page([]);
+      return page([series()]);
+    });
+    wrap();
+    await user.click((await screen.findAllByRole("button", { name: "Edit Weekly standup" }))[0]);
+    await waitFor(() => {
+      expect(getRecurrenceSeries).toHaveBeenCalledWith("series-1");
+    });
+    expect(stopRecurrence).not.toHaveBeenCalled();
+    expect(resumeRecurrence).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /^Delete$/ })).not.toBeInTheDocument();
+  });
+
   it("does not allow a second Pause while the first request is pending", async () => {
     const user = userEvent.setup();
     let resolveStop: ((value: unknown) => void) | undefined;
@@ -559,6 +640,7 @@ describe("Recurring tasks page", () => {
     wrap();
     const cards = await screen.findAllByRole("listitem");
     expect(within(cards[0]).getByRole("button", { name: "Pause Weekly standup" })).toBeInTheDocument();
+    expect(within(cards[0]).getByRole("button", { name: "Edit Weekly standup" })).toBeInTheDocument();
   });
 
   it("shows Resume on mobile cards", async () => {
@@ -573,6 +655,7 @@ describe("Recurring tasks page", () => {
     await user.click(await screen.findByRole("tab", { name: "Stopped" }));
     const cards = await screen.findAllByRole("listitem");
     expect(within(cards[0]).getByRole("button", { name: "Resume Old chore" })).toBeInTheDocument();
+    expect(within(cards[0]).getByRole("button", { name: "Edit Old chore" })).toBeInTheDocument();
   });
 
   it("shows a board-specific empty state", async () => {

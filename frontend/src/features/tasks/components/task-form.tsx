@@ -43,6 +43,7 @@ import {
   RecurrenceFields,
   buildRecurrenceInput,
   presetFromRecurrence,
+  repeatUnitFromRecurrence,
   type RepeatEnd,
   type RepeatPreset,
   type RepeatUnit,
@@ -141,6 +142,7 @@ export function TaskForm({
       setSavedTaskId(initial.id);
       setRepeatPreset(presetFromRecurrence(initial.recurrence));
       setCustomInterval(initial.recurrence?.interval ?? 1);
+      setCustomUnit(repeatUnitFromRecurrence(initial.recurrence));
       setCustomWeekdays(initial.recurrence?.weekdays?.length ? initial.recurrence.weekdays : [0, 1, 2, 3, 4]);
       setRepeatEnd(
         initial.recurrence?.until_date ? "date" : initial.recurrence?.occurrence_limit ? "count" : "never",

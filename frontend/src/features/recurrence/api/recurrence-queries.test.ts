@@ -12,4 +12,9 @@ describe("recurrence query keys", () => {
     expect(recurrenceKeys.list({ status: "active", offset: 25, limit: 25 })).not.toEqual(base);
     expect(recurrenceKeys.list({ status: "active", offset: 0, limit: 50 })).not.toEqual(base);
   });
+
+  it("has a detail key per series", () => {
+    expect(recurrenceKeys.detail("series-1")).toEqual(["recurrence-series", "detail", "series-1"]);
+    expect(recurrenceKeys.detail("series-2")).not.toEqual(recurrenceKeys.detail("series-1"));
+  });
 });

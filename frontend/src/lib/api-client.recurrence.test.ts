@@ -24,6 +24,10 @@ const seriesRead = {
   open_count: 3,
   completed_count: 1,
   detached_count: 2,
+  version: 2,
+  content: null,
+  content_schema_version: 1,
+  links: [],
 };
 
 describe("api client recurrence actions", () => {
@@ -65,5 +69,25 @@ describe("api client recurrence actions", () => {
       "/api/v1/task-recurrence/series-1/resume",
     );
     expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("POST");
+  });
+
+  it("patches a recurrence series with the update payload", async () => {
+    setCsrfToken("csrf-token");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...seriesRead, title: "Renamed", version: 3 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiClient.updateRecurrenceSeries("series-1", { expected_version: 2, title: "Renamed" }),
+    ).resolves.toMatchObject({ title: "Renamed", version: 3 });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/v1/task-recurrence/series-1");
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+      expected_version: 2,
+      title: "Renamed",
+    });
   });
 });
