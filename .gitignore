@@ -7,6 +7,9 @@ venv/
 .env
 .pytest_cache/
 .mypy_cache/
+packages/
+# ...but the vendored offline wheels MUST be kept - see README "How offline vendoring works".
+!backend/packages/
 
 # Local project Postgres data directory
 .pgdata/
@@ -37,3 +40,9 @@ yarn-error.log*
 *.swp
 .DS_Store
 Thumbs.db
+
+# Vendored npm cache for offline installs (~200 MB of tarballs).
+# Deliberately untracked: too large for git, but it MUST be copied by hand
+# when moving the project to an offline machine. See README.
+frontend/vendor/npm-cache/
+package/
