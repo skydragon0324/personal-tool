@@ -19,6 +19,7 @@ import type { ScheduleEntry, ScheduleEntryCreate } from "@/features/schedule/typ
 import { mondayOf } from "@/features/schedule/utils/schedule-time";
 import { apiClient } from "@/lib/api-client";
 import { todayISO } from "@/lib/dates";
+import { notifyApiError } from "@/lib/notify";
 
 import type { TodaySchedule } from "../types";
 
@@ -74,6 +75,8 @@ export function TodayTaskDrawer({
         links: payload.links,
         edit_scope: payload.edit_scope,
         recurrence: payload.recurrence,
+        remind_at: payload.remind_at,
+        assignee_ids: payload.assignee_ids,
       },
     });
     for (const file of pendingFiles) {
@@ -126,11 +129,16 @@ export function TodayTaskDrawer({
           submitting={remove.isPending}
           onClose={() => setDeleting(null)}
           onConfirm={async (scope, confirmCompleted) => {
-            await remove.mutateAsync({
-              taskId: deleting.id,
-              deleteScope: scope,
-              confirmCompleted: Boolean(confirmCompleted || deleting.completed),
-            });
+            try {
+              await remove.mutateAsync({
+                taskId: deleting.id,
+                deleteScope: scope,
+                confirmCompleted: Boolean(confirmCompleted || deleting.completed),
+              });
+            } catch (error) {
+              notifyApiError(error, "Could not delete the task");
+              return;
+            }
             setDeleting(null);
             onClose();
           }}
@@ -143,7 +151,12 @@ export function TodayTaskDrawer({
           onClose={() => setDeleting(null)}
           onConfirm={async () => {
             if (!deleting) return;
-            await remove.mutateAsync({ taskId: deleting.id });
+            try {
+              await remove.mutateAsync({ taskId: deleting.id });
+            } catch (error) {
+              notifyApiError(error, "Could not delete the task");
+              return;
+            }
             setDeleting(null);
             onClose();
           }}
@@ -190,7 +203,12 @@ export function TodayNoteDrawer({
         onClose={() => setPendingDelete(null)}
         onConfirm={async () => {
           if (!pendingDelete) return;
-          await mutations.remove.mutateAsync(pendingDelete.id);
+          try {
+            await mutations.remove.mutateAsync(pendingDelete.id);
+          } catch (error) {
+            notifyApiError(error, "Could not delete note");
+            return;
+          }
           setPendingDelete(null);
           onClose();
         }}
@@ -242,7 +260,12 @@ export function TodayScheduleEditor({
 
   async function handleDelete() {
     if (!pendingDelete) return;
-    await mutations.remove.mutateAsync(pendingDelete.id);
+    try {
+      await mutations.remove.mutateAsync(pendingDelete.id);
+    } catch (error) {
+      notifyApiError(error, "Could not delete schedule");
+      return;
+    }
     setPendingDelete(null);
     onClose();
   }

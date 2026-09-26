@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { notificationKeys } from "@/features/notifications/api/notification-queries";
 import { todayKeys } from "@/features/today/api/today-queries";
 import { apiClient } from "@/lib/api-client";
 import { notifyApiError } from "@/lib/notify";
@@ -57,6 +58,7 @@ export function useScheduleOccurrence() {
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
       await queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
 

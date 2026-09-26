@@ -11,6 +11,9 @@ import { ApiError, apiClient, setCsrfToken, setUnauthorizedHandler } from "@/lib
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
+  /** The session check failed for a reason other than 401 (network error, 5xx). */
+  sessionCheckFailed: boolean;
+  retrySessionCheck: () => void;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,9 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    retry: false,
+    // 401 resolves to null above. Retry network errors and 5xx a few times so a backend that is
+    // still starting does not leave the first load on the error screen.
+    retry: (failureCount, error) =>
+      failureCount < 3 && !(error instanceof ApiError && error.status < 500),
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     staleTime: 60_000,
   });
+  const refetchMe = meQuery.refetch;
 
   const resetWorkspace = useCallback(() => {
     queryClient.clear();
@@ -90,11 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user: meQuery.data ?? null,
       isLoading: meQuery.isLoading,
+      sessionCheckFailed: meQuery.isError && meQuery.data === undefined,
+      retrySessionCheck: () => void refetchMe(),
       login,
       register,
       logout,
     }),
-    [login, logout, meQuery.data, meQuery.isLoading, register],
+    [login, logout, meQuery.data, meQuery.isError, meQuery.isLoading, refetchMe, register],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

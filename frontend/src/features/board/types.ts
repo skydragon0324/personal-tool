@@ -16,6 +16,8 @@ export interface BoardFilters {
   priority: Priority | "";
   query: string;
   categoryId: string;
+  /** "" = everyone, "unassigned", or a user id. */
+  assigneeId?: string;
 }
 
 export type TiptapJSON = Record<string, unknown>;
@@ -75,6 +77,13 @@ export interface TaskAttachment {
 }
 
 /** Board card payload — no full rich content. */
+/** Someone on a board who a task can be assigned to. */
+export interface TaskAssignee {
+  id: string;
+  display_name: string;
+  email: string;
+}
+
 export interface TaskSummary {
   id: string;
   column_id: string;
@@ -96,6 +105,8 @@ export interface TaskSummary {
   subtask_completed: number;
   category: Category;
   recurrence?: RecurrenceRead | null;
+  /** Everyone the task is assigned to (can be several). */
+  assignees?: TaskAssignee[];
 }
 
 export interface TaskSubtask {
@@ -122,6 +133,7 @@ export interface TaskDetail {
   position: number;
   version: number;
   completed_at: string | null;
+  remind_at?: string | null;
   created_at: string;
   updated_at: string;
   links: TaskLink[];
@@ -129,6 +141,8 @@ export interface TaskDetail {
   subtasks: TaskSubtask[];
   category: Category;
   recurrence?: RecurrenceRead | null;
+  /** Everyone the task is assigned to (can be several). */
+  assignees?: TaskAssignee[];
 }
 
 export interface BoardColumn {
@@ -169,7 +183,13 @@ export interface BoardListItem {
   completed_tasks: number;
   status_count: number;
   attachment_count: number;
+  /** "member" when the board is shared with you by someone else. */
+  role?: BoardRole;
+  owner_name?: string | null;
+  member_count?: number;
 }
+
+export type BoardRole = "owner" | "member";
 
 export interface BoardStatusSeed {
   name: string;
@@ -209,6 +229,7 @@ export interface BoardView {
   task_limit: number;
   summary: BoardSummary;
   columns: BoardColumn[];
+  role?: BoardRole;
 }
 
 export interface TaskCreate {
@@ -223,6 +244,10 @@ export interface TaskCreate {
   links?: TaskLinkInput[];
   recurrence?: RecurrenceInput | null;
   edit_scope?: EditScope;
+  /** ISO timestamp with offset; null clears the reminder. */
+  remind_at?: string | null;
+  /** Everyone to assign; an empty list leaves the task unassigned. */
+  assignee_ids?: string[];
 }
 
 export interface TaskUpdate {
@@ -236,6 +261,8 @@ export interface TaskUpdate {
   links?: TaskLinkInput[];
   edit_scope?: EditScope;
   recurrence?: RecurrenceInput | null;
+  remind_at?: string | null;
+  assignee_ids?: string[];
 }
 
 export interface TaskMove {
@@ -258,3 +285,28 @@ export interface BoardQueryParams {
 
 /** @deprecated use TaskSummary */
 export type Task = TaskSummary;
+
+export interface BoardPerson {
+  user_id: string;
+  display_name: string;
+  email: string;
+  role: BoardRole;
+}
+
+export interface BoardInvitation {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export interface BoardMembers {
+  people: BoardPerson[];
+  invitations: BoardInvitation[];
+  /** True for the owner: can invite, remove members and cancel invitations. */
+  can_manage: boolean;
+}
+
+export interface BoardInviteResult {
+  status: "added" | "invited";
+  members: BoardMembers;
+}

@@ -14,6 +14,7 @@ from app.schemas.today import (
     TodayScheduleRead,
     TodayTaskRead,
 )
+from app.services.ownership import task_focus
 from app.services.schedule_occurrence_service import entry_occurs_on, prune_old_occurrence_states
 
 PINNED_NOTES_LIMIT = 6
@@ -74,7 +75,7 @@ def _load_task_rows(db: Session, user_id: uuid.UUID, *extra_filters):
             .join(Board, Board.id == BoardColumn.board_id)
             .options(selectinload(Task.subtasks))
             .where(
-                Board.user_id == user_id,
+                task_focus(user_id),
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
                 *extra_filters,

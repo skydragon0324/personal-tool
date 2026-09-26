@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
 import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
+import { notificationKeys } from "@/features/notifications/api/notification-queries";
 import { recurrenceKeys } from "@/features/recurrence/api/recurrence-queries";
 import { todayKeys } from "@/features/today/api/today-queries";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
@@ -23,6 +24,7 @@ export function useTaskMutations(
     void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     void queryClient.invalidateQueries({ queryKey: boardKeys.views(params.boardId) });
     void queryClient.invalidateQueries({ queryKey: recurrenceKeys.all });
+    void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
   }
 
   const create = useMutation({
@@ -107,5 +109,31 @@ export function useTaskMutations(
     },
   });
 
-  return { create, update, remove, stopRecurrence, uploadAttachment, deleteAttachment };
+  const duplicate = useMutation({
+    mutationFn: (taskId: string) => apiClient.duplicateTask(taskId),
+    onSuccess: () => invalidateRelated(),
+  });
+
+  const moveToBoard = useMutation({
+    mutationFn: ({ taskId, boardId, columnId }: { taskId: string; boardId: string; columnId?: string | null }) =>
+      apiClient.moveTaskToBoard(taskId, { board_id: boardId, column_id: columnId ?? null }),
+    onSuccess: (task, vars) => {
+      queryClient.setQueryData(taskKeys.detail(task.id), task);
+      invalidateRelated();
+      void queryClient.invalidateQueries({ queryKey: boardKeys.views(vars.boardId) });
+      // Task counts on both boards change.
+      void queryClient.invalidateQueries({ queryKey: boardKeys.list });
+    },
+  });
+
+  return {
+    create,
+    update,
+    remove,
+    stopRecurrence,
+    uploadAttachment,
+    deleteAttachment,
+    duplicate,
+    moveToBoard,
+  };
 }

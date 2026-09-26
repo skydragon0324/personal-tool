@@ -15,6 +15,8 @@ describe("application navigation", () => {
     expect(sectionFromPath("/inbox")).toBe("today");
     expect(sectionFromPath("/boards")).toBe("boards");
     expect(sectionFromPath("/boards/abc")).toBe("boards");
+    expect(sectionFromPath("/plans")).toBe("plans");
+    expect(sectionFromPath("/plans/abc")).toBe("plans");
     expect(sectionFromPath("/notepad")).toBe("notepad");
     expect(sectionFromPath("/schedule")).toBe("schedule");
     expect(isBoardsPath("/")).toBe(false);

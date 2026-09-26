@@ -63,5 +63,6 @@ class User(Base):
     task_recurrence_series: Mapped[list[TaskRecurrenceSeries]] = relationship(
         "TaskRecurrenceSeries",
         back_populates="user",
+        foreign_keys="TaskRecurrenceSeries.user_id",
         cascade="all, delete-orphan",
     )

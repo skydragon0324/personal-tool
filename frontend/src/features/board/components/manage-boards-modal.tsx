@@ -139,7 +139,8 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
   const active = useMemo(
     () =>
       (boardsQuery.data ?? [])
-        .filter((board) => !board.archived_at)
+        // Boards shared with you are managed by their owner.
+        .filter((board) => !board.archived_at && board.role !== "member")
         .sort((a, b) => a.position - b.position),
     [boardsQuery.data],
   );

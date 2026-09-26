@@ -74,6 +74,9 @@ def register(db: Session, payload: RegisterRequest, request: Request, response: 
             db.add(user)
             db.flush()
             seed_personal_board(db, user.id, payload.timezone)
+        from app.services.board_member_service import accept_pending_invitations
+
+        accept_pending_invitations(db, user)
         return _issue_session(db, user, response)
     except IntegrityError:
         db.rollback()

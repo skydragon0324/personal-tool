@@ -1,5 +1,7 @@
 import type { BoardFilters, TasksByColumn } from "../types";
 
+export const UNASSIGNED = "unassigned";
+
 export function filterTasksByColumn(
   tasksByColumn: TasksByColumn,
   filters: BoardFilters,
@@ -11,6 +13,15 @@ export function filterTasksByColumn(
     next[columnId] = tasks.filter((task) => {
       if (filters.priority && task.priority !== filters.priority) return false;
       if (filters.categoryId && task.category?.id !== filters.categoryId) {
+        return false;
+      }
+      const assignees = task.assignees ?? [];
+      if (filters.assigneeId === UNASSIGNED && assignees.length) return false;
+      if (
+        filters.assigneeId &&
+        filters.assigneeId !== UNASSIGNED &&
+        !assignees.some((person) => person.id === filters.assigneeId)
+      ) {
         return false;
       }
       if (query) {

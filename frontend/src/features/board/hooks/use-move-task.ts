@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api-client";
+import { notificationKeys } from "@/features/notifications/api/notification-queries";
 import { todayKeys } from "@/features/today/api/today-queries";
 import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
@@ -97,6 +98,7 @@ export function useMoveTask(params: BoardQueryParams) {
       await queryClient.invalidateQueries({ queryKey: todayKeys.all });
       await queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       await queryClient.invalidateQueries({ queryKey: boardKeys.views(params.boardId) });
+      await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
 }

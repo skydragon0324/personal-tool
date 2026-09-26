@@ -55,8 +55,9 @@ export function TaskDialog({
       trapFocus={false}
       transitionProps={{ duration: 120 }}
       classNames={{
-        content: "max-w-4xl w-[min(96vw,56rem)]",
-        body: "p-0 sm:p-1",
+        // One scroll area: the modal is a fixed-height column and the form scrolls inside it.
+        content: "max-w-4xl w-[min(96vw,56rem)] !flex flex-col !overflow-hidden",
+        body: "flex min-h-0 flex-1 flex-col p-0 sm:p-1",
       }}
     >
       {open ? (
@@ -72,7 +73,7 @@ export function TaskDialog({
             </Alert>
           ) : null}
           {!loadingDetail && !detailError ? (
-            <div className="px-1 pb-2 sm:px-2">
+            <div className="flex min-h-0 flex-1 flex-col px-1 pb-2 sm:px-2">
               <TaskForm
                 key={`${initial?.id ?? "new"}-${columnId}-${dueDate}`}
                 initial={initial}

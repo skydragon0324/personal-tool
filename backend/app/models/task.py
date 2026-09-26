@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from app.models.task_link import TaskLink
     from app.models.task_recurrence import TaskRecurrenceSeries
     from app.models.task_subtask import TaskSubtask
+    from app.models.user import User
 
 
 class Task(Base):
@@ -49,6 +50,7 @@ class Task(Base):
         Index("ix_tasks_start_due", "start_date", "due_date"),
         Index("ix_tasks_content_text", "content_text"),
         Index("ix_tasks_series_occurrence_date", "recurrence_series_id", "occurrence_date"),
+        Index("ix_tasks_remind_at", "remind_at", postgresql_where=text("remind_at IS NOT NULL")),
         Index(
             "uq_tasks_series_original_occurrence",
             "recurrence_series_id",
@@ -81,6 +83,7 @@ class Task(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    remind_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     recurrence_series_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("task_recurrence_series.id", ondelete="SET NULL"),
@@ -102,6 +105,10 @@ class Task(Base):
 
     column: Mapped[BoardColumn] = relationship("BoardColumn", back_populates="tasks")
     category: Mapped[Category] = relationship("Category", back_populates="tasks")
+    # Everyone assigned to the task, via task_assignees.
+    assignees: Mapped[list[User]] = relationship(
+        "User", secondary="task_assignees", lazy="selectin", order_by="User.display_name"
+    )
     recurrence_series: Mapped[TaskRecurrenceSeries | None] = relationship(
         "TaskRecurrenceSeries", back_populates="occurrences"
     )

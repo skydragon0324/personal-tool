@@ -152,3 +152,64 @@ def test_patch_series_is_404_for_another_user(db: Session) -> None:
     )
     assert stolen.status_code == 404
     app.dependency_overrides.clear()
+
+
+def test_viewing_board_or_today_does_not_bump_series_version(client: TestClient) -> None:
+    board_id, todo, done, category = _board_ids(client)
+    created = client.post(
+        "/api/v1/tasks",
+        json={
+            "column_id": todo,
+            "category_id": category,
+            "title": "Daily check-in",
+            "start_date": FRIDAY.isoformat(),
+            "due_date": FRIDAY.isoformat(),
+            "recurrence": {"freq": "daily", "interval": 1},
+        },
+    )
+    assert created.status_code == 201, created.text
+    first = created.json()
+    series_id = first["recurrence"]["series_id"]
+    opened = client.get(f"/api/v1/task-recurrence/{series_id}").json()
+
+    # Background generation from board/Today loads and task completion must not look like an edit.
+    view = client.get(
+        f"/api/v1/boards/{board_id}/view",
+        params={"start_date": "2026-11-02", "end_date": "2026-11-08"},
+    )
+    assert view.status_code == 200, view.text
+    assert client.get("/api/v1/today", params={"date": "2026-11-03"}).status_code == 200
+    completed = client.patch(
+        f"/api/v1/tasks/{first['id']}/move",
+        json={"target_column_id": done, "expected_version": first["version"]},
+    )
+    assert completed.status_code == 200, completed.text
+    assert client.get(f"/api/v1/task-recurrence/{series_id}").json()["version"] == opened["version"]
+
+    saved = client.patch(
+        f"/api/v1/task-recurrence/{series_id}",
+        json={"expected_version": opened["version"], "title": "Daily check-in (renamed)"},
+    )
+    assert saved.status_code == 200, saved.text
+
+
+def test_series_edit_rejects_due_before_start(client: TestClient) -> None:
+    _board_id, todo, _done, category = _board_ids(client)
+    created = client.post(
+        "/api/v1/tasks",
+        json={
+            "column_id": todo,
+            "category_id": category,
+            "title": "Two-day review",
+            "start_date": FRIDAY.isoformat(),
+            "due_date": date(2026, 8, 23).isoformat(),
+            "recurrence": {"freq": "weekly", "weekdays": [4]},
+        },
+    )
+    assert created.status_code == 201, created.text
+    task_id = created.json()["id"]
+    response = client.patch(
+        f"/api/v1/tasks/{task_id}",
+        json={"due_date": date(2026, 8, 20).isoformat(), "edit_scope": "series"},
+    )
+    assert response.status_code == 422, response.text

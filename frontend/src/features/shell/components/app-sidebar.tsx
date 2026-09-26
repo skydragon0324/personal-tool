@@ -9,6 +9,7 @@ import { useAuth } from "@/features/auth/components/auth-provider";
 import { ThemeToggle } from "@/features/board/components/theme-toggle";
 import { useBoards, activeBoards } from "@/features/board/hooks/use-boards";
 import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
 
 import { boardsGroupExpanded, readBoardsNavCollapsed, writeBoardsNavCollapsed } from "../utils/boards-nav";
 import { boardIdFromPath, isBoardsIndexPath, sectionFromPath } from "../utils/navigation";
@@ -43,8 +44,9 @@ export function AppSidebar() {
 
   return (
     <div className="flex h-full flex-col bg-[var(--app-surface)]">
-      <div className="border-b border-[var(--app-border)] px-4 py-4">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--app-border)] px-4 py-4">
         <p className="font-display text-lg text-[var(--app-text)]">Life Management</p>
+        <NotificationBell />
       </div>
       <nav aria-label="Application" className="flex min-h-0 flex-1 flex-col px-2 py-3">
         <Link
@@ -86,6 +88,15 @@ export function AppSidebar() {
             onNavigate={() => chrome?.closeSidebar()}
           />
         ) : null}
+        <Link
+          href="/plans"
+          aria-current={section === "plans" ? "page" : undefined}
+          onClick={() => chrome?.closeSidebar()}
+          className={`mt-1 shrink-0 ${navItemClass(section === "plans")}`}
+        >
+          <NavIcon name="plans" />
+          Plans
+        </Link>
         <Link
           href="/notepad"
           aria-current={section === "notepad" ? "page" : undefined}
@@ -133,6 +144,8 @@ function BoardList({
     name: string;
     color: string;
     icon_name: string | null;
+    role?: "owner" | "member";
+    owner_name?: string | null;
   }>;
   currentBoardId?: string;
   onNavigate: () => void;
@@ -192,6 +205,15 @@ function BoardList({
                   <BoardGlyph name={board.icon_name} size={12} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{board.name}</span>
+                {board.role === "member" ? (
+                  <span
+                    className="shrink-0 text-[var(--app-text-muted)]"
+                    title={board.owner_name ? `Shared by ${board.owner_name}` : "Shared with you"}
+                    aria-label="Shared with you"
+                  >
+                    <SharedIcon />
+                  </span>
+                ) : null}
               </Link>
             );
           })}
@@ -212,6 +234,16 @@ function navItemClass(active: boolean): string {
       ? "bg-[var(--app-primary)]/15 text-[var(--app-text)]"
       : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)]"
   }`;
+}
+
+function SharedIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="9" cy="8" r="3.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {

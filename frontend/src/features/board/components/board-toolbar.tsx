@@ -4,7 +4,8 @@ import { Button, Input, Select, Text, TextInput } from "@mantine/core";
 import { DatePickerInput, MonthPickerInput, YearPickerInput } from "@mantine/dates";
 
 import { formatLongDate } from "@/lib/dates";
-import type { BoardFilters, Category, Priority } from "../types";
+import { UNASSIGNED } from "../utils/filter-tasks";
+import type { BoardFilters, BoardPerson, Category, Priority } from "../types";
 import { commitCustomRange, normalizeCustomDraft } from "../utils/board-range";
 import {
   dayRange,
@@ -31,6 +32,9 @@ interface BoardToolbarProps {
   filters: BoardFilters;
   onFiltersChange: (next: BoardFilters) => void;
   categories: Category[];
+  /** People on the board, for the assignee filter. */
+  people?: BoardPerson[];
+  currentUserId?: string;
   onReset: () => void;
   customError: string | null;
   onCustomError: (message: string | null) => void;
@@ -223,6 +227,8 @@ export function BoardToolbar({
   filters,
   onFiltersChange,
   categories,
+  people = [],
+  currentUserId,
   onReset,
   customError,
   onCustomError,
@@ -230,7 +236,7 @@ export function BoardToolbar({
 }: BoardToolbarProps) {
   return (
     <section className="border-b border-[var(--app-border)] bg-[var(--app-surface)]">
-      <div className="mx-auto grid max-w-[1400px] items-start gap-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(8rem,10rem)_minmax(9rem,12rem)_minmax(16rem,1.4fr)_minmax(9rem,12rem)_minmax(8rem,10rem)_1fr_auto]">
+      <div className="mx-auto grid max-w-[1400px] items-start gap-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(8rem,10rem)_minmax(9rem,12rem)_minmax(16rem,1.4fr)_minmax(9rem,12rem)_minmax(8rem,10rem)_minmax(9rem,12rem)_1fr_auto]">
         <Select
           label="Date field"
           data={[
@@ -303,6 +309,22 @@ export function BoardToolbar({
             })
           }
           clearable
+        />
+        <Select
+          label="Assignee"
+          placeholder="Anyone"
+          data={[
+            { value: "", label: "Anyone" },
+            ...(currentUserId ? [{ value: currentUserId, label: "Assigned to me" }] : []),
+            { value: UNASSIGNED, label: "Unassigned" },
+            ...people
+              .filter((person) => person.user_id !== currentUserId)
+              .map((person) => ({ value: person.user_id, label: person.display_name })),
+          ]}
+          value={filters.assigneeId ?? ""}
+          onChange={(value) => onFiltersChange({ ...filters, assigneeId: value ?? "" })}
+          clearable
+          searchable
         />
         <TextInput
           label="Search"

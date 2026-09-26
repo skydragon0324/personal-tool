@@ -28,6 +28,10 @@ vi.mock("@/features/board/hooks/use-boards", () => ({
   activeBoards: (boards: Array<{ id: string; name: string }> | undefined) => boards ?? [],
 }));
 
+vi.mock("@/features/notifications/components/notification-bell", () => ({
+  NotificationBell: () => createElement("button", { type: "button", "aria-label": "Notifications" }),
+}));
+
 describe("sidebar board hierarchy", () => {
   it("nests board children under Boards and keeps New/Manage off the sidebar", async () => {
     render(createElement(MantineProvider, { env: "test" }, createElement(AppSidebar)));

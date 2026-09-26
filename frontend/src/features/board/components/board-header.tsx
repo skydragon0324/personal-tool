@@ -15,6 +15,10 @@ interface BoardHeaderProps {
   onViewModeChange: (mode: ViewMode) => void;
   onQuickAdd: () => void;
   onManageStatuses: () => void;
+  onShare: () => void;
+  /** Members of a shared board cannot manage statuses. */
+  isOwner?: boolean;
+  memberCount?: number;
   quickAddDisabled?: boolean;
 }
 
@@ -33,6 +37,9 @@ export function BoardHeader({
   onViewModeChange,
   onQuickAdd,
   onManageStatuses,
+  onShare,
+  isOwner = true,
+  memberCount = 0,
   quickAddDisabled = false,
 }: BoardHeaderProps) {
   return (
@@ -47,7 +54,7 @@ export function BoardHeader({
           </span>
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-[var(--app-text-muted)]">
-              Current board
+              {isOwner ? "Current board" : "Shared board"}
             </p>
             <h1 className="truncate font-display text-2xl text-[var(--app-text)] sm:text-3xl">
               {boardName}
@@ -62,8 +69,13 @@ export function BoardHeader({
               </Button>
             </span>
           </Tooltip>
-          <Button variant="light" onClick={onManageStatuses}>
-            Manage statuses
+          {isOwner ? (
+            <Button variant="light" onClick={onManageStatuses}>
+              Manage statuses
+            </Button>
+          ) : null}
+          <Button variant="default" onClick={onShare}>
+            {memberCount > 0 ? `Share · ${memberCount + 1}` : "Share"}
           </Button>
           <Menu shadow="md" width={220} position="bottom-end">
             <Menu.Target>

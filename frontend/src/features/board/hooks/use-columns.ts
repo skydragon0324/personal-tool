@@ -66,7 +66,14 @@ export function useColumnMutations(boardId: string) {
     onSuccess: invalidate,
   });
 
-  return { create, update, reorder, archive, restore, remove };
+  /** Delete a status in one step, moving any tasks it has to `moveToColumnId`. */
+  const removeMovingTasks = useMutation({
+    mutationFn: ({ columnId, moveToColumnId }: { columnId: string; moveToColumnId: string | null }) =>
+      apiClient.deleteColumnMovingTasks(columnId, moveToColumnId),
+    onSuccess: invalidate,
+  });
+
+  return { create, update, reorder, archive, restore, remove, removeMovingTasks };
 }
 
 export function activeColumns(columns: ColumnDetail[] | undefined): ColumnDetail[] {

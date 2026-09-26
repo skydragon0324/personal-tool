@@ -67,6 +67,10 @@ class TaskRecurrenceSeries(Base):
         UUID(as_uuid=True), ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(160), nullable=False)
+    # Assignees copied onto newly generated occurrences.
+    assignee_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), nullable=False, default=list, server_default=text("'{}'")
+    )
     priority: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
     content: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -92,7 +96,9 @@ class TaskRecurrenceSeries(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    user: Mapped[User] = relationship("User", back_populates="task_recurrence_series")
+    user: Mapped[User] = relationship(
+        "User", back_populates="task_recurrence_series", foreign_keys="TaskRecurrenceSeries.user_id"
+    )
     board: Mapped[Board] = relationship("Board")
     default_column: Mapped[BoardColumn | None] = relationship("BoardColumn")
     category: Mapped[Category] = relationship("Category")

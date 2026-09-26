@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -19,6 +20,9 @@ class BoardColumnRead(BaseModel):
     is_done: bool
     archived_at: datetime | None = None
     tasks: list[TaskSummaryRead]
+
+
+BoardRole = Literal["owner", "member"]
 
 
 class BoardSummary(BaseModel):
@@ -45,6 +49,7 @@ class BoardView(BaseModel):
     task_limit: int = 500
     summary: BoardSummary
     columns: list[BoardColumnRead]
+    role: BoardRole = "owner"
 
 
 class BoardRead(BaseModel):
@@ -63,6 +68,9 @@ class BoardRead(BaseModel):
     completed_tasks: int = 0
     status_count: int = 0
     attachment_count: int = 0
+    role: BoardRole = "owner"
+    owner_name: str | None = None
+    member_count: int = 0
 
 
 class BoardStatusSeed(BaseModel):

@@ -7,10 +7,11 @@ import { useCallback, useMemo } from "react";
 
 import { ApiError } from "@/lib/api-client";
 import { notifyApiError, notifyConflict } from "@/lib/notify";
-import type { BoardColumn, BoardQueryParams, TaskSummary, TasksByColumn } from "../types";
+import type { BoardColumn, BoardPerson, BoardQueryParams, TaskSummary, TasksByColumn } from "../types";
 import { useBoardDnd } from "../hooks/use-board-dnd";
 import { BOARD_CONTENT_GUTTER } from "../utils/board-layout";
 import { POINTER_ACTIVATION_DISTANCE, isNoDragTarget } from "../utils/pointer-activation";
+import { AddStatusColumn } from "./column-header";
 import { KanbanColumn } from "./kanban-column";
 import { TaskDragOverlay } from "./task-drag-overlay";
 
@@ -21,6 +22,12 @@ interface KanbanBoardProps {
   onAdd: (columnId: string) => void;
   onOpenDetail: (task: TaskSummary, mode?: "view" | "edit") => void;
   onDelete: (task: TaskSummary) => void;
+  /** Owners can add, rename, recolor, reorder and delete statuses from the board. */
+  canManageStatuses: boolean;
+  people: BoardPerson[];
+  onAssign: (task: TaskSummary, userIds: string[]) => void;
+  onDuplicate: (task: TaskSummary) => void;
+  onMoveToBoard: (task: TaskSummary) => void;
 }
 
 export function KanbanBoard({
@@ -30,6 +37,11 @@ export function KanbanBoard({
   onAdd,
   onOpenDetail,
   onDelete,
+  canManageStatuses,
+  people,
+  onAssign,
+  onDuplicate,
+  onMoveToBoard,
 }: KanbanBoardProps) {
   const orderedColumns = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
@@ -102,6 +114,12 @@ export function KanbanBoard({
           {orderedColumns.map((column) => (
             <KanbanColumn
               key={column.id}
+              boardId={query.boardId}
+              canManageStatuses={canManageStatuses}
+              people={people}
+              onAssign={onAssign}
+              onDuplicate={onDuplicate}
+              onMoveToBoard={onMoveToBoard}
               column={column}
               columns={orderedColumns}
               tasks={items[column.id] ?? []}
@@ -111,6 +129,7 @@ export function KanbanBoard({
               onMoveStatus={(task, columnId) => void handleMoveStatus(task, columnId)}
             />
           ))}
+          {canManageStatuses ? <AddStatusColumn boardId={query.boardId} columns={orderedColumns} /> : null}
         </div>
         <TaskDragOverlay resolveTask={resolveTask} />
       </DragDropProvider>

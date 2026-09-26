@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TaskSummary } from "../types";
-import { filterTasksByColumn } from "./filter-tasks";
+import { UNASSIGNED, filterTasksByColumn } from "./filter-tasks";
 
 const task = (
   overrides: Partial<TaskSummary> & Pick<TaskSummary, "id" | "title" | "category">,
@@ -61,5 +61,30 @@ describe("filterTasksByColumn", () => {
       categoryId: "",
     });
     expect(filtered["col-1"]).toHaveLength(2);
+  });
+});
+
+describe("assignee filter", () => {
+  const category = { id: "cat", name: "Work", color: "blue" };
+  const ann = { id: "user-ann", display_name: "Ann", email: "ann@example.com" };
+  const tasks = {
+    "col-1": [
+      task({ id: "a", title: "Ann's", category, assignees: [ann, { id: "user-bo", display_name: "Bo", email: "bo@example.com" }] }),
+      task({ id: "b", title: "Nobody's", category, assignees: [] }),
+    ],
+  };
+  const base = { priority: "" as const, query: "", categoryId: "" };
+
+  it("keeps everything by default", () => {
+    expect(filterTasksByColumn(tasks, base)["col-1"].map((item) => item.id)).toEqual(["a", "b"]);
+  });
+
+  it("filters by person or unassigned", () => {
+    expect(
+      filterTasksByColumn(tasks, { ...base, assigneeId: "user-ann" })["col-1"].map((item) => item.id),
+    ).toEqual(["a"]);
+    expect(
+      filterTasksByColumn(tasks, { ...base, assigneeId: UNASSIGNED })["col-1"].map((item) => item.id),
+    ).toEqual(["b"]);
   });
 });

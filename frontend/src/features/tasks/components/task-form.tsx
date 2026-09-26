@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Select } from "@mantine/core";
+import { MultiSelect, Select } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import {
   Alert,
@@ -36,6 +36,7 @@ import type {
   TaskLinkInput,
   TiptapJSON,
 } from "@/features/board/types";
+import { useBoardMembers } from "@/features/board/hooks/use-board-members";
 import { useCategories, useCreateCategory } from "@/features/board/hooks/use-categories";
 import { todayISO } from "@/lib/dates";
 import { CategoryCombobox } from "./category-combobox";
@@ -108,6 +109,7 @@ export function TaskForm({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [content, setContent] = useState<TiptapJSON | null>(null);
   const [links, setLinks] = useState<TaskLinkInput[]>([]);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [pendingImages, setPendingImages] = useState<PendingInlineImage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -118,9 +120,29 @@ export function TaskForm({
 
   const categoriesQuery = useCategories(boardId);
   const createCategory = useCreateCategory(boardId);
+  const membersQuery = useBoardMembers(boardId);
+  const people = useMemo(() => membersQuery.data?.people ?? [], [membersQuery.data]);
+  const shared = people.length > 1;
+  const assigneeOptions = useMemo(() => {
+    const options = people.map((person) => ({ value: person.user_id, label: person.display_name }));
+    // Keep current assignees selectable even if the member list has not loaded yet.
+    for (const current of initial?.assignees ?? []) {
+      if (!options.some((option) => option.value === current.id)) {
+        options.push({ value: current.id, label: current.display_name });
+      }
+    }
+    return options;
+  }, [initial?.assignees, people]);
   const categories = categoriesQuery.data ?? [];
 
+  // Reset the form only when the task identity changes. A refetch of the same task (e.g. after an
+  // image upload or attachment delete) yields a new `initial` object and must not wipe unsaved edits.
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
+  const initialId = initial?.id ?? null;
+
   useEffect(() => {
+    const initial = initialRef.current;
     if (initial) {
       setTitle(initial.title);
       setPriority(initial.priority);
@@ -140,6 +162,7 @@ export function TaskForm({
         })),
       );
       setSavedTaskId(initial.id);
+      setAssigneeIds((initial.assignees ?? []).map((person) => person.id));
       setRepeatPreset(presetFromRecurrence(initial.recurrence));
       setCustomInterval(initial.recurrence?.interval ?? 1);
       setCustomUnit(repeatUnitFromRecurrence(initial.recurrence));
@@ -158,13 +181,14 @@ export function TaskForm({
       setContent(null);
       setLinks([]);
       setSavedTaskId(null);
+      setAssigneeIds([]);
       setRepeatPreset("none");
       setRepeatEnd("never");
     }
     setPendingFiles([]);
     setPendingImages([]);
     setError(null);
-  }, [initial, dueDate]);
+  }, [initialId, dueDate]);
 
   const handleEditorReady = useCallback((editor: Editor | null) => {
     editorRef.current = editor;
@@ -326,6 +350,7 @@ export function TaskForm({
           position: index,
         })),
         recurrence,
+        assignee_ids: assigneeIds,
       };
       if (initial?.recurrence?.series_id) {
         if (recurrence === null) {
@@ -384,7 +409,8 @@ export function TaskForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex max-h-[min(85vh,900px)] flex-col">
+    // Fills its container; only the fields area scrolls so the action buttons stay visible.
+    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
         <section className="space-y-3">
           <Title order={5}>Basics</Title>
@@ -421,6 +447,24 @@ export function TaskForm({
               valueFormat="MMM D, YYYY"
             />
           </SimpleGrid>
+          <MultiSelect
+            label="Assign to"
+            description={
+              initial?.recurrence?.series_id
+                ? "They get a notification. Future repeats go to the same people."
+                : shared
+                  ? "They get a notification when you save."
+                  : "Use Share on the board to invite teammates you can assign."
+            }
+            placeholder={assigneeIds.length ? undefined : "Unassigned"}
+            data={assigneeOptions}
+            value={assigneeIds}
+            onChange={setAssigneeIds}
+            clearable
+            searchable
+            hidePickedOptions
+            maw={520}
+          />
           <RecurrenceFields
             preset={repeatPreset}
             onPresetChange={setRepeatPreset}

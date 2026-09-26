@@ -223,7 +223,7 @@ def test_restore_missing_column_is_404(client: TestClient) -> None:
     assert response.status_code == 404
 
 
-def test_delete_column_requires_archived_empty_status(client: TestClient) -> None:
+def test_delete_column_archived_or_active(client: TestClient) -> None:
     name = f"Temp-{uuid4().hex[:8]}"
     created = client.post(
         f"/api/v1/boards/{DEFAULT_BOARD_ID}/columns",
@@ -231,9 +231,6 @@ def test_delete_column_requires_archived_empty_status(client: TestClient) -> Non
     )
     assert created.status_code == 201, created.text
     column_id = created.json()["id"]
-
-    active_delete = client.delete(f"/api/v1/columns/{column_id}")
-    assert active_delete.status_code == 422
 
     archived = client.post(f"/api/v1/columns/{column_id}/archive", json={})
     assert archived.status_code == 200
@@ -252,3 +249,23 @@ def test_default_board_is_named_personal(client: TestClient) -> None:
     )
     assert response.status_code == 200, response.text
     assert response.json()["name"] == "Personal"
+
+
+def test_delete_active_column_moves_its_tasks(client: TestClient) -> None:
+    columns = client.get(f"/api/v1/boards/{DEFAULT_BOARD_ID}/columns").json()
+    target = next(item["id"] for item in columns if not item["is_done"] and not item["archived_at"])
+    created = client.post(
+        f"/api/v1/boards/{DEFAULT_BOARD_ID}/columns",
+        json={"name": f"Temp-{uuid4().hex[:8]}", "color": "slate", "is_done": False},
+    ).json()
+    category = client.get(f"/api/v1/boards/{DEFAULT_BOARD_ID}/categories").json()[0]["id"]
+    task = client.post(
+        "/api/v1/tasks",
+        json={"column_id": created["id"], "category_id": category, "title": "Keep me", "due_date": "2026-09-23"},
+    ).json()
+
+    blocked = client.delete(f"/api/v1/columns/{created['id']}")
+    assert blocked.status_code == 409
+    deleted = client.delete(f"/api/v1/columns/{created['id']}", params={"move_to_column_id": target})
+    assert deleted.status_code == 204, deleted.text
+    assert client.get(f"/api/v1/tasks/{task['id']}").json()["column_id"] == target

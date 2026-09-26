@@ -13,6 +13,7 @@ import {
   Modal,
   Select,
   Stack,
+  Switch,
   Tabs,
   Text,
   TextInput,
@@ -97,19 +98,17 @@ function SortableStatusRow({
               />
             ))}
           </Group>
-          <Checkbox
-            label="Counts as completed"
-            description="Tasks in this status are counted as completed."
-            checked={column.is_done}
-            onChange={(event) => onDone(event.currentTarget.checked)}
-          />
-          <Button size="xs" color="red" variant="light" onClick={onRequestArchive}>
-            Archive status
-          </Button>
-          <Text size="xs" c="dimmed">
-            Archiving hides this status from the board. Existing tasks must be moved to another
-            status.
-          </Text>
+          <Group justify="space-between" gap="xs">
+            <Switch
+              size="sm"
+              label="Counts as completed"
+              checked={column.is_done}
+              onChange={(event) => onDone(event.currentTarget.checked)}
+            />
+            <Button size="xs" color="red" variant="subtle" onClick={onRequestArchive}>
+              Remove…
+            </Button>
+          </Group>
         </div>
       </div>
     </div>
@@ -137,7 +136,8 @@ export function StatusManagerModal({
   initialTab = "active",
 }: StatusManagerModalProps) {
   const columnsQuery = useColumns(boardId, true);
-  const { create, update, reorder, archive, restore, remove } = useColumnMutations(boardId);
+  const { create, update, reorder, archive, restore, remove, removeMovingTasks } =
+    useColumnMutations(boardId);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("slate");
   const [newDone, setNewDone] = useState(false);
@@ -145,13 +145,11 @@ export function StatusManagerModal({
   const [pendingArchive, setPendingArchive] = useState<ColumnDetail | null>(null);
   const [archiveMoveTo, setArchiveMoveTo] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ColumnDetail | null>(null);
-  const [deleteName, setDeleteName] = useState("");
   const [tab, setTab] = useState<"active" | "archived">(initialTab);
 
   useEffect(() => {
     if (opened) {
       setTab(initialTab);
-      setDeleteName("");
       setPendingDelete(null);
     }
   }, [opened, initialTab]);
@@ -223,6 +221,22 @@ export function StatusManagerModal({
     }
   }
 
+  async function deleteNow() {
+    if (!pendingArchive) return;
+    setError(null);
+    try {
+      await removeMovingTasks.mutateAsync({
+        columnId: pendingArchive.id,
+        moveToColumnId: pendingArchive.task_count > 0 ? archiveMoveTo : null,
+      });
+      notifySuccess(`Deleted ${pendingArchive.name}`);
+      setPendingArchive(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete status");
+      notifyApiError(err, "Could not delete status");
+    }
+  }
+
   async function handleRestore(column: ColumnDetail) {
     setError(null);
     try {
@@ -236,13 +250,12 @@ export function StatusManagerModal({
   }
 
   async function confirmDelete() {
-    if (!pendingDelete || deleteName !== pendingDelete.name) return;
+    if (!pendingDelete) return;
     setError(null);
     try {
       await remove.mutateAsync(pendingDelete.id);
       notifySuccess(`Deleted ${pendingDelete.name}`);
       setPendingDelete(null);
-      setDeleteName("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not delete status";
       setError(message);
@@ -395,7 +408,6 @@ export function StatusManagerModal({
                             variant="light"
                             onClick={() => {
                               setPendingDelete(column);
-                              setDeleteName("");
                             }}
                             disabled={column.task_count > 0 || remove.isPending}
                           >
@@ -424,14 +436,14 @@ export function StatusManagerModal({
       <Modal
         opened={pendingArchive !== null}
         onClose={() => setPendingArchive(null)}
-        title="Archive status"
+        title={pendingArchive ? `Remove “${pendingArchive.name}”` : "Remove status"}
         radius="lg"
       >
         {pendingArchive ? (
           <Stack>
-            <Text>
-              Archive <strong>{pendingArchive.name}</strong>? It will be hidden from the board and
-              can be restored later.
+            <Text size="sm">
+              <strong>Archive</strong> hides the status and lets you restore it later.{" "}
+              <strong>Delete</strong> removes it for good. Either way its tasks are kept.
             </Text>
             {pendingArchive.task_count > 0 ? (
               <>
@@ -461,12 +473,20 @@ export function StatusManagerModal({
                 Cancel
               </Button>
               <Button
-                color="red"
+                variant="light"
                 onClick={() => void confirmArchive()}
                 loading={archive.isPending}
                 disabled={pendingArchive.task_count > 0 && !archiveMoveTo}
               >
-                Archive status
+                Archive
+              </Button>
+              <Button
+                color="red"
+                onClick={() => void deleteNow()}
+                loading={removeMovingTasks.isPending}
+                disabled={pendingArchive.task_count > 0 && !archiveMoveTo}
+              >
+                Delete
               </Button>
             </Group>
           </Stack>
@@ -484,11 +504,6 @@ export function StatusManagerModal({
             <Text>
               Permanently delete <strong>{pendingDelete.name}</strong>? This action cannot be undone.
             </Text>
-            <TextInput
-              label="Type the status name to confirm"
-              value={deleteName}
-              onChange={(event) => setDeleteName(event.currentTarget.value)}
-            />
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setPendingDelete(null)}>
                 Cancel
@@ -497,7 +512,6 @@ export function StatusManagerModal({
                 color="red"
                 onClick={() => void confirmDelete()}
                 loading={remove.isPending}
-                disabled={deleteName !== pendingDelete.name}
               >
                 Delete permanently
               </Button>

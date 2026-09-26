@@ -68,6 +68,21 @@ App: http://localhost:3000
 | `PATCH` | `/tasks/{id}/move` | Transactional reorder / column move |
 | `DELETE` | `/tasks/{id}` | Delete task |
 | `POST` | `/columns/{id}/restore` | Restore an archived status |
+| `GET` | `/boards/{board_id}/members` | Board owner, members and (owner only) pending invitations |
+| `POST` | `/boards/{board_id}/members` | Owner shares the board by email (unknown emails join on sign-up) |
+| `DELETE` | `/boards/{board_id}/members/{user_id}` | Owner removes a member, or a member leaves |
+| `DELETE` | `/boards/{board_id}/invitations/{id}` | Owner cancels a pending invitation |
+| `GET` | `/plans` | List plans with progress counts |
+| `POST` | `/plans` | Create a plan |
+| `GET` / `PATCH` / `DELETE` | `/plans/{plan_id}` | Plan with its days and items / rename / delete |
+| `POST` | `/plans/{plan_id}/days` | Add a day to a plan (one per date) |
+| `PATCH` / `DELETE` | `/plan-days/{day_id}` | Change a day's date or label / delete it |
+| `POST` | `/plan-days/{day_id}/items` | Add a checkbox item |
+| `PATCH` / `DELETE` | `/plan-items/{item_id}` | Rename, check or uncheck / delete an item |
+| `GET` | `/notifications` | Generate due notifications and return the feed |
+| `GET` / `PATCH` | `/notifications/preferences` | Digest, schedule, reminder and quiet-hour settings |
+
+Shared boards: members can create, edit, move, delete and assign tasks and create categories. Statuses, board settings and membership are owner-only (`403` for members).
 | `GET` | `/health` | Health check |
 
 Move body:

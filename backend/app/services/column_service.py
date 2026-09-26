@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models import BoardColumn, Task
 from app.schemas.column import ColumnArchive, ColumnCreate, ColumnRead, ColumnReorder, ColumnUpdate
 from app.services.category_service import get_board_or_404
-from app.services.ownership import get_column_for_user
+from app.services.ownership import get_board_for_user, get_column_for_user
 
 
 def _task_count(db: Session, column_id: uuid.UUID) -> int:
@@ -62,7 +62,7 @@ def _unused_column_position(db: Session, board_id: uuid.UUID, *, start_from: int
 
 
 def create_column(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: ColumnCreate) -> ColumnRead:
-    get_board_or_404(db, user_id, board_id)
+    get_board_for_user(db, user_id, board_id, owner_only=True)
     max_active = db.scalar(
         select(func.coalesce(func.max(BoardColumn.position), -1)).where(
             BoardColumn.board_id == board_id,
@@ -84,7 +84,7 @@ def create_column(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload:
 
 
 def update_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload: ColumnUpdate) -> ColumnRead:
-    column = get_column_for_user(db, user_id, column_id)
+    column = get_column_for_user(db, user_id, column_id, owner_only=True)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
         setattr(column, key, value)
@@ -94,7 +94,7 @@ def update_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload
 
 
 def reorder_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload: ColumnReorder) -> ColumnRead:
-    column = get_column_for_user(db, user_id, column_id)
+    column = get_column_for_user(db, user_id, column_id, owner_only=True)
     if column.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Archived statuses cannot be reordered")
 
@@ -126,7 +126,7 @@ def reorder_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payloa
 
 
 def archive_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payload: ColumnArchive) -> ColumnRead:
-    column = get_column_for_user(db, user_id, column_id)
+    column = get_column_for_user(db, user_id, column_id, owner_only=True)
     if column.archived_at is not None:
         return _to_read(db, column)
 
@@ -152,7 +152,7 @@ def archive_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payloa
             detail="This status still has tasks. Move them to another status before archiving.",
         )
     if payload.move_to_column_id is not None:
-        target = get_column_for_user(db, user_id, payload.move_to_column_id)
+        target = get_column_for_user(db, user_id, payload.move_to_column_id, owner_only=True)
         if target.board_id != column.board_id or target.archived_at is not None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -179,7 +179,10 @@ def archive_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payloa
             task.column_id = target.id
             task.position = max_pos + 1 + index
             if target.is_done and task.completed_at is None:
+                from app.services.notification_service import dismiss_task_notifications
+
                 task.completed_at = datetime.now(UTC)
+                dismiss_task_notifications(db, task.id)
             if not target.is_done:
                 task.completed_at = None
 
@@ -203,7 +206,7 @@ def archive_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID, payloa
 
 
 def restore_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID) -> ColumnRead:
-    column = get_column_for_user(db, user_id, column_id)
+    column = get_column_for_user(db, user_id, column_id, owner_only=True)
     if column.archived_at is None:
         return _to_read(db, column)
 
@@ -226,13 +229,18 @@ def restore_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID) -> Col
     return _to_read(db, column)
 
 
-def delete_column(db: Session, user_id: uuid.UUID, column_id: uuid.UUID) -> None:
-    column = get_column_for_user(db, user_id, column_id)
+def delete_column(
+    db: Session,
+    user_id: uuid.UUID,
+    column_id: uuid.UUID,
+    move_to_column_id: uuid.UUID | None = None,
+) -> None:
+    """Delete a status. An active status is archived first, moving its tasks to
+    `move_to_column_id` when it has any, so it can be removed in one step from the board."""
+    column = get_column_for_user(db, user_id, column_id, owner_only=True)
     if column.archived_at is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Active statuses cannot be deleted. Archive the status first.",
-        )
+        archive_column(db, user_id, column_id, ColumnArchive(move_to_column_id=move_to_column_id))
+        column = get_column_for_user(db, user_id, column_id, owner_only=True)
     if _task_count(db, column.id) > 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

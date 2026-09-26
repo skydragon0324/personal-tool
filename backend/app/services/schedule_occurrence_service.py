@@ -102,6 +102,10 @@ def set_occurrence_state(
     state.is_completed = payload.is_completed
     state.completed_at = now if payload.is_completed else None
     state.updated_at = now
+    if payload.is_completed:
+        from app.services.notification_service import dismiss_schedule_notification
+
+        dismiss_schedule_notification(db, entry_id, occurrence_date)
     db.commit()
     db.refresh(state)
     return ScheduleOccurrenceRead(

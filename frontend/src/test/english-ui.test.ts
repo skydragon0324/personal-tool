@@ -246,13 +246,12 @@ describe("English UI copy", () => {
     );
     expect(statuses).toContain("Counts as completed");
     expect(statuses).toContain("Tasks in this status are counted as completed.");
-    expect(statuses).toContain("Archive status");
+    expect(statuses).toContain("Archive");
+    expect(statuses).toContain("Delete");
     expect(statuses).toContain("Restore");
     expect(statuses).toContain("Active (");
     expect(statuses).toContain("Archived (");
-    expect(statuses).toContain(
-      "Archiving hides this status from the board. Existing tasks must be moved to another",
-    );
+    expect(statuses).toContain("hides the status and lets you restore it later.");
     expect(statuses).toContain("Delete permanently");
     expect(statuses).toContain("Archive is reversible. Delete permanently cannot be undone.");
     const boardPage = readFileSync(

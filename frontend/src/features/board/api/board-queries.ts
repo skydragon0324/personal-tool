@@ -14,6 +14,10 @@ export const boardKeys = {
     ] as const,
 };
 
+export const memberKeys = {
+  list: (boardId: string) => ["board-members", boardId] as const,
+};
+
 export const categoryKeys = {
   list: (boardId: string) => ["categories", boardId] as const,
 };

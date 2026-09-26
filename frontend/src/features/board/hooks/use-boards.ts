@@ -72,7 +72,14 @@ export function useBoardMutations(currentBoardId?: string) {
 }
 
 export function activeBoards(boards: BoardListItem[] | undefined): BoardListItem[] {
+  const shared = (board: BoardListItem) => (board.role === "member" ? 1 : 0);
+  // Your own boards in your order, then boards shared with you by name (their positions are
+  // the owner's, so they are not comparable with yours).
   return (boards ?? [])
     .filter((board) => !board.archived_at)
-    .sort((a, b) => a.position - b.position);
+    .sort(
+      (a, b) =>
+        shared(a) - shared(b) ||
+        (shared(a) ? a.name.localeCompare(b.name) : a.position - b.position),
+    );
 }

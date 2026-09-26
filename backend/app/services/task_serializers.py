@@ -5,6 +5,7 @@ from app.models import Task, TaskAttachment
 from app.schemas.category import CategorySummary
 from app.schemas.recurrence import RecurrenceRead
 from app.schemas.task import (
+    TaskAssigneeRead,
     TaskAttachmentRead,
     TaskDetailRead,
     TaskLinkRead,
@@ -32,6 +33,10 @@ def recurrence_from_task(task: Task) -> RecurrenceRead | None:
         is_detached=bool(task.is_detached),
         occurrence_index=task.occurrence_index,
     )
+
+
+def assignees_from_task(task: Task) -> list[TaskAssigneeRead]:
+    return [TaskAssigneeRead.model_validate(user) for user in task.assignees or []]
 
 
 def _subtask_progress(task: Task) -> tuple[int, int]:
@@ -65,6 +70,7 @@ def to_summary(task: Task) -> TaskSummaryRead:
         subtask_total=subtask_total,
         category=CategorySummary.model_validate(task.category),
         recurrence=recurrence_from_task(task),
+        assignees=assignees_from_task(task),
     )
 
 
@@ -99,6 +105,8 @@ def to_detail(task: Task) -> TaskDetailRead:
         position=task.position,
         version=task.version,
         completed_at=task.completed_at,
+        remind_at=task.remind_at,
+        assignees=assignees_from_task(task),
         created_at=task.created_at,
         updated_at=task.updated_at,
         links=[TaskLinkRead.model_validate(link) for link in sorted(task.links, key=lambda l: l.position)],

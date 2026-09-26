@@ -9,7 +9,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Board, BoardColumn, Category, Task, TaskLink, TaskSubtask, User
+from app.models import Board, BoardColumn, Category, Task, TaskAssignee, TaskLink, TaskSubtask, User
 from app.models.task_recurrence import (
     TaskRecurrenceException,
     TaskRecurrenceLinkTemplate,
@@ -29,7 +29,12 @@ from app.schemas.task import TaskCreate, TaskDetailRead, TaskLinkInput, TaskUpda
 from app.services.board_service import get_column_or_404
 from app.services.category_service import ensure_category_on_board
 from app.services.content_utils import extract_text_from_content, uncheck_checklist, validate_content_urls
-from app.services.ownership import get_column_for_user, get_task_for_user
+from app.services.ownership import (
+    accessible_board_ids,
+    board_access,
+    get_column_for_user,
+    get_task_for_user,
+)
 from app.services.recurrence_dates import list_occurrence_dates, occurrence_index_for
 from app.services.storage import get_storage
 from app.services.task_serializers import to_detail
@@ -56,7 +61,10 @@ def get_series_for_user(
 ) -> TaskRecurrenceSeries:
     query = (
         select(TaskRecurrenceSeries)
-        .where(TaskRecurrenceSeries.id == series_id, TaskRecurrenceSeries.user_id == user_id)
+        .where(
+            TaskRecurrenceSeries.id == series_id,
+            TaskRecurrenceSeries.board_id.in_(accessible_board_ids(user_id)),
+        )
         .options(
             selectinload(TaskRecurrenceSeries.link_templates),
             selectinload(TaskRecurrenceSeries.subtask_templates),
@@ -212,7 +220,7 @@ def list_series(
         .join(Board, Board.id == TaskRecurrenceSeries.board_id)
         .outerjoin(BoardColumn, BoardColumn.id == TaskRecurrenceSeries.default_column_id)
         .join(Category, Category.id == TaskRecurrenceSeries.category_id)
-        .where(TaskRecurrenceSeries.user_id == user_id)
+        .where(board_access(user_id))
     )
     if board_id is not None:
         query = query.where(TaskRecurrenceSeries.board_id == board_id)
@@ -455,6 +463,8 @@ def _materialize_occurrence(
             task.subtasks.append(
                 TaskSubtask(title=item.title, is_completed=False, position=item.position)
             )
+        for user_id in series.assignee_ids or []:
+            db.add(TaskAssignee(task_id=task.id, user_id=user_id))
         db.flush()
         nested.commit()
         return task
@@ -553,7 +563,10 @@ def generate_for_request(
 ) -> RecurrenceGenerateResult:
     series = db.scalar(
         select(TaskRecurrenceSeries)
-        .where(TaskRecurrenceSeries.id == series_id, TaskRecurrenceSeries.user_id == user_id)
+        .where(
+            TaskRecurrenceSeries.id == series_id,
+            TaskRecurrenceSeries.board_id.in_(accessible_board_ids(user_id)),
+        )
         .options(
             selectinload(TaskRecurrenceSeries.link_templates),
             selectinload(TaskRecurrenceSeries.subtask_templates),
@@ -582,18 +595,23 @@ def fill_user_series(
 ) -> None:
     query = (
         select(TaskRecurrenceSeries)
-        .where(TaskRecurrenceSeries.user_id == user_id, TaskRecurrenceSeries.status == "active")
+        .where(TaskRecurrenceSeries.status == "active")
         .options(
             selectinload(TaskRecurrenceSeries.link_templates),
             selectinload(TaskRecurrenceSeries.subtask_templates),
         )
         .with_for_update()
     )
+    # Callers pass a board_id only after checking access to that board.
     if board_id is not None:
         query = query.where(TaskRecurrenceSeries.board_id == board_id)
+    else:
+        query = query.where(TaskRecurrenceSeries.board_id.in_(accessible_board_ids(user_id)))
     series_rows = list(db.scalars(query).all())
     for series in series_rows:
-        generate_series_window(db, series, start=start, end=end, ensure_next=True, strict=False)
+        generate_series_window(
+            db, series, start=start, end=end, ensure_next=True, strict=False, bump_version=False
+        )
 
 
 def ensure_next_after_completion(db: Session, task: Task) -> None:
@@ -618,13 +636,14 @@ def ensure_next_after_completion(db: Session, task: Task) -> None:
         end=today + timedelta(days=HORIZON_DAYS),
         ensure_next=True,
         strict=False,
+        bump_version=False,
     )
 
 
 def create_recurring_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDetailRead:
     assert payload.recurrence is not None
     column = get_column_or_404(db, user_id, payload.column_id)
-    board = db.scalar(select(Board).where(Board.id == column.board_id, Board.user_id == user_id))
+    board = db.scalar(select(Board).where(Board.id == column.board_id, board_access(user_id)))
     if board is None or board.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
     ensure_category_on_board(db, payload.category_id, column.board_id)
@@ -695,12 +714,16 @@ def create_recurring_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) 
         original_occurrence_date=start,
         occurrence_index=1,
         is_detached=False,
+        remind_at=payload.remind_at,
     )
     first.content = template_content
     first.content_text = extract_text_from_content(template_content) if template_content else None
     first.content_schema_version = 1
     db.add(first)
     db.flush()
+    from app.services.task_service import set_assignees
+
+    set_assignees(db, first, board.id, payload.assignee_ids, user_id)
     for item in payload.links:
         first.links.append(
             TaskLink(
@@ -1075,6 +1098,11 @@ def _sync_template_from_payload(
         series.content_text = extract_text_from_content(series.content) if series.content else None
     next_start = payload.start_date if payload.start_date is not None else task.start_date
     next_due = payload.due_date if payload.due_date is not None else task.due_date
+    if next_due < next_start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="start_date must be on or before due_date",
+        )
     series.duration_days = (next_due - next_start).days
     if payload.links is not None:
         _replace_link_templates(db, series, payload.links)

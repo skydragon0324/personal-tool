@@ -142,10 +142,16 @@ def move_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: Task
     task.position = target_position
     task.version += 1
     task.updated_at = datetime.now(UTC)
-    task.completed_at = datetime.now(UTC) if target_column.is_done else None
-    if target_column.is_done:
+    already_completed = source_column.is_done and task.completed_at is not None
+    if not target_column.is_done:
+        task.completed_at = None
+    elif not already_completed:
+        task.completed_at = datetime.now(UTC)
+    if target_column.is_done and not already_completed:
+        from app.services.notification_service import dismiss_task_notifications
         from app.services.recurrence_service import ensure_next_after_completion
 
+        dismiss_task_notifications(db, task.id)
         ensure_next_after_completion(db, task)
 
     db.commit()

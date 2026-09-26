@@ -11,6 +11,7 @@ import { PageHeader } from "@/features/shell/components/page-header";
 import { useWorkspaceChrome } from "@/features/shell/components/workspace-chrome";
 
 import { AttentionTabs } from "./attention-list";
+import { TaskOverview } from "./task-overview";
 import { useDashboardSummary } from "../hooks/use-dashboard";
 import type { DashboardBoardStats, DashboardSummary } from "../types";
 
@@ -66,7 +67,12 @@ export function BoardsDashboardPage() {
               <Button onClick={() => chrome?.openNewBoard()}>New board</Button>
             </div>
           ) : null}
-          {data && data.active_boards > 0 ? <DashboardBody data={data} /> : null}
+          {data && data.active_boards > 0 ? (
+            <>
+              <DashboardBody data={data} />
+              <TaskOverview />
+            </>
+          ) : null}
         </div>
       </div>
     </div>

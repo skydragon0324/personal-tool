@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser
@@ -47,6 +47,12 @@ def restore_column(column_id: UUID, user: CurrentUser, db: Session = Depends(get
 
 
 @router.delete("/{column_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_column(column_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> Response:
-    column_service.delete_column(db, user.id, column_id)
+def delete_column(
+    column_id: UUID,
+    user: CurrentUser,
+    move_to_column_id: UUID | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Delete a status. Tasks in an active status move to `move_to_column_id` first."""
+    column_service.delete_column(db, user.id, column_id, move_to_column_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

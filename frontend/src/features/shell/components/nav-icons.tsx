@@ -2,7 +2,7 @@ export function NavIcon({
   name,
   className,
 }: {
-  name: "today" | "boards" | "notepad" | "schedule";
+  name: "today" | "boards" | "plans" | "notepad" | "schedule";
   className?: string;
 }) {
   const props = {
@@ -26,6 +26,13 @@ export function NavIcon({
         <svg {...props}>
           <rect x="3" y="5" width="7" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
           <rect x="14" y="5" width="7" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        </svg>
+      );
+    case "plans":
+      return (
+        <svg {...props}>
+          <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M8 9l1.5 1.5L12 8M8 15l1.5 1.5L12 14M14.5 9.5H16M14.5 15.5H16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "notepad":

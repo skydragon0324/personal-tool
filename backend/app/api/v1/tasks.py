@@ -11,13 +11,20 @@ from app.schemas.task import (
     TaskCreate,
     TaskDetailRead,
     TaskMove,
+    TaskMoveToBoard,
     TaskUpdate,
     SubtaskCreate,
     SubtaskRead,
     SubtaskReorder,
     SubtaskUpdate,
 )
-from app.services import attachment_service, subtask_service, task_ordering_service, task_service
+from app.services import (
+    attachment_service,
+    subtask_service,
+    task_ordering_service,
+    task_service,
+    task_transfer_service,
+)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -50,6 +57,23 @@ def move_task(
     db: Session = Depends(get_db),
 ) -> TaskDetailRead:
     return task_ordering_service.move_task(db, user.id, task_id, payload)
+
+
+@router.post("/{task_id}/duplicate", response_model=TaskDetailRead, status_code=status.HTTP_201_CREATED)
+def duplicate_task(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> TaskDetailRead:
+    """Copy the task (content, links, sub-tasks, files) right below the original, unassigned."""
+    return task_transfer_service.duplicate_task(db, user.id, task_id)
+
+
+@router.post("/{task_id}/move-to-board", response_model=TaskDetailRead)
+def move_task_to_board(
+    task_id: UUID,
+    payload: TaskMoveToBoard,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> TaskDetailRead:
+    """Move the task to another board; assignees stay only if they are on that board too."""
+    return task_transfer_service.move_to_board(db, user.id, task_id, payload)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)

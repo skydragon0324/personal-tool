@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Board, BoardColumn, Task
+from app.models import Board, BoardColumn, Category, Task, TaskSubtask, User
+from app.services.ownership import board_access
 from app.schemas.dashboard import (
     DashboardAttention,
     DashboardAttentionItem,
     DashboardBoardStats,
     DashboardPriorityCounts,
     DashboardSummary,
+    DashboardPerson,
+    DashboardTaskList,
+    DashboardTaskRow,
 )
 
 ATTENTION_LIMIT = 8
@@ -27,7 +32,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
     active_boards = list(
         db.scalars(
             select(Board)
-            .where(Board.user_id == user_id, Board.archived_at.is_(None))
+            .where(board_access(user_id), Board.archived_at.is_(None))
             .order_by(Board.position, Board.name)
         ).all()
     )
@@ -65,7 +70,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
                 ),
             )
             .outerjoin(Task, Task.column_id == BoardColumn.id)
-            .where(Board.user_id == user_id, Board.archived_at.is_(None))
+            .where(board_access(user_id), Board.archived_at.is_(None))
             .group_by(Board.id)
         ).all()
         if board_ids
@@ -88,7 +93,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
             .join(BoardColumn, BoardColumn.id == Task.column_id)
             .join(Board, Board.id == BoardColumn.board_id)
             .where(
-                Board.user_id == user_id,
+                board_access(user_id),
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
             )
@@ -113,7 +118,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
             .join(BoardColumn, BoardColumn.id == Task.column_id)
             .join(Board, Board.id == BoardColumn.board_id)
             .where(
-                Board.user_id == user_id,
+                board_access(user_id),
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
                 BoardColumn.is_done.is_(False),
@@ -193,3 +198,74 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
             due_today=attention_items(overdue=False),
         ),
     )
+
+
+TASK_LIST_LIMIT = 1000
+
+
+def list_tasks(
+    db: Session,
+    user_id: uuid.UUID,
+    *,
+    state: str = "open",
+    board_id: uuid.UUID | None = None,
+) -> DashboardTaskList:
+    """Tasks across every active board the user can access, soonest due first.
+
+    ``state`` is "open", "done" or "all". Filtering by assignee, priority and text happens on the
+    client, which keeps this endpoint simple and the table responsive.
+    """
+    subtasks = (
+        select(
+            TaskSubtask.task_id.label("task_id"),
+            func.count(TaskSubtask.id).label("total"),
+            func.count(TaskSubtask.id).filter(TaskSubtask.is_completed.is_(True)).label("done"),
+        )
+        .group_by(TaskSubtask.task_id)
+        .subquery()
+    )
+    query = (
+        select(Task, Board, BoardColumn, Category, subtasks.c.total, subtasks.c.done)
+        .join(BoardColumn, BoardColumn.id == Task.column_id)
+        .join(Board, Board.id == BoardColumn.board_id)
+        .join(Category, Category.id == Task.category_id)
+        .outerjoin(subtasks, subtasks.c.task_id == Task.id)
+        .where(board_access(user_id), Board.archived_at.is_(None), BoardColumn.archived_at.is_(None))
+        .order_by(Task.due_date, Task.title)
+    )
+    if state == "open":
+        query = query.where(BoardColumn.is_done.is_(False), Task.completed_at.is_(None))
+    elif state == "done":
+        query = query.where(or_(BoardColumn.is_done.is_(True), Task.completed_at.is_not(None)))
+    if board_id is not None:
+        query = query.where(Board.id == board_id)
+    rows = db.execute(query.limit(TASK_LIST_LIMIT + 1)).all()
+    items = [
+        DashboardTaskRow(
+            id=task.id,
+            title=task.title,
+            board_id=board.id,
+            board_name=board.name,
+            board_color=board.color,
+            status_id=column.id,
+            status_name=column.name,
+            status_color=column.color,
+            is_done=column.is_done or task.completed_at is not None,
+            category_name=category.name,
+            category_color=category.color,
+            priority=task.priority,
+            start_date=task.start_date,
+            due_date=task.due_date,
+            completed_at=task.completed_at,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            assignees=[
+                DashboardPerson(id=user.id, display_name=user.display_name) for user in task.assignees
+            ],
+            subtask_total=int(total or 0),
+            subtask_completed=int(done or 0),
+            is_recurring=task.recurrence_series_id is not None,
+        )
+        for task, board, column, category, total, done in rows[:TASK_LIST_LIMIT]
+    ]
+    return DashboardTaskList(items=items, truncated=len(rows) > TASK_LIST_LIMIT)

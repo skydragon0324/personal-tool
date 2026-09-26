@@ -361,6 +361,32 @@ export const apiClient = {
     );
   },
 
+  /** Copy a task (content, links, sub-tasks, files) right below the original, unassigned. */
+  duplicateTask: (taskId: string) =>
+    request<import("@/features/board/types").TaskDetail>(`/api/v1/tasks/${taskId}/duplicate`, { method: "POST" }),
+
+  /** Move a task to another board; the assignee stays only if they are on that board. */
+  moveTaskToBoard: (taskId: string, payload: { board_id: string; column_id?: string | null }) =>
+    request<import("@/features/board/types").TaskDetail>(`/api/v1/tasks/${taskId}/move-to-board`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getDashboardTasks: (params: { state?: "open" | "done" | "all"; boardId?: string } = {}) => {
+    const search = new URLSearchParams();
+    if (params.state) search.set("state", params.state);
+    if (params.boardId) search.set("board_id", params.boardId);
+    const query = search.toString();
+    return request<import("@/features/dashboard/types").DashboardTaskList>(
+      `/api/v1/dashboard/tasks${query ? `?${query}` : ""}`,
+    );
+  },
+
+  getPlansOverview: (today: string) =>
+    request<import("@/features/plans/types").PlanOverview>(
+      `/api/v1/plans/overview?today=${encodeURIComponent(today)}`,
+    ),
+
   getDashboardSummary: (today: string) =>
     request<import("@/features/dashboard/types").DashboardSummary>(
       `/api/v1/dashboard/summary?today=${encodeURIComponent(today)}`,
@@ -487,4 +513,115 @@ export const apiClient = {
     request<void>("/api/v1/auth/logout", { method: "POST" }).finally(() => {
       setCsrfToken(null);
     }),
+
+  getNotifications: () =>
+    request<import("@/features/notifications/types").NotificationFeed>("/api/v1/notifications"),
+
+  markNotificationRead: (notificationId: string) =>
+    request<import("@/features/notifications/types").AppNotification>(
+      `/api/v1/notifications/${notificationId}/read`,
+      { method: "POST" },
+    ),
+
+  markAllNotificationsRead: () =>
+    request<void>("/api/v1/notifications/read-all", { method: "POST" }),
+
+  dismissNotification: (notificationId: string) =>
+    request<void>(`/api/v1/notifications/${notificationId}`, { method: "DELETE" }),
+
+  /** Remind me about the notification's task at `remindAt` (ISO with offset); hides the notice. */
+  snoozeNotification: (notificationId: string, remindAt: string) =>
+    request<void>(`/api/v1/notifications/${notificationId}/snooze`, {
+      method: "POST",
+      body: JSON.stringify({ remind_at: remindAt }),
+    }),
+
+  /** Move the notification's task to its board's completed status. */
+  completeNotificationTask: (notificationId: string) =>
+    request<void>(`/api/v1/notifications/${notificationId}/complete-task`, { method: "POST" }),
+
+  dismissAllNotifications: () => request<void>("/api/v1/notifications", { method: "DELETE" }),
+
+  getNotificationPreferences: () =>
+    request<import("@/features/notifications/types").NotificationPreferences>(
+      "/api/v1/notifications/preferences",
+    ),
+
+  updateNotificationPreferences: (
+    payload: import("@/features/notifications/types").NotificationPreferencesUpdate,
+  ) =>
+    request<import("@/features/notifications/types").NotificationPreferences>(
+      "/api/v1/notifications/preferences",
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+
+  listPlans: () => request<import("@/features/plans/types").PlanSummary[]>("/api/v1/plans"),
+
+  getPlan: (planId: string) => request<import("@/features/plans/types").PlanDetail>(`/api/v1/plans/${planId}`),
+
+  createPlan: (payload: import("@/features/plans/types").PlanCreate) =>
+    request<import("@/features/plans/types").PlanDetail>("/api/v1/plans", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updatePlan: (planId: string, payload: import("@/features/plans/types").PlanUpdate) =>
+    request<import("@/features/plans/types").PlanDetail>(`/api/v1/plans/${planId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deletePlan: (planId: string) => request<void>(`/api/v1/plans/${planId}`, { method: "DELETE" }),
+
+  createPlanDay: (planId: string, payload: import("@/features/plans/types").PlanDayCreate) =>
+    request<import("@/features/plans/types").PlanDay>(`/api/v1/plans/${planId}/days`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updatePlanDay: (dayId: string, payload: import("@/features/plans/types").PlanDayUpdate) =>
+    request<import("@/features/plans/types").PlanDay>(`/api/v1/plan-days/${dayId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deletePlanDay: (dayId: string) => request<void>(`/api/v1/plan-days/${dayId}`, { method: "DELETE" }),
+
+  createPlanItem: (dayId: string, payload: { title: string }) =>
+    request<import("@/features/plans/types").PlanItem>(`/api/v1/plan-days/${dayId}/items`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updatePlanItem: (itemId: string, payload: import("@/features/plans/types").PlanItemUpdate) =>
+    request<import("@/features/plans/types").PlanItem>(`/api/v1/plan-items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deletePlanItem: (itemId: string) =>
+    request<void>(`/api/v1/plan-items/${itemId}`, { method: "DELETE" }),
+
+  getBoardMembers: (boardId: string) =>
+    request<import("@/features/board/types").BoardMembers>(`/api/v1/boards/${boardId}/members`),
+
+  inviteBoardMember: (boardId: string, email: string) =>
+    request<import("@/features/board/types").BoardInviteResult>(`/api/v1/boards/${boardId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  /** Delete a status; tasks in an active status move to `moveToColumnId` first. */
+  deleteColumnMovingTasks: (columnId: string, moveToColumnId: string | null) =>
+    request<void>(
+      `/api/v1/columns/${columnId}${moveToColumnId ? `?move_to_column_id=${moveToColumnId}` : ""}`,
+      { method: "DELETE" },
+    ),
+
+  /** Owner removes a member, or pass your own id to leave the board. */
+  removeBoardMember: (boardId: string, userId: string) =>
+    request<void>(`/api/v1/boards/${boardId}/members/${userId}`, { method: "DELETE" }),
+
+  cancelBoardInvitation: (boardId: string, invitationId: string) =>
+    request<void>(`/api/v1/boards/${boardId}/invitations/${invitationId}`, { method: "DELETE" }),
 };

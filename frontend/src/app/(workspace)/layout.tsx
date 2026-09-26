@@ -8,13 +8,18 @@ import { WorkspaceLoadingScreen } from "@/features/auth/components/workspace-loa
 import { LifeManagementShell } from "@/features/shell/components/life-management-shell";
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, sessionCheckFailed, retrySessionCheck } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) router.replace("/login");
-  }, [isLoading, router, user]);
+    // Only a confirmed 401 (user === null without an error) means signed out; a network blip or 5xx
+    // must not bounce an authenticated user to the login page.
+    if (!isLoading && !sessionCheckFailed && !user) router.replace("/login");
+  }, [isLoading, router, sessionCheckFailed, user]);
 
+  if (!isLoading && sessionCheckFailed && !user) {
+    return <WorkspaceLoadingScreen onRetry={retrySessionCheck} />;
+  }
   if (isLoading || !user) return <WorkspaceLoadingScreen />;
   return <LifeManagementShell>{children}</LifeManagementShell>;
 }

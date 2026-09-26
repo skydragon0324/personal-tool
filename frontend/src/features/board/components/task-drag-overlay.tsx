@@ -35,9 +35,9 @@ export function TaskDragOverlay({
 
 function OverlayCard({ task }: { task: TaskSummary }) {
   return (
-    <div className="cursor-grabbing rounded-2xl border border-[var(--app-primary)] bg-[var(--app-surface)] p-3 shadow-2xl">
+    <div className="cursor-grabbing rounded-xl border border-[var(--app-primary)] bg-[var(--app-surface)] px-2.5 py-2 shadow-2xl">
       <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 font-medium text-[var(--app-text)]">{task.title}</p>
+        <p className="line-clamp-2 text-sm font-medium text-[var(--app-text)]">{task.title}</p>
         <PriorityBadge priority={task.priority} />
       </div>
     </div>

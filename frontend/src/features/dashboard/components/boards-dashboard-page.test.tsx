@@ -34,6 +34,8 @@ vi.mock("@/features/shell/components/workspace-chrome", async (importOriginal) =
   };
 });
 
+vi.mock("./task-overview", () => ({ TaskOverview: () => null }));
+
 vi.mock("../hooks/use-dashboard", () => ({
   useDashboardSummary: () => summaryQuery,
 }));

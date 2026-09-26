@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -157,3 +157,23 @@ def test_another_user_cannot_move_task(db: Session) -> None:
     )
     assert stolen.status_code == 404
     app.dependency_overrides.clear()
+
+
+def test_reordering_inside_done_keeps_completed_at(client: TestClient) -> None:
+    columns = _columns(client)
+    todo = columns["To Do"]["id"]
+    done = columns["Done"]["id"]
+    first = _create_task(client, "Done First", todo)
+    second = _create_task(client, "Done Second", todo)
+    status, first = _move(client, first, target_column_id=done)
+    assert status == 200, first
+    status, second = _move(client, second, target_column_id=done)
+    assert status == 200, second
+    completed_at = first["completed_at"]
+    assert completed_at is not None
+
+    status, reordered = _move(client, first, target_column_id=done, after_task_id=second["id"])
+    assert status == 200, reordered
+    assert reordered["column_id"] == done
+    # Compare instants: the database session time zone decides how the timestamp is rendered.
+    assert datetime.fromisoformat(reordered["completed_at"]) == datetime.fromisoformat(completed_at)

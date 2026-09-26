@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -54,3 +54,39 @@ class DashboardSummary(BaseModel):
     boards: list[DashboardBoardStats]
     priority: DashboardPriorityCounts
     attention: DashboardAttention
+
+
+class DashboardPerson(BaseModel):
+    id: uuid.UUID
+    display_name: str
+
+
+class DashboardTaskRow(BaseModel):
+    """One task in the cross-board task list on the Boards page."""
+
+    id: uuid.UUID
+    title: str
+    board_id: uuid.UUID
+    board_name: str
+    board_color: str
+    status_id: uuid.UUID
+    status_name: str
+    status_color: str
+    is_done: bool
+    category_name: str
+    category_color: str
+    priority: str
+    start_date: date
+    due_date: date
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    assignees: list[DashboardPerson]
+    subtask_total: int
+    subtask_completed: int
+    is_recurring: bool
+
+
+class DashboardTaskList(BaseModel):
+    items: list[DashboardTaskRow]
+    truncated: bool

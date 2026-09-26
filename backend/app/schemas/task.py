@@ -64,6 +64,14 @@ class SubtaskRead(BaseModel):
     updated_at: datetime
 
 
+class TaskAssigneeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    display_name: str
+    email: str
+
+
 class TaskSummaryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -87,6 +95,7 @@ class TaskSummaryRead(BaseModel):
     subtask_completed: int = 0
     category: CategorySummary
     recurrence: RecurrenceRead | None = None
+    assignees: list[TaskAssigneeRead] = Field(default_factory=list)
 
 
 class TaskDetailRead(BaseModel):
@@ -105,6 +114,8 @@ class TaskDetailRead(BaseModel):
     position: int
     version: int
     completed_at: datetime | None
+    remind_at: datetime | None = None
+    assignees: list[TaskAssigneeRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     links: list[TaskLinkRead]
@@ -147,6 +158,12 @@ class SubtaskReorder(BaseModel):
     after_subtask_id: uuid.UUID | None = None
 
 
+def _require_aware(value: datetime | None) -> datetime | None:
+    if value is not None and value.tzinfo is None:
+        raise ValueError("remind_at must include a timezone offset")
+    return value
+
+
 class TaskCreate(BaseModel):
     column_id: uuid.UUID
     category_id: uuid.UUID
@@ -158,6 +175,14 @@ class TaskCreate(BaseModel):
     priority: Priority = Priority.medium
     links: list[TaskLinkInput] = Field(default_factory=list)
     recurrence: RecurrenceInput | None = None
+    remind_at: datetime | None = None
+    # Everyone on the board this task is assigned to; an empty list clears it.
+    assignee_ids: list[uuid.UUID] | None = None
+
+    @field_validator("remind_at")
+    @classmethod
+    def _remind_at(cls, value: datetime | None) -> datetime | None:
+        return _require_aware(value)
 
     @model_validator(mode="after")
     def _dates(self) -> "TaskCreate":
@@ -179,6 +204,14 @@ class TaskUpdate(BaseModel):
     links: list[TaskLinkInput] | None = None
     edit_scope: EditScope | None = None
     recurrence: RecurrenceInput | None = None
+    remind_at: datetime | None = None
+    # Everyone on the board this task is assigned to; an empty list clears it.
+    assignee_ids: list[uuid.UUID] | None = None
+
+    @field_validator("remind_at")
+    @classmethod
+    def _remind_at(cls, value: datetime | None) -> datetime | None:
+        return _require_aware(value)
 
     @model_validator(mode="after")
     def _dates(self) -> "TaskUpdate":
@@ -197,6 +230,13 @@ class TaskMove(BaseModel):
     before_task_id: uuid.UUID | None = None
     after_task_id: uuid.UUID | None = None
     target_position: int | None = Field(default=None, ge=0)
+
+
+class TaskMoveToBoard(BaseModel):
+    board_id: uuid.UUID
+    # Defaults to the first open status on the target board.
+    column_id: uuid.UUID | None = None
+    expected_version: int | None = Field(default=None, ge=1)
 
 
 # Back-compat alias used by older imports

@@ -3,12 +3,19 @@
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { useDroppable } from "@dnd-kit/react";
 
-import type { BoardColumn, TaskSummary } from "../types";
-import { statusHeaderClass, statusSoftClass } from "../utils/status-colors";
+import type { BoardColumn, BoardPerson, TaskSummary } from "../types";
+import { statusSoftClass } from "../utils/status-colors";
+import { ColumnHeader } from "./column-header";
 import { EmptyColumn } from "./empty-column";
 import { TaskCard } from "./task-card";
 
 interface KanbanColumnProps {
+  boardId: string;
+  canManageStatuses: boolean;
+  people: BoardPerson[];
+  onAssign: (task: TaskSummary, userIds: string[]) => void;
+  onDuplicate: (task: TaskSummary) => void;
+  onMoveToBoard: (task: TaskSummary) => void;
   column: BoardColumn;
   columns: BoardColumn[];
   tasks: TaskSummary[];
@@ -19,6 +26,12 @@ interface KanbanColumnProps {
 }
 
 export function KanbanColumn({
+  boardId,
+  canManageStatuses,
+  people,
+  onAssign,
+  onDuplicate,
+  onMoveToBoard,
   column,
   columns,
   tasks,
@@ -39,25 +52,18 @@ export function KanbanColumn({
       className="flex flex-none flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-muted)]"
       style={{ width: "20rem", minWidth: "20rem", maxWidth: "20rem" }}
     >
-      <header
-        className={`sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-3 text-white ${statusHeaderClass(column.color)}`}
-      >
-        <div>
-          <h2 className="font-display text-lg leading-tight">{column.name}</h2>
-          <p className="text-xs text-white/80">{tasks.length}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => onAdd(column.id)}
-          className="rounded-lg bg-white/15 px-2.5 py-1 text-sm font-medium hover:bg-white/25"
-        >
-          Add
-        </button>
-      </header>
+      <ColumnHeader
+        boardId={boardId}
+        column={column}
+        columns={columns}
+        taskCount={tasks.length}
+        canManage={canManageStatuses}
+        onAdd={onAdd}
+      />
       <div
         ref={ref}
         data-column-id={column.id}
-        className={`flex min-h-[12rem] flex-1 flex-col gap-3 overflow-y-auto p-3 ${statusSoftClass(column.color)} ${
+        className={`flex min-h-[12rem] flex-1 flex-col gap-2 overflow-y-auto p-2 ${statusSoftClass(column.color)} ${
           isDropTarget ? "bg-[var(--app-primary)]/10" : ""
         }`}
       >
@@ -74,6 +80,10 @@ export function KanbanColumn({
               onOpenDetail={onOpenDetail}
               onDelete={onDelete}
               onMoveStatus={onMoveStatus}
+              people={people}
+              onAssign={onAssign}
+              onDuplicate={onDuplicate}
+              onMoveToBoard={onMoveToBoard}
             />
           ))
         )}

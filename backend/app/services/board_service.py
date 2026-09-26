@@ -6,7 +6,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -17,7 +17,7 @@ from app.core.constants import (
     UNCATEGORIZED_COLOR,
     UNCATEGORIZED_NAME,
 )
-from app.models import Board, BoardColumn, Category, Task, TaskAttachment
+from app.models import Board, BoardColumn, BoardMember, Category, Task, TaskAttachment, User
 from app.schemas.board import (
     BoardColumnRead,
     BoardCreate,
@@ -27,7 +27,7 @@ from app.schemas.board import (
     BoardUpdate,
     BoardView,
 )
-from app.services.ownership import get_board_for_user, get_column_for_user
+from app.services.ownership import board_access, get_board_for_user, get_column_for_user
 from app.services.storage import get_storage
 from app.services.task_serializers import to_summary
 
@@ -104,7 +104,7 @@ def get_board_view(
 
     board = db.scalar(
         select(Board)
-        .where(Board.id == board_id, Board.user_id == user_id)
+        .where(Board.id == board_id, board_access(user_id))
         .options(selectinload(Board.columns))
     )
     if board is None:
@@ -187,6 +187,7 @@ def get_board_view(
         task_limit=safe_limit,
         summary=BoardSummary(total=total, completed=completed, remaining=remaining),
         columns=column_reads,
+        role="owner" if board.user_id == user_id else "member",
     )
 
 
@@ -237,7 +238,7 @@ def _task_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, tuple[int, 
         .select_from(Board)
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
         .outerjoin(Task, Task.column_id == BoardColumn.id)
-        .where(Board.user_id == user_id)
+        .where(board_access(user_id))
         .group_by(Board.id)
     ).all()
     return {board_id: (int(total), int(completed)) for board_id, total, completed in rows}
@@ -248,7 +249,7 @@ def _status_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, int]:
         select(Board.id, func.count(BoardColumn.id))
         .select_from(Board)
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
-        .where(Board.user_id == user_id)
+        .where(board_access(user_id))
         .group_by(Board.id)
     ).all()
     return {board_id: int(count) for board_id, count in rows}
@@ -261,7 +262,7 @@ def _attachment_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, int]:
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
         .outerjoin(Task, Task.column_id == BoardColumn.id)
         .outerjoin(TaskAttachment, TaskAttachment.task_id == Task.id)
-        .where(Board.user_id == user_id)
+        .where(board_access(user_id))
         .group_by(Board.id)
     ).all()
     return {board_id: int(count) for board_id, count in rows}
@@ -274,9 +275,27 @@ def _board_stats(
     return _task_counts(db, user_id), _status_counts(db, user_id), _attachment_counts(db, user_id)
 
 
+def _sharing(db: Session, boards: list[Board]) -> tuple[dict[uuid.UUID, int], dict[uuid.UUID, str]]:
+    """Member counts per board and owner display names."""
+    board_ids = [board.id for board in boards]
+    if not board_ids:
+        return {}, {}
+    members = dict(
+        db.execute(
+            select(BoardMember.board_id, func.count(BoardMember.id))
+            .where(BoardMember.board_id.in_(board_ids))
+            .group_by(BoardMember.board_id)
+        ).all()
+    )
+    owner_ids = {board.user_id for board in boards}
+    owners = dict(db.execute(select(User.id, User.display_name).where(User.id.in_(owner_ids))).all())
+    return {key: int(value) for key, value in members.items()}, owners
+
+
 def _read_board(db: Session, user_id: uuid.UUID, board: Board) -> BoardRead:
     counts, statuses, attachments = _board_stats(db, user_id)
-    return _to_read(board, counts, statuses, attachments)
+    members, owners = _sharing(db, [board])
+    return _to_read(board, counts, statuses, attachments, viewer_id=user_id, members=members, owners=owners)
 
 
 def _to_read(
@@ -284,6 +303,10 @@ def _to_read(
     counts: dict[uuid.UUID, tuple[int, int]],
     status_counts: dict[uuid.UUID, int] | None = None,
     attachment_counts: dict[uuid.UUID, int] | None = None,
+    *,
+    viewer_id: uuid.UUID | None = None,
+    members: dict[uuid.UUID, int] | None = None,
+    owners: dict[uuid.UUID, str] | None = None,
 ) -> BoardRead:
     total, completed = counts.get(board.id, (0, 0))
     return BoardRead(
@@ -300,18 +323,36 @@ def _to_read(
         completed_tasks=completed,
         status_count=(status_counts or {}).get(board.id, 0),
         attachment_count=(attachment_counts or {}).get(board.id, 0),
+        role="member" if viewer_id is not None and board.user_id != viewer_id else "owner",
+        owner_name=(owners or {}).get(board.user_id),
+        member_count=(members or {}).get(board.id, 0),
     )
 
 
 def list_boards(db: Session, user_id: uuid.UUID, *, include_archived: bool = True) -> list[BoardRead]:
-    query = select(Board).where(Board.user_id == user_id)
+    # Own boards (active and, optionally, archived) first, then active boards shared with the user.
+    query = select(Board).where(
+        board_access(user_id),
+        or_(Board.user_id == user_id, Board.archived_at.is_(None)),
+    )
     if not include_archived:
         query = query.where(Board.archived_at.is_(None))
     boards = list(
-        db.scalars(query.order_by(Board.archived_at.is_not(None), Board.position, Board.name)).all()
+        db.scalars(
+            query.order_by(
+                Board.archived_at.is_not(None),
+                Board.user_id != user_id,
+                Board.position,
+                Board.name,
+            )
+        ).all()
     )
     counts, statuses, attachments = _board_stats(db, user_id)
-    return [_to_read(board, counts, statuses, attachments) for board in boards]
+    members, owners = _sharing(db, boards)
+    return [
+        _to_read(board, counts, statuses, attachments, viewer_id=user_id, members=members, owners=owners)
+        for board in boards
+    ]
 
 
 def get_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> BoardRead:
@@ -417,7 +458,7 @@ def create_board(db: Session, user_id: uuid.UUID, payload: BoardCreate) -> Board
 
 
 def update_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: BoardUpdate) -> BoardRead:
-    board = get_board_for_user(db, user_id, board_id)
+    board = get_board_for_user(db, user_id, board_id, owner_only=True)
     data = payload.model_dump(exclude_unset=True)
     if "name" in data and data["name"] is not None:
         _ensure_unique_name(db, user_id, data["name"], exclude_id=board.id)
@@ -436,7 +477,7 @@ def update_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: 
 
 
 def reorder_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: BoardReorder) -> BoardRead:
-    board = get_board_for_user(db, user_id, board_id)
+    board = get_board_for_user(db, user_id, board_id, owner_only=True)
     if board.archived_at is not None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -482,7 +523,7 @@ def reorder_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload:
 
 
 def archive_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> BoardRead:
-    board = get_board_for_user(db, user_id, board_id)
+    board = get_board_for_user(db, user_id, board_id, owner_only=True)
     if board.archived_at is not None:
         return _read_board(db, user_id, board)
 
@@ -515,7 +556,7 @@ def archive_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> Board
 
 
 def restore_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> BoardRead:
-    board = get_board_for_user(db, user_id, board_id)
+    board = get_board_for_user(db, user_id, board_id, owner_only=True)
     if board.archived_at is None:
         return _read_board(db, user_id, board)
 
@@ -535,7 +576,7 @@ def restore_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> Board
 
 
 def delete_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID) -> None:
-    board = get_board_for_user(db, user_id, board_id)
+    board = get_board_for_user(db, user_id, board_id, owner_only=True)
     if board.archived_at is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

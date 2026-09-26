@@ -10,6 +10,7 @@ import type {
   TaskDetail,
   TiptapJSON,
 } from "@/features/board/types";
+import { AssigneeAvatars } from "@/features/board/components/assignee-avatars";
 import { useTaskDetail } from "@/features/board/hooks/use-task-detail";
 import { CategoryBadge } from "./category-badge";
 import { PriorityBadge } from "./priority-badge";
@@ -38,6 +39,8 @@ interface TaskDetailDrawerProps {
     meta?: { repeating?: boolean; completed?: boolean },
   ) => void;
   onStopRepeat?: (seriesId: string) => Promise<void> | void;
+  onDuplicate?: (task: TaskDetail) => void;
+  onMoveToBoard?: (task: TaskDetail) => void;
 }
 
 export function TaskDetailDrawer({
@@ -55,6 +58,8 @@ export function TaskDetailDrawer({
   onDeleteAttachment,
   onDelete,
   onStopRepeat,
+  onDuplicate,
+  onMoveToBoard,
 }: TaskDetailDrawerProps) {
   const detailQuery = useTaskDetail(taskId);
   const task = detailQuery.data ?? null;
@@ -73,6 +78,10 @@ export function TaskDetailDrawer({
       position="right"
       size="lg"
       title={localMode === "edit" ? "Edit task" : "Task details"}
+      classNames={{
+        content: "!flex flex-col",
+        body: "flex min-h-0 flex-1 flex-col overflow-y-auto",
+      }}
     >
       {detailQuery.isLoading ? (
         <Group justify="center" py="xl">
@@ -122,6 +131,8 @@ export function TaskDetailDrawer({
             {task.recurrence ? <Badge variant="light">{recurrenceLabel(task.recurrence)}</Badge> : null}
           </Group>
           <Text size="sm">{formatTaskPeriod(task.start_date, task.due_date)}</Text>
+          {task.assignees?.length ? <AssigneeAvatars people={task.assignees} size={28} max={6} /> : null}
+          {task.remind_at ? <Text size="sm">Reminder: {formatDateTime(task.remind_at)}</Text> : null}
           <Text size="xs" c="dimmed">
             Created {formatDateTime(task.created_at)} · Updated {formatDateTime(task.updated_at)}
           </Text>
@@ -182,6 +193,12 @@ export function TaskDetailDrawer({
                   >
                     Stop repeating
                   </Menu.Item>
+                ) : null}
+                {onDuplicate ? (
+                  <Menu.Item onClick={() => onDuplicate(task)}>Duplicate</Menu.Item>
+                ) : null}
+                {onMoveToBoard ? (
+                  <Menu.Item onClick={() => onMoveToBoard(task)}>Move to board…</Menu.Item>
                 ) : null}
                 <Menu.Item
                   color="red"

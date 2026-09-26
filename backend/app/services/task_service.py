@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import Task, TaskLink
+from app.models import BoardColumn, Task, TaskLink, User
 from app.schemas.task import TaskCreate, TaskDetailRead, TaskLinkInput, TaskUpdate
 from app.services.board_service import get_column_or_404
 from app.services.category_service import ensure_category_on_board
@@ -42,6 +42,51 @@ def _replace_links(db: Session, task: Task, links: list[TaskLinkInput]) -> None:
         )
 
 
+def _set_remind_at(db: Session, task: Task, remind_at: datetime | None) -> None:
+    if task.remind_at == remind_at:
+        return
+    from app.services.notification_service import dismiss_task_notifications
+
+    # Hide a reminder that already fired for the old time; the new time fires on its own.
+    dismiss_task_notifications(db, task.id)
+    task.remind_at = remind_at
+
+
+def set_assignees(
+    db: Session,
+    task: Task,
+    board_id: uuid.UUID,
+    assignee_ids: list[uuid.UUID] | None,
+    actor_id: uuid.UUID,
+) -> None:
+    """Assign a task to people on its board; newly added people are notified. Caller commits."""
+    from app.services.board_member_service import validate_assignees
+    from app.services.notification_service import notify_task_assigned
+
+    wanted = set(assignee_ids or [])
+    current = {user.id for user in task.assignees}
+    if wanted == current:
+        return
+    validate_assignees(db, board_id, wanted)
+    users = list(db.scalars(select(User).where(User.id.in_(wanted))).all()) if wanted else []
+    task.assignees = sorted(users, key=lambda user: user.display_name.lower())
+    if task.recurrence_series is not None:
+        # New occurrences of the series go to the same people.
+        task.recurrence_series.assignee_ids = [user.id for user in task.assignees]
+    added = wanted - current - {actor_id}
+    if added:
+        db.flush()
+        actor = db.get(User, actor_id)
+        for user_id in added:
+            notify_task_assigned(db, user_id, task, board_id, actor.display_name if actor else "Someone")
+
+
+def _board_id(db: Session, task: Task) -> uuid.UUID:
+    board_id = db.scalar(select(BoardColumn.board_id).where(BoardColumn.id == task.column_id))
+    assert board_id is not None
+    return board_id
+
+
 def create_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDetailRead:
     if payload.recurrence is not None:
         from app.services.recurrence_service import create_recurring_task
@@ -69,12 +114,14 @@ def create_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDet
         position=max_pos + 1,
         version=1,
         completed_at=now if column.is_done else None,
+        remind_at=payload.remind_at,
     )
     _apply_content(task, payload.content)
     db.add(task)
     db.flush()
     if payload.links:
         _replace_links(db, task, payload.links)
+    set_assignees(db, task, column.board_id, payload.assignee_ids, user_id)
     db.commit()
     return to_detail(_load_task(db, user_id, task.id))
 
@@ -86,6 +133,18 @@ def get_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskDetailR
 def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDetailRead:
     task = get_task_for_user(db, user_id, task_id, for_update=True)
     if task.recurrence_series_id is not None:
+        # Reminder and assignee are handled here rather than by the series edit-scope logic.
+        per_task = {"remind_at", "assignee_ids"} & payload.model_fields_set
+        if per_task:
+            if "remind_at" in per_task:
+                _set_remind_at(db, task, payload.remind_at)
+            if "assignee_ids" in per_task:
+                set_assignees(db, task, _board_id(db, task), payload.assignee_ids, user_id)
+            payload = TaskUpdate.model_validate(payload.model_dump(exclude_unset=True, exclude=per_task))
+            if not (payload.model_fields_set - {"edit_scope"}):
+                task.updated_at = datetime.now(UTC)
+                db.commit()
+                return to_detail(_load_task(db, user_id, task_id))
         from app.services.recurrence_service import update_with_scope
 
         return update_with_scope(db, user_id, task_id, payload)
@@ -93,6 +152,10 @@ def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: Ta
     data = payload.model_dump(exclude_unset=True)
     data.pop("edit_scope", None)
     data.pop("recurrence", None)
+    if "remind_at" in data:
+        _set_remind_at(db, task, data.pop("remind_at"))
+    if "assignee_ids" in data:
+        set_assignees(db, task, _board_id(db, task), data.pop("assignee_ids"), user_id)
     links_payload = data.pop("links", None)
     new_due = data.pop("due_date", None)
     new_start = data.pop("start_date", None)

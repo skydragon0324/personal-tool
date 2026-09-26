@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentUser
 from app.db.session import get_db
 from app.schemas.board import BoardCreate, BoardRead, BoardReorder, BoardUpdate, BoardView
+from app.schemas.board_member import BoardInvite, BoardInviteResult, BoardMembersRead
 from app.schemas.category import CategoryCreate, CategoryRead
 from app.schemas.column import ColumnCreate, ColumnRead
-from app.services import board_service, category_service, column_service
+from app.services import board_member_service, board_service, category_service, column_service
 
 router = APIRouter(prefix="/boards", tags=["boards"])
 
@@ -136,3 +137,32 @@ def create_column(
     db: Session = Depends(get_db),
 ) -> ColumnRead:
     return column_service.create_column(db, user.id, board_id, payload)
+
+
+@router.get("/{board_id}/members", response_model=BoardMembersRead)
+def list_members(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> BoardMembersRead:
+    return board_member_service.list_members(db, user.id, board_id)
+
+
+@router.post("/{board_id}/members", response_model=BoardInviteResult, status_code=status.HTTP_201_CREATED)
+def invite_member(
+    board_id: UUID, payload: BoardInvite, user: CurrentUser, db: Session = Depends(get_db)
+) -> BoardInviteResult:
+    return board_member_service.invite(db, user.id, board_id, payload.email)
+
+
+@router.delete("/{board_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_member(
+    board_id: UUID, member_user_id: UUID, user: CurrentUser, db: Session = Depends(get_db)
+) -> Response:
+    """Owner removes a member, or a member leaves the board (their own id)."""
+    board_member_service.remove_member(db, user.id, board_id, member_user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{board_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_invitation(
+    board_id: UUID, invitation_id: UUID, user: CurrentUser, db: Session = Depends(get_db)
+) -> Response:
+    board_member_service.cancel_invitation(db, user.id, board_id, invitation_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

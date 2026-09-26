@@ -7,6 +7,8 @@ from app.api.v1 import (
     dashboard,
     health,
     notes,
+    notifications,
+    plans,
     schedule,
     task_recurrence,
     tasks,
@@ -21,6 +23,8 @@ api_router.include_router(today.router)
 api_router.include_router(boards.router)
 api_router.include_router(columns.router)
 api_router.include_router(notes.router)
+api_router.include_router(notifications.router)
+api_router.include_router(plans.router)
 api_router.include_router(schedule.router)
 api_router.include_router(task_recurrence.router)
 api_router.include_router(tasks.router)

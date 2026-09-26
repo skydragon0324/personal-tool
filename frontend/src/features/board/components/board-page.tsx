@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { useAuth } from "@/features/auth/components/auth-provider";
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
 import { RecurrenceScopeDialog } from "@/features/tasks/components/recurrence-scope-dialog";
 import { TaskDetailDrawer } from "@/features/tasks/components/task-detail-drawer";
 import { TaskDialog } from "@/features/tasks/components/task-dialog";
 import { ApiError } from "@/lib/api-client";
 import { formatRangeLabel, todayISO } from "@/lib/dates";
-import { notifyApiError, notifyConflict } from "@/lib/notify";
+import { notifyApiError, notifyConflict, notifySuccess } from "@/lib/notify";
+import { OPEN_TASK_EVENT, type OpenTaskDetail } from "@/lib/open-task-event";
 import { tasksByColumnFromView } from "../api/board-queries";
 import { useBoard } from "../hooks/use-board";
+import { useBoardMembers } from "../hooks/use-board-members";
 import { useCategories } from "../hooks/use-categories";
 import { useMoveTask } from "../hooks/use-move-task";
 import { useTaskMutations } from "../hooks/use-task-mutations";
@@ -40,6 +43,8 @@ import { rangesFromPreferences, readBoardPreferences } from "../utils/board-pref
 import { writeLastBoardId } from "../utils/last-board";
 import { createSaveNotice, isTaskInDateView } from "../utils/task-visibility";
 import { BoardHeader } from "./board-header";
+import { BoardMembersModal } from "./board-members-modal";
+import { MoveToBoardModal, type MovableTask } from "./move-to-board-modal";
 import { BoardSummaryCard } from "./board-summary";
 import { BoardToolbar } from "./board-toolbar";
 import { KanbanBoard } from "./kanban-board";
@@ -66,6 +71,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     priority: prefs.priority,
     query: DEFAULT_FILTERS.query,
     categoryId: prefs.categoryId,
+    assigneeId: "",
   });
 
   useEffect(() => {
@@ -80,6 +86,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       priority: loaded.priority,
       query: "",
       categoryId: loaded.categoryId,
+      assigneeId: "",
     });
     writeLastBoardId(boardId, window.localStorage);
   }, [boardId]);
@@ -108,7 +115,16 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   const { data, isLoading, isError, error, refetch } = useBoard(query);
   const categoriesQuery = useCategories(boardId);
   const moveTask = useMoveTask(query);
-  const { create, update, remove, stopRecurrence, uploadAttachment, deleteAttachment } = useTaskMutations(
+  const {
+    create,
+    update,
+    remove,
+    stopRecurrence,
+    uploadAttachment,
+    deleteAttachment,
+    duplicate,
+    moveToBoard,
+  } = useTaskMutations(
     query,
     {
       shouldApplyToView: (task) =>
@@ -132,6 +148,11 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   } | null>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [moving, setMoving] = useState<MovableTask | null>(null);
+  const membersQuery = useBoardMembers(boardId);
+  const people = membersQuery.data?.people ?? [];
+  const { user } = useAuth();
   const [statusTab, setStatusTab] = useState<"active" | "archived">("active");
   const [saveNotice, setSaveNotice] = useState<ReturnType<typeof createSaveNotice> | null>(
     null,
@@ -143,6 +164,17 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       setViewingId(task);
       setDetailMode("view");
     }
+  }, [boardId]);
+
+  useEffect(() => {
+    function onOpenTask(event: Event) {
+      const detail = (event as CustomEvent<OpenTaskDetail>).detail;
+      if (!detail || detail.boardId !== boardId) return;
+      setViewingId(detail.taskId);
+      setDetailMode("view");
+    }
+    window.addEventListener(OPEN_TASK_EVENT, onOpenTask);
+    return () => window.removeEventListener(OPEN_TASK_EVENT, onOpenTask);
   }, [boardId]);
 
   const tasksByColumn = useMemo(() => {
@@ -179,6 +211,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       priority: "",
       query: "",
       categoryId: "",
+      assigneeId: "",
     });
     updatePrefs({
       rangeMode: "month",
@@ -238,6 +271,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           links: payload.links,
           edit_scope: payload.edit_scope,
           recurrence: payload.recurrence,
+          remind_at: payload.remind_at,
+          assignee_ids: payload.assignee_ids,
         },
       });
       if (pendingFiles.length) {
@@ -271,6 +306,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         links: payload.links,
         edit_scope: payload.edit_scope,
         recurrence: payload.recurrence,
+        remind_at: payload.remind_at,
+        assignee_ids: payload.assignee_ids,
       } satisfies TaskUpdate,
     });
     if (pendingFiles.length) {
@@ -285,13 +322,67 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     confirmCompleted = false,
   ) {
     if (!deleting) return;
-    await remove.mutateAsync({
-      taskId: deleting.id,
-      deleteScope: deleting.repeating ? scope : "this",
-      confirmCompleted,
-    });
+    try {
+      await remove.mutateAsync({
+        taskId: deleting.id,
+        deleteScope: deleting.repeating ? scope : "this",
+        confirmCompleted,
+      });
+    } catch (err) {
+      notifyApiError(err, "Could not delete the task");
+      return;
+    }
     if (viewingId === deleting.id) setViewingId(null);
     setDeleting(null);
+  }
+
+  async function handleDuplicate(taskId: string) {
+    try {
+      const copy = await duplicate.mutateAsync(taskId);
+      notifySuccess(`Created “${copy.title}”`);
+    } catch (err) {
+      notifyApiError(err, "Could not duplicate the task");
+    }
+  }
+
+  function startMove(task: {
+    id: string;
+    title: string;
+    assignees?: MovableTask["assignees"];
+    recurrence?: { series_id: string } | null;
+  }) {
+    setMoving({
+      id: task.id,
+      title: task.title,
+      assignees: task.assignees ?? [],
+      repeating: Boolean(task.recurrence?.series_id),
+    });
+  }
+
+  async function handleMoveToBoard(boardIdTarget: string, columnId: string | null) {
+    if (!moving) return;
+    try {
+      const moved = await moveToBoard.mutateAsync({ taskId: moving.id, boardId: boardIdTarget, columnId });
+      if (viewingId === moving.id) setViewingId(null);
+      setMoving(null);
+      const kept = new Set((moved.assignees ?? []).map((person) => person.id));
+      const dropped = (moving.assignees ?? []).filter((person) => !kept.has(person.id));
+      notifySuccess(
+        dropped.length
+          ? `Moved “${moved.title}”. Unassigned ${dropped.map((person) => person.display_name).join(", ")} (not on that board).`
+          : `Moved “${moved.title}”`,
+      );
+    } catch (err) {
+      notifyApiError(err, "Could not move the task");
+    }
+  }
+
+  async function handleAssign(task: TaskSummary, userIds: string[]) {
+    try {
+      await update.mutateAsync({ taskId: task.id, payload: { assignee_ids: userIds } });
+    } catch (err) {
+      notifyApiError(err, "Could not update the assignees");
+    }
   }
 
   async function handleMoveStatus(task: TaskSummary, columnId: string) {
@@ -327,6 +418,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
 
   const hasStatuses = (data?.columns.length ?? 0) > 0;
   const showEmptyStatuses = Boolean(data && !hasStatuses);
+  const isOwner = (data?.role ?? "owner") === "owner";
+  const memberCount = Math.max((membersQuery.data?.people.length ?? 1) - 1, 0);
 
   useEffect(() => {
     const name = data?.name;
@@ -350,6 +443,9 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           setStatusTab("active");
           setStatusOpen(true);
         }}
+        onShare={() => setShareOpen(true)}
+        isOwner={isOwner}
+        memberCount={memberCount}
         quickAddDisabled={!hasStatuses}
       />
       <BoardToolbar
@@ -377,6 +473,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           updatePrefs({ priority: next.priority, categoryId: next.categoryId });
         }}
         categories={categoriesQuery.data ?? []}
+        people={people}
+        currentUserId={user?.id}
         onReset={resetFilters}
         customError={customError}
         onCustomError={setCustomError}
@@ -450,7 +548,13 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         </div>
       ) : null}
 
-      {showEmptyStatuses ? (
+      {showEmptyStatuses && !isOwner ? (
+        <div className="mx-auto max-w-[1400px] px-4 py-16 text-center text-[var(--app-text-muted)] sm:px-6">
+          The board owner has not set up any statuses yet.
+        </div>
+      ) : null}
+
+      {showEmptyStatuses && isOwner ? (
         <NoStatusesState
           onCreate={() => {
             setStatusTab("active");
@@ -477,6 +581,11 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
               completed: Boolean(task.completed_at),
             })
           }
+          canManageStatuses={isOwner}
+          people={people}
+          onAssign={(task, userIds) => void handleAssign(task, userIds)}
+          onDuplicate={(task) => void handleDuplicate(task.id)}
+          onMoveToBoard={startMove}
         />
       ) : null}
 
@@ -548,6 +657,16 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
               }
             : undefined
         }
+        onDuplicate={(task) => void handleDuplicate(task.id)}
+        onMoveToBoard={startMove}
+      />
+
+      <MoveToBoardModal
+        task={moving}
+        currentBoardId={boardId}
+        submitting={moveToBoard.isPending}
+        onClose={() => setMoving(null)}
+        onMove={(target, columnId) => void handleMoveToBoard(target, columnId)}
       />
 
       {deleting?.repeating ? (
@@ -572,11 +691,19 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         />
       )}
 
-      <StatusManagerModal
-        opened={statusOpen}
-        onClose={() => setStatusOpen(false)}
+      {isOwner ? (
+        <StatusManagerModal
+          opened={statusOpen}
+          onClose={() => setStatusOpen(false)}
+          boardId={boardId}
+          initialTab={statusTab}
+        />
+      ) : null}
+      <BoardMembersModal
         boardId={boardId}
-        initialTab={statusTab}
+        boardName={data?.name ?? "Board"}
+        opened={shareOpen}
+        onClose={() => setShareOpen(false)}
       />
     </div>
   );

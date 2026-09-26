@@ -1,11 +1,15 @@
 from app.models.board import Board
 from app.models.board_column import BoardColumn
+from app.models.board_member import BoardInvitation, BoardMember
 from app.models.category import Category
 from app.models.inbox_item import InboxItem
 from app.models.note import Note
+from app.models.notification import Notification, NotificationPreference
+from app.models.plan import Plan, PlanDay, PlanItem
 from app.models.schedule_entry import ScheduleEntry
 from app.models.schedule_occurrence_state import ScheduleOccurrenceState
 from app.models.task import Task
+from app.models.task_assignee import TaskAssignee
 from app.models.task_attachment import TaskAttachment
 from app.models.task_link import TaskLink
 from app.models.task_recurrence import (
@@ -22,12 +26,20 @@ from app.models.user_session import UserSession
 __all__ = [
     "Board",
     "BoardColumn",
+    "BoardInvitation",
+    "BoardMember",
     "Category",
     "InboxItem",
     "Note",
+    "Notification",
+    "NotificationPreference",
+    "Plan",
+    "PlanDay",
+    "PlanItem",
     "ScheduleEntry",
     "ScheduleOccurrenceState",
     "Task",
+    "TaskAssignee",
     "TaskLink",
     "TaskAttachment",
     "TaskRecurrenceAttachmentRef",

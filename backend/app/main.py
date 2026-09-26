@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,6 +8,7 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Life Management API",
@@ -28,7 +31,8 @@ app.include_router(api_router)
 async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, HTTPException):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
-    )
+    logger.exception("Unhandled error", exc_info=exc)
+    content = {"detail": "Internal server error"}
+    if settings.environment.lower() == "development":
+        content["error"] = str(exc)
+    return JSONResponse(status_code=500, content=content)
