@@ -20,6 +20,7 @@ backend/uploads/
 
 # Node / Next.js
 node_modules/
+packages/
 .next/
 .next-dev/
 .next-stale/
