@@ -19,7 +19,6 @@ from app.models.task_recurrence import (
     TaskRecurrenceSeries,
     TaskRecurrenceSubtaskTemplate,
 )
-from app.models.task_subtask import TaskSubtask
 from app.models.user import User
 from app.models.user_session import UserSession
 
@@ -47,7 +46,6 @@ __all__ = [
     "TaskRecurrenceLinkTemplate",
     "TaskRecurrenceSeries",
     "TaskRecurrenceSubtaskTemplate",
-    "TaskSubtask",
     "User",
     "UserSession",
 ]

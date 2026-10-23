@@ -52,24 +52,36 @@ class TaskAttachmentRead(BaseModel):
     download_url: str | None = None
 
 
-class SubtaskRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    task_id: uuid.UUID
-    title: str
-    is_completed: bool
-    position: int
-    created_at: datetime
-    updated_at: datetime
-
-
 class TaskAssigneeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     display_name: str
     email: str
+
+
+class SubtaskRead(BaseModel):
+    """A sub-task as listed under its parent. Open the sub-task itself for full details."""
+
+    id: uuid.UUID
+    # The parent task.
+    task_id: uuid.UUID
+    title: str
+    is_completed: bool
+    position: int
+    column_id: uuid.UUID
+    start_date: date
+    due_date: date
+    priority: Priority
+    completed_at: datetime | None
+    assignees: list[TaskAssigneeRead] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class TaskParentRead(BaseModel):
+    id: uuid.UUID
+    title: str
 
 
 class TaskSummaryRead(BaseModel):
@@ -121,12 +133,14 @@ class TaskDetailRead(BaseModel):
     links: list[TaskLinkRead]
     attachments: list[TaskAttachmentRead]
     subtasks: list[SubtaskRead] = Field(default_factory=list)
+    # Set when this task is a sub-task.
+    parent: TaskParentRead | None = None
     category: CategorySummary
     recurrence: RecurrenceRead | None = None
 
 
 class SubtaskCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=160)
 
     @field_validator("title")
     @classmethod
@@ -138,7 +152,7 @@ class SubtaskCreate(BaseModel):
 
 
 class SubtaskUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=200)
+    title: str | None = Field(default=None, min_length=1, max_length=160)
     is_completed: bool | None = None
 
     @field_validator("title")

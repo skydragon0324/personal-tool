@@ -9,8 +9,9 @@ from app.schemas.task import (
     TaskAttachmentRead,
     TaskDetailRead,
     TaskLinkRead,
-    TaskSummaryRead,
     SubtaskRead,
+    TaskParentRead,
+    TaskSummaryRead,
 )
 from app.services.content_utils import content_preview, count_checklist_items
 
@@ -39,10 +40,29 @@ def assignees_from_task(task: Task) -> list[TaskAssigneeRead]:
     return [TaskAssigneeRead.model_validate(user) for user in task.assignees or []]
 
 
+def to_subtask_read(task: Task) -> SubtaskRead:
+    assert task.parent_task_id is not None
+    return SubtaskRead(
+        id=task.id,
+        task_id=task.parent_task_id,
+        title=task.title,
+        is_completed=task.completed_at is not None,
+        position=task.subtask_position or 0,
+        column_id=task.column_id,
+        start_date=task.start_date,
+        due_date=task.due_date,
+        priority=task.priority,
+        completed_at=task.completed_at,
+        assignees=assignees_from_task(task),
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
+
+
 def _subtask_progress(task: Task) -> tuple[int, int]:
     subtasks = list(task.subtasks or [])
     total = len(subtasks)
-    completed = sum(1 for item in subtasks if item.is_completed)
+    completed = sum(1 for item in subtasks if item.completed_at is not None)
     return completed, total
 
 
@@ -112,9 +132,10 @@ def to_detail(task: Task) -> TaskDetailRead:
         links=[TaskLinkRead.model_validate(link) for link in sorted(task.links, key=lambda l: l.position)],
         attachments=[to_attachment_read(a) for a in task.attachments],
         subtasks=[
-            SubtaskRead.model_validate(item)
-            for item in sorted(task.subtasks or [], key=lambda subtask: subtask.position)
+            to_subtask_read(item)
+            for item in sorted(task.subtasks or [], key=lambda subtask: subtask.subtask_position or 0)
         ],
+        parent=TaskParentRead(id=task.parent.id, title=task.parent.title) if task.parent else None,
         category=CategorySummary.model_validate(task.category),
         recurrence=recurrence_from_task(task),
     )

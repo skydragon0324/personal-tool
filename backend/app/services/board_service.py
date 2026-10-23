@@ -6,7 +6,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -127,7 +127,7 @@ def get_board_view(
     if column_ids:
         query = (
             select(Task)
-            .where(Task.column_id.in_(column_ids))
+            .where(Task.column_id.in_(column_ids), Task.parent_task_id.is_(None))
             .options(
                 selectinload(Task.links),
                 selectinload(Task.attachments),
@@ -237,7 +237,7 @@ def _task_counts(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, tuple[int, 
         )
         .select_from(Board)
         .outerjoin(BoardColumn, BoardColumn.board_id == Board.id)
-        .outerjoin(Task, Task.column_id == BoardColumn.id)
+        .outerjoin(Task, and_(Task.column_id == BoardColumn.id, Task.parent_task_id.is_(None)))
         .where(board_access(user_id))
         .group_by(Board.id)
     ).all()

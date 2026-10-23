@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, time
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -18,6 +18,9 @@ class NotificationRead(BaseModel):
     kind: NotificationKind
     title: str
     body: str
+    # A key and values for showing the body in the user's language; ``body`` is the English text.
+    body_key: str | None = None
+    body_params: dict[str, Any] | None = None
     board_id: uuid.UUID | None
     task_id: uuid.UUID | None
     schedule_entry_id: uuid.UUID | None

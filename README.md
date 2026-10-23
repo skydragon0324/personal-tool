@@ -2,7 +2,7 @@
 
 Personal workspace for managing tasks across separate boards such as Personal, Work, and Friends.
 
-**Stack:** FastAPI · Next.js (App Router) · PostgreSQL · SQLAlchemy · TanStack Query · `@dnd-kit/react`
+**Stack:** FastAPI · Next.js 12 (Pages Router, runs on Node 12.22+) · PostgreSQL · SQLAlchemy · TanStack Query · `@dnd-kit/react`
 
 ## Quick start
 

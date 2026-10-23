@@ -79,6 +79,8 @@ def test_task_reminder_fires_once_when_due(client: TestClient, db: Session) -> N
     assert len(reminders) == 1
     assert reminders[0].title == "Call the bank"
     assert reminders[0].body == "Due today"
+    # Clients translate from the key and values; the body stays English.
+    assert (reminders[0].body_key, reminders[0].body_params) == ("task_reminder_due_today", {})
     assert str(reminders[0].task_id) == task["id"]
 
 
@@ -383,6 +385,8 @@ def test_unfinished_task_past_due_gets_one_overdue_notice(client: TestClient, db
         task["id"]
     ]
     assert "was due" in overdue[0].body
+    assert overdue[0].body_key == "task_overdue"
+    assert set(overdue[0].body_params) == {"due", "days"}
 
 
 def test_closing_overdue_notice_keeps_it_closed(client: TestClient, db: Session) -> None:

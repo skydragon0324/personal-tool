@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from app.models.task_attachment import TaskAttachment
     from app.models.task_link import TaskLink
     from app.models.task_recurrence import TaskRecurrenceSeries
-    from app.models.task_subtask import TaskSubtask
     from app.models.user import User
 
 
@@ -96,6 +95,14 @@ class Task(Base):
     is_detached: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
+    parent_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    # Order among the parent's sub-tasks (``position`` is the slot in the status column).
+    subtask_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -124,9 +131,15 @@ class Task(Base):
         cascade="all, delete-orphan",
         order_by="TaskAttachment.created_at",
     )
-    subtasks: Mapped[list[TaskSubtask]] = relationship(
-        "TaskSubtask",
-        back_populates="task",
+    # Sub-tasks are full tasks that belong to a parent task. They live in a status column like any
+    # task (so they have a status and keep a slot in that column's ordering) but are left out of
+    # every task list; they are reached through their parent. Only one level deep.
+    parent: Mapped[Task | None] = relationship(
+        "Task", remote_side="Task.id", back_populates="subtasks"
+    )
+    subtasks: Mapped[list[Task]] = relationship(
+        "Task",
+        back_populates="parent",
         cascade="all, delete-orphan",
-        order_by="TaskSubtask.position",
+        order_by="Task.subtask_position",
     )

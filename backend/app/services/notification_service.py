@@ -115,17 +115,20 @@ def _task_reminder_rows(
     values: list[dict] = []
     for task, board_id in rows:
         assert task.remind_at is not None
+        due = {"due": task.due_date.isoformat()}
         if task.due_date < today:
-            body = f"Overdue since {_short_date(task.due_date)}"
+            body, body_key, body_params = f"Overdue since {_short_date(task.due_date)}", "task_reminder_overdue", due
         elif task.due_date == today:
-            body = "Due today"
+            body, body_key, body_params = "Due today", "task_reminder_due_today", {}
         else:
-            body = f"Due {_short_date(task.due_date)}"
+            body, body_key, body_params = f"Due {_short_date(task.due_date)}", "task_reminder_due", due
         values.append(
             {
                 "kind": TASK_REMINDER,
                 "title": task.title[:200],
                 "body": body,
+                "body_key": body_key,
+                "body_params": body_params,
                 "board_id": board_id,
                 "task_id": task.id,
                 "dedupe_key": f"{TASK_REMINDER}:{task.id}:{int(task.remind_at.timestamp())}",
@@ -164,6 +167,8 @@ def _overdue_rows(db: Session, user_id: uuid.UUID, zone: ZoneInfo, now: datetime
                 "title": title[:200],
                 "body": f"Not finished · was due {_short_date(due_date)}"
                 + (f" ({days} days ago)" if days > 1 else " (yesterday)"),
+                "body_key": "task_overdue",
+                "body_params": {"due": due_date.isoformat(), "days": days},
                 "board_id": board_id,
                 "task_id": task_id,
                 "dedupe_key": f"{TASK_OVERDUE}:{task_id}:{due_date.isoformat()}",
@@ -226,6 +231,12 @@ def _schedule_rows(
                     "kind": SCHEDULE_START,
                     "title": entry.title[:200],
                     "body": f"Starts {when} · {_clock(entry.start_time)}–{_clock(entry.end_time)}",
+                    "body_key": "schedule_starts_in" if minutes > 0 else "schedule_starts_now",
+                    "body_params": {
+                        "minutes": minutes,
+                        "start": _clock(entry.start_time),
+                        "end": _clock(entry.end_time),
+                    },
                     "schedule_entry_id": entry.id,
                     "dedupe_key": f"{SCHEDULE_START}:{entry.id}:{day.isoformat()}",
                     "fire_at": starts_at - lead,
@@ -289,12 +300,15 @@ def _digest_row(
         "kind": DAILY_DIGEST,
         "title": "Your day at a glance",
         "body": " · ".join(parts),
+        "body_key": "daily_digest",
+        "body_params": {"due_today": due_today, "overdue": overdue, "scheduled": scheduled},
         "dedupe_key": dedupe_key,
         "fire_at": fire_at,
     }
     if not parts:
         # Nothing to report: store a hidden row so the day is marked as handled.
         row["body"] = "Nothing due today"
+        row["body_key"], row["body_params"] = "daily_digest_empty", {}
         row["dismissed_at"] = now
     return row
 
@@ -435,6 +449,8 @@ def notify_board_shared(db: Session, user_id: uuid.UUID, board: Board, inviter_n
         board.id,
         title=board.name[:200],
         body=f"{inviter_name} added you to this board",
+        body_key="board_shared",
+        body_params={"name": inviter_name},
         board_id=board.id,
     )
 
@@ -449,6 +465,8 @@ def notify_task_assigned(
         task.id,
         title=task.title[:200],
         body=f"{assigner_name} assigned this task to you · Due {_short_date(task.due_date)}",
+        body_key="task_assigned",
+        body_params={"name": assigner_name, "due": task.due_date.isoformat()},
         board_id=board_id,
         task_id=task.id,
     )

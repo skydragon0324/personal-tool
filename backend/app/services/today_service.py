@@ -61,7 +61,7 @@ def _serialize_task(task: Task, board: Board, column: BoardColumn, selected: dat
         status_name=column.name,
         status_color=column.color,
         status_is_done=column.is_done,
-        subtask_completed=sum(1 for item in subtasks if item.is_completed),
+        subtask_completed=sum(1 for item in subtasks if item.completed_at is not None),
         subtask_total=len(subtasks),
         deadline_status=_deadline_status(task, column, selected),
     )
@@ -76,6 +76,7 @@ def _load_task_rows(db: Session, user_id: uuid.UUID, *extra_filters):
             .options(selectinload(Task.subtasks))
             .where(
                 task_focus(user_id),
+                Task.parent_task_id.is_(None),
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
                 *extra_filters,

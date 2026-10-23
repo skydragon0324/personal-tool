@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import BoardColumn, Task, TaskLink, User
@@ -14,6 +14,7 @@ from app.services.category_service import ensure_category_on_board
 from app.services.content_utils import extract_text_from_content, validate_content_urls
 from app.services.ownership import get_task_for_user
 from app.services.storage import get_storage
+from app.services.task_ordering_service import renumber_columns
 from app.services.task_serializers import to_detail
 
 
@@ -132,6 +133,11 @@ def get_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskDetailR
 
 def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDetailRead:
     task = get_task_for_user(db, user_id, task_id, for_update=True)
+    if task.parent_task_id is not None and payload.recurrence is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A sub-task cannot repeat",
+        )
     if task.recurrence_series_id is not None:
         # Reminder and assignee are handled here rather than by the series edit-scope logic.
         per_task = {"remind_at", "assignee_ids"} & payload.model_fields_set
@@ -231,21 +237,14 @@ def delete_task(
             confirm_completed=confirm_completed,
         )
         return
-    column_id = task.column_id
-    old_position = task.position
-    storage_keys = [attachment.storage_key for attachment in task.attachments]
+    # Sub-tasks go with their parent; each also frees a slot in its own status column.
+    removed = [task, *task.subtasks]
+    column_ids = {item.column_id for item in removed}
+    storage_keys = [attachment.storage_key for item in removed for attachment in item.attachments]
 
     db.delete(task)
     db.flush()
-
-    db.execute(
-        update(Task)
-        .where(
-            Task.column_id == column_id,
-            Task.position > old_position,
-        )
-        .values(position=Task.position - 1)
-    )
+    renumber_columns(db, column_ids)
     db.commit()
 
     storage = get_storage()
