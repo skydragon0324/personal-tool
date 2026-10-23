@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { apiClient, setCsrfToken, setUnauthorizedHandler } from "@/lib/api-client";
+import { stubGlobal, unstubAllGlobals } from "@/test/stub-globals";
 
 const seriesRead = {
   id: "series-1",
@@ -34,17 +33,17 @@ describe("api client recurrence actions", () => {
   afterEach(() => {
     setUnauthorizedHandler(null);
     setCsrfToken(null);
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it("posts stop and resume to the series endpoints and returns RecurrenceSeriesRead", async () => {
     setCsrfToken("csrf-token");
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => seriesRead,
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubGlobal("fetch", fetchMock);
 
     await expect(apiClient.stopRecurrence("series-1")).resolves.toMatchObject({
       id: "series-1",
@@ -73,12 +72,12 @@ describe("api client recurrence actions", () => {
 
   it("patches a recurrence series with the update payload", async () => {
     setCsrfToken("csrf-token");
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({ ...seriesRead, title: "Renamed", version: 3 }),
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubGlobal("fetch", fetchMock);
 
     await expect(
       apiClient.updateRecurrenceSeries("series-1", { expected_version: 2, title: "Renamed" }),

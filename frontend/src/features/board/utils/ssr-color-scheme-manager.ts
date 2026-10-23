@@ -1,5 +1,3 @@
-"use client";
-
 import {
   localStorageColorSchemeManager,
   type MantineColorSchemeManager,

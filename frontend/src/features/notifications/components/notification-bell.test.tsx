@@ -3,19 +3,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NotificationFeed } from "../types";
 import { NotificationBell } from "./notification-bell";
 
-const getNotifications = vi.fn();
-const markAllNotificationsRead = vi.fn();
-const dismissNotification = vi.fn();
-const markNotificationRead = vi.fn();
-const push = vi.fn();
+const getNotifications = jest.fn();
+const markAllNotificationsRead = jest.fn();
+const dismissNotification = jest.fn();
+const markNotificationRead = jest.fn();
+const push = jest.fn();
 
-vi.mock("@/lib/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-client")>();
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -28,7 +27,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("next/navigation", () => ({
+jest.mock("@/lib/navigation", () => ({
   useRouter: () => ({ push }),
   usePathname: () => "/today",
 }));

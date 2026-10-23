@@ -1,4 +1,4 @@
-"use client";
+import { t } from "@/i18n";
 
 import { STATUS_COLORS, statusHeaderClass } from "./status-colors";
 
@@ -16,6 +16,22 @@ export const BOARD_ICONS = [
 export type BoardIconName = (typeof BOARD_ICONS)[number];
 
 export const BOARD_COLORS = STATUS_COLORS;
+
+const ICON_LABELS: Record<BoardIconName, () => string> = {
+  home: () => t("boards.iconHome"),
+  briefcase: () => t("boards.iconBriefcase"),
+  users: () => t("boards.iconUsers"),
+  heart: () => t("boards.iconHeart"),
+  star: () => t("boards.iconStar"),
+  flag: () => t("boards.iconFlag"),
+  bookmark: () => t("boards.iconBookmark"),
+  calendar: () => t("boards.iconCalendar"),
+};
+
+/** The spoken name of a board icon, for screen readers and tooltips. */
+export function boardIconLabel(icon: BoardIconName): string {
+  return ICON_LABELS[icon]();
+}
 
 export function boardColorClass(color: string): string {
   return statusHeaderClass(color);

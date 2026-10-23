@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { scheduleTimeStatus } from "./schedule-status";
 
 describe("schedule time status", () => {

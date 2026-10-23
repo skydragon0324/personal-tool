@@ -1,5 +1,3 @@
-"use client";
-
 import { move } from "@dnd-kit/helpers";
 import type { DragEndEvent, DragOverEvent } from "@dnd-kit/react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
@@ -18,6 +16,7 @@ import {
 } from "../utils/board-move";
 import { itemsByColumnIds } from "../utils/reorder-tasks";
 import { useMoveTask } from "./use-move-task";
+import { t } from "@/i18n";
 
 interface UseBoardDndArgs {
   query: BoardQueryParams;
@@ -189,7 +188,7 @@ export function useBoardDnd({
           notifyConflict();
           return;
         }
-        notifyApiError(error, "Could not move the task");
+        notifyApiError(error, t("boardPage.couldNotMove"));
       } finally {
         dragging.current = false;
         sourceTaskId.current = null;

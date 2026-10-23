@@ -1,6 +1,5 @@
-"use client";
-
 import { Alert, Button } from "@mantine/core";
+import { t } from "@/i18n";
 
 interface SaveNoticeProps {
   message: string;
@@ -23,22 +22,22 @@ export function SaveNotice({
       variant="light"
       withCloseButton
       onClose={onDismiss}
-      title="Saved"
+      title={t("board.saved")}
       className="mx-auto mt-4 max-w-[1400px] px-4 sm:px-6"
     >
       <p>{message}</p>
       {outOfRange ? (
-        <p className="mt-1 text-sm">This task is outside the current date range, so it is hidden.</p>
+        <p className="mt-1 text-sm">{t("board.outOfRange")}</p>
       ) : null}
       {hiddenByFilters ? (
         <p className="mt-1 text-sm">
-          Category, priority, or search filters may still hide this task.
+          {t("board.hiddenByFilters")}
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         {outOfRange && onViewTask ? (
           <Button size="xs" onClick={onViewTask}>
-            View task
+            {t("board.viewTask")}
           </Button>
         ) : null}
       </div>

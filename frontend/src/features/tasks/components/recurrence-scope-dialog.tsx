@@ -1,8 +1,7 @@
-"use client";
-
 import { Button, Radio, Stack, Text } from "@mantine/core";
 
 import type { DeleteScope, EditScope } from "@/features/board/types";
+import { t } from "@/i18n";
 
 export function RecurrenceScopeDialog({
   open,
@@ -29,9 +28,9 @@ export function RecurrenceScopeDialog({
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
       role="alertdialog"
       aria-modal="true"
-      aria-label={isDelete ? "Delete repeating task" : "Edit repeating task"}
+      aria-label={isDelete ? t("tasks.deleteRepeatingLabel") : t("tasks.editRepeatingLabel")}
     >
-      <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={onClose} />
+      <button type="button" className="absolute inset-0 cursor-default" aria-label={t("common.close")} onClick={onClose} />
       <form
         className="relative z-10 w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-xl"
         onSubmit={(event) => {
@@ -42,30 +41,30 @@ export function RecurrenceScopeDialog({
         }}
       >
         <h2 className="font-display text-xl text-[var(--app-text)]">
-          {isDelete ? "Delete a repeating task" : "Save a repeating task"}
+          {isDelete ? t("tasks.deleteRepeatingTitle") : t("tasks.saveRepeatingTitle")}
         </h2>
         <Text size="sm" c="dimmed" mt="sm">
-          This is a repeating task.
+          {t("tasks.isRepeating")}
         </Text>
         {isDelete && completed ? (
           <Text size="sm" mt="sm">
-            This completed task will be permanently removed. Other repeats are kept.
+            {t("tasks.completedRemoved")}
           </Text>
         ) : null}
         {isDelete && !completed ? (
           <Text size="sm" mt="sm">
-            Completed and individually customized tasks are kept.
+            {t("tasks.completedKept")}
           </Text>
         ) : null}
         <Radio.Group name="scope" defaultValue="this" mt="md">
           <Stack gap="xs">
-            <Radio value="this" label="This task only" />
+            <Radio value="this" label={t("tasks.thisTaskOnly")} />
             {!completed ? (
               <>
-                <Radio value="this_and_future" label="This and following tasks" />
+                <Radio value="this_and_future" label={t("tasks.thisAndFollowing")} />
                 <Radio
                   value="series"
-                  label={isDelete ? "All unfinished tasks in the series" : "All tasks in the series"}
+                  label={isDelete ? t("tasks.allUnfinishedInSeries") : t("tasks.allInSeries")}
                 />
               </>
             ) : null}
@@ -73,10 +72,10 @@ export function RecurrenceScopeDialog({
         </Radio.Group>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button type="button" variant="default" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" color={isDelete ? "red" : undefined} loading={submitting}>
-            {isDelete ? "Delete" : "Save"}
+            {isDelete ? t("common.delete") : t("common.save")}
           </Button>
         </div>
       </form>

@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { computeProgressStats } from "./progress-stats";
 import type { BoardColumn, TaskSummary, TasksByColumn } from "../types";
 

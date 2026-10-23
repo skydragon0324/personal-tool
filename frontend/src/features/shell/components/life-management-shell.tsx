@@ -1,5 +1,3 @@
-"use client";
-
 import { AppShell } from "@mantine/core";
 
 import { NotificationBridge } from "@/features/notifications/components/notification-bridge";

@@ -1,5 +1,3 @@
-"use client";
-
 import { Alert, Button, Center, Loader, Modal } from "@mantine/core";
 import { useEffect, useState } from "react";
 
@@ -8,6 +6,7 @@ import { useUpdateRecurrenceSeries } from "../hooks/use-update-recurrence-series
 import type { RecurrenceSeriesUpdatePayload } from "../types";
 import { isStaleSeriesVersion } from "../utils/series-edit";
 import { RecurringSeriesEditForm } from "./recurring-series-edit-form";
+import { t } from "@/i18n";
 
 export function RecurringSeriesEditModal({
   seriesId,
@@ -62,7 +61,7 @@ export function RecurringSeriesEditModal({
         if (saving) return;
         onClose();
       }}
-      title="Edit recurring task"
+      title={t("recurring.editTitle")}
       size="xl"
       radius="lg"
       padding="lg"
@@ -75,14 +74,14 @@ export function RecurringSeriesEditModal({
       }}
     >
       {loading ? (
-        <Center py="xl" role="status" aria-label="Loading recurring task">
+        <Center py="xl" role="status" aria-label={t("recurring.loadingOne")}>
           <Loader />
         </Center>
       ) : null}
       {failed ? (
-        <Alert color="red" m="md" title="Could not load recurring task.">
+        <Alert color="red" m="md" title={t("recurring.couldNotLoadOne")}>
           <Button size="xs" variant="light" mt="sm" onClick={() => void detailQuery.refetch()}>
-            Retry
+            {t("common.retry")}
           </Button>
         </Alert>
       ) : null}

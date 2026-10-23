@@ -1,7 +1,5 @@
-"use client";
-
-import { ActionIcon, Avatar, Badge, Button, Group, Loader, Modal, Stack, Text, TextInput } from "@mantine/core";
-import { useRouter } from "next/navigation";
+import { ActionIcon, Avatar, Badge, Button, Group, Input, Loader, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { useRouter } from "@/lib/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
@@ -9,6 +7,7 @@ import { notifyApiError, notifySuccess } from "@/lib/notify";
 
 import { useBoardMemberMutations, useBoardMembers } from "../hooks/use-board-members";
 import { initials } from "../utils/person";
+import { t } from "@/i18n";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,7 +34,7 @@ export function BoardMembersModal({
   async function submit() {
     const value = email.trim();
     if (!EMAIL_PATTERN.test(value)) {
-      setError("Enter a valid email address");
+      setError(t("auth.emailInvalid"));
       return;
     }
     setError(null);
@@ -44,11 +43,11 @@ export function BoardMembersModal({
       setEmail("");
       notifySuccess(
         result.status === "added"
-          ? `${value} now has access to ${boardName}`
-          : `Invitation saved. ${value} joins ${boardName} when they sign up.`,
+          ? t("members.added", { email: value, board: boardName })
+          : t("members.invitationSaved", { email: value, board: boardName }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not invite");
+      setError(err instanceof Error ? err.message : t("members.couldNotInvite"));
     }
   }
 
@@ -59,12 +58,12 @@ export function BoardMembersModal({
       onClose();
       router.push("/boards");
     } catch (err) {
-      notifyApiError(err, "Could not leave the board");
+      notifyApiError(err, t("members.couldNotLeave"));
     }
   }
 
   return (
-    <Modal opened={opened} onClose={onClose} title={`Share “${boardName}”`} radius="lg" size="md">
+    <Modal opened={opened} onClose={onClose} title={t("members.shareTitle", { name: boardName })} radius="lg" size="md">
       <Stack gap="md">
         {canManage ? (
           <form
@@ -73,12 +72,18 @@ export function BoardMembersModal({
               void submit();
             }}
           >
+            {/* Label and help text sit above the row so the button always lines up with the input. */}
+            <Input.Label htmlFor="invite-email">{t("members.inviteByEmail")}</Input.Label>
+            <Input.Description mb={8}>
+              {t("members.inviteHint")}
+            </Input.Description>
             <Group align="flex-start" gap="xs" wrap="nowrap">
               <TextInput
+                id="invite-email"
                 className="flex-1"
-                label="Invite by email"
-                description="Teammates can create, edit and assign tasks. Only you can change statuses."
-                placeholder="teammate@example.com"
+                inputMode="email"
+                autoComplete="email"
+                placeholder={t("members.emailPlaceholder")}
                 value={email}
                 onChange={(event) => {
                   setEmail(event.currentTarget.value);
@@ -87,8 +92,8 @@ export function BoardMembersModal({
                 error={error}
                 data-autofocus
               />
-              <Button type="submit" mt={46} loading={invite.isPending}>
-                Invite
+              <Button type="submit" loading={invite.isPending} disabled={!email.trim()}>
+                {t("members.invite")}
               </Button>
             </Group>
           </form>
@@ -96,11 +101,11 @@ export function BoardMembersModal({
 
         <div>
           <Text size="sm" fw={600} mb={6}>
-            People on this board
+            {t("members.people")}
           </Text>
           {membersQuery.isLoading ? <Loader size="sm" /> : null}
-          {membersQuery.isError ? <Text c="red" size="sm">Could not load members.</Text> : null}
-          <ul aria-label="Board members" className="divide-y divide-[var(--app-border)]">
+          {membersQuery.isError ? <Text c="red" size="sm">{t("members.couldNotLoad")}</Text> : null}
+          <ul aria-label={t("members.membersLabel")} className="divide-y divide-[var(--app-border)]">
             {members?.people.map((person) => {
               const isMe = person.user_id === user?.id;
               return (
@@ -111,7 +116,7 @@ export function BoardMembersModal({
                   <div className="min-w-0 flex-1">
                     <Text size="sm" fw={500} truncate>
                       {person.display_name}
-                      {isMe ? " (you)" : ""}
+                      {isMe ? t("members.youSuffix") : ""}
                     </Text>
                     <Text size="xs" c="dimmed" truncate>
                       {person.email}
@@ -119,7 +124,7 @@ export function BoardMembersModal({
                   </div>
                   {person.role === "owner" ? (
                     <Badge variant="light" size="sm">
-                      Owner
+                      {t("members.owner")}
                     </Badge>
                   ) : canManage ? (
                     <Button
@@ -129,15 +134,15 @@ export function BoardMembersModal({
                       loading={remove.isPending && remove.variables === person.user_id}
                       onClick={() =>
                         remove.mutate(person.user_id, {
-                          onError: (err) => notifyApiError(err, "Could not remove member"),
+                          onError: (err) => notifyApiError(err, t("members.couldNotRemove")),
                         })
                       }
                     >
-                      Remove
+                      {t("members.remove")}
                     </Button>
                   ) : isMe ? (
                     <Button size="compact-xs" variant="subtle" color="red" onClick={() => void leave()}>
-                      Leave
+                      {t("members.leave")}
                     </Button>
                   ) : null}
                 </li>
@@ -149,25 +154,25 @@ export function BoardMembersModal({
         {canManage && members?.invitations.length ? (
           <div>
             <Text size="sm" fw={600} mb={6}>
-              Pending invitations
+              {t("members.pendingInvitations")}
             </Text>
-            <ul aria-label="Pending invitations" className="divide-y divide-[var(--app-border)]">
+            <ul aria-label={t("members.pendingInvitations")} className="divide-y divide-[var(--app-border)]">
               {members.invitations.map((invitation) => (
                 <li key={invitation.id} className="flex items-center gap-3 py-2">
                   <Text size="sm" className="min-w-0 flex-1" truncate>
                     {invitation.email}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    Joins on sign-up
+                    {t("members.joinsOnSignUp")}
                   </Text>
                   <ActionIcon
                     variant="subtle"
                     color="gray"
                     size="sm"
-                    aria-label={`Cancel invitation for ${invitation.email}`}
+                    aria-label={t("members.cancelInvitationFor", { email: invitation.email })}
                     onClick={() =>
                       cancelInvitation.mutate(invitation.id, {
-                        onError: (err) => notifyApiError(err, "Could not cancel the invitation"),
+                        onError: (err) => notifyApiError(err, t("members.couldNotCancelInvitation")),
                       })
                     }
                   >

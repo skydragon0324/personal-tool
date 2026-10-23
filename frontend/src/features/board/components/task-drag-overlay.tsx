@@ -1,5 +1,3 @@
-"use client";
-
 import { createPortal } from "react-dom";
 import { DragOverlay } from "@dnd-kit/react";
 

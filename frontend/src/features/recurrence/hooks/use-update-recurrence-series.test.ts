@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { boardKeys } from "@/features/board/api/board-queries";
 import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
@@ -10,12 +9,12 @@ import { todayKeys } from "@/features/today/api/today-queries";
 import { recurrenceKeys } from "../api/recurrence-queries";
 import { useUpdateRecurrenceSeries } from "./use-update-recurrence-series";
 
-const updateRecurrenceSeries = vi.fn();
-const notifySuccess = vi.fn();
-const notifyApiError = vi.fn();
+const updateRecurrenceSeries = jest.fn();
+const notifySuccess = jest.fn();
+const notifyApiError = jest.fn();
 
-vi.mock("@/lib/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api-client")>("@/lib/api-client");
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -25,7 +24,7 @@ vi.mock("@/lib/api-client", async () => {
   };
 });
 
-vi.mock("@/lib/notify", () => ({
+jest.mock("@/lib/notify", () => ({
   notifySuccess: (...args: unknown[]) => notifySuccess(...args),
   notifyApiError: (...args: unknown[]) => notifyApiError(...args),
 }));
@@ -45,7 +44,7 @@ describe("useUpdateRecurrenceSeries", () => {
 
   it("sends the payload and invalidates related queries", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const invalidate = jest.spyOn(client, "invalidateQueries");
     updateRecurrenceSeries.mockResolvedValue({ id: "series-1", title: "Renamed", version: 5 });
     const { result } = renderHook(() => useUpdateRecurrenceSeries(), { wrapper: wrapper(client) });
 

@@ -1,5 +1,3 @@
-"use client";
-
 import { useRef } from "react";
 import { ActionIcon, Menu } from "@mantine/core";
 import { useSortable } from "@dnd-kit/react/sortable";
@@ -14,6 +12,7 @@ import {
   wasShortClick,
 } from "../utils/pointer-activation";
 import { AssigneeAvatars } from "./assignee-avatars";
+import { t } from "@/i18n";
 
 interface TaskCardProps {
   task: TaskSummary;
@@ -104,20 +103,20 @@ export function TaskCard({
         <div data-no-dnd="true" className="-mr-1 -mt-0.5 shrink-0">
           <Menu shadow="md" position="bottom-end" withinPortal>
             <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Task menu">
+              <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t("task.menu")}>
                 ⋯
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item onClick={() => onOpenDetail(task, "edit")}>Edit</Menu.Item>
-              {onDuplicate ? <Menu.Item onClick={() => onDuplicate(task)}>Duplicate</Menu.Item> : null}
+              <Menu.Item onClick={() => onOpenDetail(task, "edit")}>{t("common.edit")}</Menu.Item>
+              {onDuplicate ? <Menu.Item onClick={() => onDuplicate(task)}>{t("task.duplicate")}</Menu.Item> : null}
               {onMoveToBoard ? (
-                <Menu.Item onClick={() => onMoveToBoard(task)}>Move to board…</Menu.Item>
+                <Menu.Item onClick={() => onMoveToBoard(task)}>{t("task.moveToBoard")}</Menu.Item>
               ) : null}
               {columns.length > 1 ? (
                 <>
                   <Menu.Divider />
-                  <Menu.Label>Change status</Menu.Label>
+                  <Menu.Label>{t("task.changeStatus")}</Menu.Label>
                   {columns.map((column) => (
                     <Menu.Item
                       key={column.id}
@@ -132,7 +131,7 @@ export function TaskCard({
               {onAssign && people.length ? (
                 <>
                   <Menu.Divider />
-                  <Menu.Label>Assign to</Menu.Label>
+                  <Menu.Label>{t("task.assignTo")}</Menu.Label>
                   {people.map((person) => {
                     const ids = (task.assignees ?? []).map((item) => item.id);
                     const assigned = ids.includes(person.user_id);
@@ -153,13 +152,13 @@ export function TaskCard({
                     );
                   })}
                   {task.assignees?.length ? (
-                    <Menu.Item onClick={() => onAssign(task, [])}>Unassign everyone</Menu.Item>
+                    <Menu.Item onClick={() => onAssign(task, [])}>{t("task.unassignEveryone")}</Menu.Item>
                   ) : null}
                 </>
               ) : null}
               <Menu.Divider />
               <Menu.Item color="red" onClick={() => onDelete(task)}>
-                Delete
+                {t("common.delete")}
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -177,21 +176,21 @@ export function TaskCard({
                 : ""
           }`}
         >
-          {overdue ? "Overdue · " : dueToday ? "Due today · " : ""}
+          {overdue ? t("task.overduePrefix") : dueToday ? t("task.dueTodayPrefix") : ""}
           {formatTaskPeriod(task.start_date, task.due_date)}
         </span>
         {task.checklist_total > 0 ? (
           <span>
-            Checklist {task.checklist_completed}/{task.checklist_total}
+            {t("task.checklistCount", { done: task.checklist_completed, total: task.checklist_total })}
           </span>
         ) : null}
         {task.subtask_total > 0 ? (
           <span>
-            Subtasks {task.subtask_completed}/{task.subtask_total}
+            {t("task.subtasksCount", { done: task.subtask_completed, total: task.subtask_total })}
           </span>
         ) : null}
-        {task.link_count > 0 ? <span>Links {task.link_count}</span> : null}
-        {task.attachment_count > 0 ? <span>Files {task.attachment_count}</span> : null}
+        {task.link_count > 0 ? <span>{t("task.linksCount", { count: task.link_count })}</span> : null}
+        {task.attachment_count > 0 ? <span>{t("task.filesCount", { count: task.attachment_count })}</span> : null}
       </div>
     </article>
   );

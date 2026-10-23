@@ -1,14 +1,13 @@
-"use client";
-
 import { Burger } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/lib/navigation";
 import { createContext, useContext, useMemo } from "react";
 
 import { ManageBoardsModal } from "@/features/board/components/manage-boards-modal";
 import { NewBoardModal } from "@/features/board/components/new-board-modal";
 
 import { boardIdFromPath } from "../utils/navigation";
+import { t } from "@/i18n";
 
 interface WorkspaceChromeValue {
   openSidebar: () => void;
@@ -66,7 +65,7 @@ export function MobileSidebarButton() {
       onClick={chrome.toggleSidebar}
       hiddenFrom="sm"
       size="sm"
-      aria-label={chrome.sidebarOpened ? "Close navigation" : "Open navigation"}
+      aria-label={chrome.sidebarOpened ? t("shell.closeNavigation") : t("shell.openNavigation")}
     />
   );
 }

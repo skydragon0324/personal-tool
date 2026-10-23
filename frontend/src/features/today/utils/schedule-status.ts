@@ -1,4 +1,5 @@
 import type { ScheduleTimeStatus } from "../types";
+import { t } from "@/i18n";
 
 function localDateTime(isoDate: string, time: string): Date {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -22,9 +23,9 @@ export function scheduleTimeStatus(args: {
   return "passed";
 }
 
-export const SCHEDULE_STATUS_LABEL: Record<ScheduleTimeStatus, string> = {
-  upcoming: "Upcoming",
-  in_progress: "In progress",
-  passed: "Passed",
-  completed: "Completed",
-};
+export function scheduleStatusLabel(status: ScheduleTimeStatus): string {
+  if (status === "upcoming") return t("today.scheduleUpcoming");
+  if (status === "in_progress") return t("today.scheduleInProgress");
+  if (status === "passed") return t("today.schedulePassed");
+  return t("today.scheduleCompleted");
+}

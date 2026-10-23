@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { applyRangeChange, commitCustomRange, normalizeCustomDraft } from "./board-range";
 
 describe("custom date range", () => {

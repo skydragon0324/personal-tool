@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { LAST_BOARD_STORAGE_KEY, resolveLastBoardId } from "./last-board";
 import {
   boardPreferencesKey,

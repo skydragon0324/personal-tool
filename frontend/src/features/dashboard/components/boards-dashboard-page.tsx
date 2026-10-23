@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Loader, Progress, Text } from "@mantine/core";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -14,6 +12,7 @@ import { AttentionTabs } from "./attention-list";
 import { TaskOverview } from "./task-overview";
 import { useDashboardSummary } from "../hooks/use-dashboard";
 import type { DashboardBoardStats, DashboardSummary } from "../types";
+import { t } from "@/i18n";
 
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -34,13 +33,13 @@ export function BoardsDashboardPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Boards">
+      <PageHeader title={t("shell.boards")}>
         <Button variant="light" component={Link} href="/boards/recurring">
-          Recurring tasks
+          {t("dashboard.recurringTasks")}
         </Button>
-        <Button onClick={() => chrome?.openNewBoard()}>New board</Button>
+        <Button onClick={() => chrome?.openNewBoard()}>{t("dashboard.newBoard")}</Button>
         <Button variant="light" onClick={() => chrome?.openManageBoards()}>
-          Manage boards
+          {t("dashboard.manageBoards")}
         </Button>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
@@ -52,19 +51,19 @@ export function BoardsDashboardPage() {
           ) : null}
           {summaryQuery.isError ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Text>Could not load dashboard.</Text>
+              <Text>{t("dashboard.couldNotLoad")}</Text>
               <Button variant="light" onClick={() => void summaryQuery.refetch()}>
-                Retry
+                {t("common.retry")}
               </Button>
             </div>
           ) : null}
           {data && data.active_boards === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-center">
-              <h2 className="font-display text-2xl text-[var(--app-text)]">No boards yet</h2>
+              <h2 className="font-display text-2xl text-[var(--app-text)]">{t("dashboard.noBoards")}</h2>
               <Text c="dimmed" maw={420}>
-                Create a board to start tracking tasks across your life.
+                {t("dashboard.noBoardsHint")}
               </Text>
-              <Button onClick={() => chrome?.openNewBoard()}>New board</Button>
+              <Button onClick={() => chrome?.openNewBoard()}>{t("dashboard.newBoard")}</Button>
             </div>
           ) : null}
           {data && data.active_boards > 0 ? (
@@ -81,31 +80,31 @@ export function BoardsDashboardPage() {
 
 function DashboardBody({ data }: { data: DashboardSummary }) {
   return (
-    <DashboardGrid label="Boards dashboard">
+    <DashboardGrid label={t("dashboard.gridLabel")}>
       <DashboardPanel
-        title="Overview"
-        description="A snapshot of work across your boards"
+        title={t("dashboard.overview")}
+        description={t("dashboard.overviewHint")}
         icon={<NavIcon name="boards" />}
         count={data.active_boards}
       >
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-          <MetricTile label="Active boards" value={data.active_boards} />
-          <MetricTile label="Total tasks" value={data.total_tasks} />
-          <MetricTile label="Open" value={data.open_tasks} />
-          <MetricTile label="Completed" value={data.completed_tasks} accent="complete" />
-          <MetricTile label="Completion rate" value={percent(data.completion_rate)} accent="complete" />
-          <MetricTile label="Due today" value={data.due_today} accent="today" />
-          <MetricTile label="Overdue" value={data.overdue} accent="danger" />
+          <MetricTile label={t("dashboard.activeBoards")} value={data.active_boards} />
+          <MetricTile label={t("dashboard.totalTasks")} value={data.total_tasks} />
+          <MetricTile label={t("dashboard.open")} value={data.open_tasks} />
+          <MetricTile label={t("dashboard.completed")} value={data.completed_tasks} accent="complete" />
+          <MetricTile label={t("dashboard.completionRate")} value={percent(data.completion_rate)} accent="complete" />
+          <MetricTile label={t("dashboard.dueToday")} value={data.due_today} accent="today" />
+          <MetricTile label={t("dashboard.overdue")} value={data.overdue} accent="danger" />
         </div>
       </DashboardPanel>
 
       <DashboardPanel
-        title="Board progress"
-        description="Completion by board"
+        title={t("dashboard.boardProgress")}
+        description={t("dashboard.boardProgressHint")}
         icon={<NavIcon name="boards" />}
         count={data.boards.length}
         empty={
-          data.boards.length === 0 ? <PanelEmpty>No boards yet</PanelEmpty> : undefined
+          data.boards.length === 0 ? <PanelEmpty>{t("dashboard.noBoards")}</PanelEmpty> : undefined
         }
       >
         <ul className="space-y-1">
@@ -118,16 +117,16 @@ function DashboardBody({ data }: { data: DashboardSummary }) {
       </DashboardPanel>
 
       <DashboardPanel
-        title="Workload"
-        description="Priority mix and completion"
+        title={t("dashboard.workload")}
+        description={t("dashboard.workloadHint")}
         icon={<NavIcon name="today" />}
       >
         <WorkloadPanel data={data} />
       </DashboardPanel>
 
       <DashboardPanel
-        title="Needs attention"
-        description="Overdue and due today"
+        title={t("dashboard.needsAttention")}
+        description={t("dashboard.needsAttentionHint")}
         icon={<NavIcon name="schedule" />}
         count={data.attention.overdue.length + data.attention.due_today.length}
       >
@@ -188,7 +187,7 @@ function BoardProgressRow({ board }: { board: DashboardBoardStats }) {
           </p>
           {board.overdue > 0 ? (
             <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:bg-rose-500/20 dark:text-rose-200">
-              {board.overdue} overdue
+              {t("dashboard.overdueCount", { count: board.overdue })}
             </span>
           ) : null}
         </div>
@@ -197,7 +196,7 @@ function BoardProgressRow({ board }: { board: DashboardBoardStats }) {
           mt={6}
           size="sm"
           color="teal"
-          aria-label={`${board.name} ${percent(board.completion_rate)} complete`}
+          aria-label={t("dashboard.percentComplete", { name: board.name, percent: percent(board.completion_rate) })}
         />
       </div>
     </Link>
@@ -211,37 +210,37 @@ function WorkloadPanel({ data }: { data: DashboardSummary }) {
   return (
     <div className="space-y-5">
       <div>
-        <p className="mb-2 text-xs font-medium text-[var(--app-text-muted)]">Priority</p>
+        <p className="mb-2 text-xs font-medium text-[var(--app-text-muted)]">{t("dashboard.priority")}</p>
         <SegmentedBar
           segments={[
-            { label: "High", value: data.priority.high, className: "bg-rose-500" },
-            { label: "Medium", value: data.priority.medium, className: "bg-amber-400" },
-            { label: "Low", value: data.priority.low, className: "bg-sky-400" },
+            { label: t("task.priorityHigh"), value: data.priority.high, className: "bg-rose-500" },
+            { label: t("task.priorityMedium"), value: data.priority.medium, className: "bg-amber-400" },
+            { label: t("task.priorityLow"), value: data.priority.low, className: "bg-sky-400" },
           ]}
           total={priorityTotal}
         />
         <Legend
           items={[
-            { label: "High", value: data.priority.high },
-            { label: "Medium", value: data.priority.medium },
-            { label: "Low", value: data.priority.low },
+            { label: t("task.priorityHigh"), value: data.priority.high },
+            { label: t("task.priorityMedium"), value: data.priority.medium },
+            { label: t("task.priorityLow"), value: data.priority.low },
           ]}
         />
       </div>
       <div>
-        <p className="mb-2 text-xs font-medium text-[var(--app-text-muted)]">Completion</p>
+        <p className="mb-2 text-xs font-medium text-[var(--app-text-muted)]">{t("dashboard.completion")}</p>
         <SegmentedBar
           segments={[
-            { label: "Completed", value: data.completed_tasks, className: "bg-teal-500" },
-            { label: "Open", value: data.open_tasks, className: "bg-slate-300 dark:bg-slate-600" },
+            { label: t("dashboard.completed"), value: data.completed_tasks, className: "bg-teal-500" },
+            { label: t("dashboard.open"), value: data.open_tasks, className: "bg-slate-300 dark:bg-slate-600" },
           ]}
           total={taskTotal}
         />
         <Legend
           items={[
-            { label: "Total", value: data.total_tasks },
-            { label: "Open", value: data.open_tasks },
-            { label: "Completed", value: data.completed_tasks },
+            { label: t("dashboard.total"), value: data.total_tasks },
+            { label: t("dashboard.open"), value: data.open_tasks },
+            { label: t("dashboard.completed"), value: data.completed_tasks },
           ]}
         />
       </div>

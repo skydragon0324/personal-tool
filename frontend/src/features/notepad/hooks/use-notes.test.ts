@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
 
@@ -9,12 +8,12 @@ import { noteKeys } from "../api/note-queries";
 import type { Note } from "../types";
 import { useNoteMutations } from "./use-notes";
 
-const updateNote = vi.fn();
-const listNotes = vi.fn();
-const notifyApiError = vi.fn();
+const updateNote = jest.fn();
+const listNotes = jest.fn();
+const notifyApiError = jest.fn();
 
-vi.mock("@/lib/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api-client")>("@/lib/api-client");
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -25,7 +24,7 @@ vi.mock("@/lib/api-client", async () => {
   };
 });
 
-vi.mock("@/lib/notify", () => ({
+jest.mock("@/lib/notify", () => ({
   notifyApiError: (...args: unknown[]) => notifyApiError(...args),
 }));
 

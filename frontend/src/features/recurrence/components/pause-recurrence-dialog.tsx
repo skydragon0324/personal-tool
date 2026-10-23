@@ -1,6 +1,5 @@
-"use client";
-
 import { Button, Group, Modal, Text } from "@mantine/core";
+import { t } from "@/i18n";
 
 export function PauseRecurrenceDialog({
   title,
@@ -17,18 +16,18 @@ export function PauseRecurrenceDialog({
     <Modal
       opened={title !== null}
       onClose={onClose}
-      title="Pause recurring task?"
+      title={t("recurring.pauseTitle")}
       radius="lg"
     >
       <Text size="sm">
-        Future occurrences will stop generating. Existing tasks and completed history will stay.
+        {t("recurring.pauseBody")}
       </Text>
       <Group justify="flex-end" mt="md">
         <Button variant="default" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button color="red" onClick={onConfirm} loading={submitting}>
-          Pause
+          {t("recurring.pause")}
         </Button>
       </Group>
     </Modal>

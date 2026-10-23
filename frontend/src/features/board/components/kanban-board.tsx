@@ -1,5 +1,3 @@
-"use client";
-
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import type { DragOverEvent } from "@dnd-kit/react";
 import { DragDropProvider, KeyboardSensor, PointerSensor } from "@dnd-kit/react";
@@ -14,6 +12,7 @@ import { POINTER_ACTIVATION_DISTANCE, isNoDragTarget } from "../utils/pointer-ac
 import { AddStatusColumn } from "./column-header";
 import { KanbanColumn } from "./kanban-column";
 import { TaskDragOverlay } from "./task-drag-overlay";
+import { t } from "@/i18n";
 
 interface KanbanBoardProps {
   query: BoardQueryParams;
@@ -89,7 +88,7 @@ export function KanbanBoard({
         notifyConflict();
         return;
       }
-      notifyApiError(error, "Could not change status");
+      notifyApiError(error, t("task.couldNotChangeStatus"));
     }
   }
 

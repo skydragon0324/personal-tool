@@ -1,5 +1,3 @@
-"use client";
-
 import { move } from "@dnd-kit/helpers";
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { DragDropProvider } from "@dnd-kit/react";
@@ -7,14 +5,16 @@ import { useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { Button, Group, Modal, Stack, Tabs, Text, TextInput } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 
 import { formatDateTime } from "@/lib/dates";
 import { notifyApiError, notifySuccess } from "@/lib/notify";
 import { useBoardMutations, useBoards } from "../hooks/use-boards";
 import type { BoardListItem } from "../types";
-import { BOARD_COLORS, BOARD_ICONS, BoardGlyph, boardColorClass } from "../utils/board-icons";
+import { BOARD_COLORS, BOARD_ICONS, BoardGlyph, boardColorClass, boardIconLabel } from "../utils/board-icons";
 import { resolveLastBoardId } from "../utils/last-board";
+import { colorName, t } from "@/i18n";
+import { tRich } from "@/i18n/rich";
 
 interface ManageBoardsModalProps {
   opened: boolean;
@@ -59,7 +59,7 @@ function SortableBoardRow({
           type="button"
           ref={handleRef}
           className="mt-1 cursor-grab rounded-md border border-[var(--app-border)] px-2 py-1 text-[var(--app-text-muted)]"
-          aria-label={`Reorder ${board.name}`}
+          aria-label={t("boards.reorder", { name: board.name })}
         >
           ⋮⋮
         </button>
@@ -68,7 +68,7 @@ function SortableBoardRow({
         </span>
         <div className="min-w-0 flex-1 space-y-2">
           <TextInput
-            label="Name"
+            label={t("boards.name")}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             onBlur={() => {
@@ -84,7 +84,7 @@ function SortableBoardRow({
                   board.color === color ? "ring-2 ring-[var(--app-primary)] ring-offset-2" : ""
                 }`}
                 onClick={() => onColor(color)}
-                aria-label={color}
+                aria-label={colorName(color)}
               />
             ))}
           </Group>
@@ -99,14 +99,14 @@ function SortableBoardRow({
                     : "border-[var(--app-border)]"
                 }`}
                 onClick={() => onIcon(icon)}
-                aria-label={icon}
+                aria-label={boardIconLabel(icon)}
               >
                 <BoardGlyph name={icon} size={14} />
               </button>
             ))}
           </Group>
           <Button size="xs" color="red" variant="light" onClick={onArchive} disabled={archiveDisabled}>
-            Archive
+            {t("boards.archive")}
           </Button>
         </div>
       </div>
@@ -165,7 +165,7 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
     if (!pendingArchive) return;
     try {
       await archive.mutateAsync(pendingArchive.id);
-      notifySuccess(`Archived ${pendingArchive.name}`);
+      notifySuccess(t("boards.archived", { name: pendingArchive.name }));
       if (pendingArchive.id === currentBoardId) {
         const nextId = resolveLastBoardId(
           (boardsQuery.data ?? []).map((board) =>
@@ -178,7 +178,7 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
       }
       setPendingArchive(null);
     } catch (error) {
-      notifyApiError(error, "Could not archive board");
+      notifyApiError(error, t("boards.couldNotArchive"));
     }
   }
 
@@ -186,11 +186,11 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
     if (!pendingDelete || deleteName !== pendingDelete.name) return;
     try {
       await remove.mutateAsync(pendingDelete.id);
-      notifySuccess(`Deleted ${pendingDelete.name}`);
+      notifySuccess(t("boards.deleted", { name: pendingDelete.name }));
       setPendingDelete(null);
       setDeleteName("");
     } catch (error) {
-      notifyApiError(error, "Could not delete board");
+      notifyApiError(error, t("boards.couldNotDelete"));
     }
   }
 
@@ -199,15 +199,15 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
       <Modal
         opened={opened}
         onClose={onClose}
-        title="Manage boards"
+        title={t("boards.manageTitle")}
         size="xl"
         radius="lg"
         styles={{ body: { maxHeight: "min(75vh, 720px)", overflowY: "auto" } }}
       >
         <Tabs defaultValue="active">
           <Tabs.List>
-            <Tabs.Tab value="active">Active ({active.length})</Tabs.Tab>
-            <Tabs.Tab value="archived">Archived ({archived.length})</Tabs.Tab>
+            <Tabs.Tab value="active">{t("boards.activeTab", { count: active.length })}</Tabs.Tab>
+            <Tabs.Tab value="archived">{t("boards.archivedTab", { count: archived.length })}</Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="active" pt="md">
             <DragDropProvider
@@ -228,7 +228,7 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
                 try {
                   await reorder.mutateAsync({ boardId: sourceId, targetPosition: target });
                 } catch (error) {
-                  notifyApiError(error, "Could not reorder boards");
+                  notifyApiError(error, t("boards.couldNotReorder"));
                   setOrderedIds(active.map((board) => board.id));
                 }
               }}
@@ -241,14 +241,18 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
                     index={index}
                     onRename={(name) =>
                       void update.mutateAsync({ boardId: board.id, payload: { name } }).catch((error) => {
-                        notifyApiError(error, "Could not rename board");
+                        notifyApiError(error, t("boards.couldNotRename"));
                       })
                     }
                     onColor={(color) =>
-                      void update.mutateAsync({ boardId: board.id, payload: { color } })
+                      void update.mutateAsync({ boardId: board.id, payload: { color } }).catch((error) => {
+                        notifyApiError(error, t("boards.couldNotChangeColor"));
+                      })
                     }
                     onIcon={(icon_name) =>
-                      void update.mutateAsync({ boardId: board.id, payload: { icon_name } })
+                      void update.mutateAsync({ boardId: board.id, payload: { icon_name } }).catch((error) => {
+                        notifyApiError(error, t("boards.couldNotChangeIcon"));
+                      })
                     }
                     onArchive={() => setPendingArchive(board)}
                     archiveDisabled={active.length <= 1}
@@ -259,7 +263,7 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
           </Tabs.Panel>
           <Tabs.Panel value="archived" pt="md">
             <Text size="sm" c="dimmed" mb="md">
-              Archive is reversible. Delete permanently cannot be undone.
+              {t("boards.archiveHint")}
             </Text>
             {archived.length ? (
               <div className="space-y-3">
@@ -269,13 +273,12 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
                       <div>
                         <Text fw={600}>{board.name}</Text>
                         <Text size="sm" c="dimmed">
-                          Archived {board.archived_at ? formatDateTime(board.archived_at) : ""}
+                          {t("boards.archivedAt", { date: board.archived_at ? formatDateTime(board.archived_at) : "" })}
                         </Text>
                         <Text size="sm" c="dimmed">
-                          {board.total_tasks} {board.total_tasks === 1 ? "task" : "tasks"} ·{" "}
-                          {board.status_count} {board.status_count === 1 ? "status" : "statuses"} ·{" "}
-                          {board.attachment_count}{" "}
-                          {board.attachment_count === 1 ? "attachment" : "attachments"}
+                          {t("boards.taskCount", { count: board.total_tasks })} ·{" "}
+                          {t("boards.statusCount", { count: board.status_count })} ·{" "}
+                          {t("boards.attachmentCount", { count: board.attachment_count })}
                         </Text>
                       </div>
                       <Group gap="xs">
@@ -283,14 +286,14 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
                           variant="light"
                           onClick={() =>
                             void restore.mutateAsync(board.id).then(
-                              () => notifySuccess(`Restored ${board.name}`),
-                              (error) => notifyApiError(error, "Could not restore board"),
+                              () => notifySuccess(t("boards.restored", { name: board.name })),
+                              (error) => notifyApiError(error, t("boards.couldNotRestore")),
                             )
                           }
                           loading={restore.isPending && restore.variables === board.id}
                           disabled={restore.isPending || remove.isPending}
                         >
-                          Restore
+                          {t("boards.restore")}
                         </Button>
                         <Button
                           color="red"
@@ -301,7 +304,7 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
                           }}
                           disabled={remove.isPending}
                         >
-                          Delete permanently
+                          {t("boards.deletePermanently")}
                         </Button>
                       </Group>
                     </Group>
@@ -310,26 +313,25 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
               </div>
             ) : (
               <Text size="sm" c="dimmed">
-                No archived boards.
+                {t("boards.noArchived")}
               </Text>
             )}
           </Tabs.Panel>
         </Tabs>
       </Modal>
 
-      <Modal opened={pendingArchive !== null} onClose={() => setPendingArchive(null)} title="Archive board" radius="lg">
+      <Modal opened={pendingArchive !== null} onClose={() => setPendingArchive(null)} title={t("boards.archiveTitle")} radius="lg">
         {pendingArchive ? (
           <Stack>
             <Text>
-              Archive <strong>{pendingArchive.name}</strong>? Tasks, statuses, and categories stay on this
-              board and will return when you restore it.
+              {tRich("boards.archiveConfirm", { name: <strong>{pendingArchive.name}</strong> })}
             </Text>
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setPendingArchive(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button color="red" onClick={() => void confirmArchive()} loading={archive.isPending}>
-                Archive
+                {t("boards.archive")}
               </Button>
             </Group>
           </Stack>
@@ -339,33 +341,32 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
       <Modal
         opened={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        title="Delete board permanently"
+        title={t("boards.deleteTitle")}
         radius="lg"
       >
         {pendingDelete ? (
           <Stack>
             <Text>
-              Permanently delete <strong>{pendingDelete.name}</strong>? This will remove its tasks,
-              statuses, categories, and attachments.
+              {tRich("boards.deleteConfirm", { name: <strong>{pendingDelete.name}</strong> })}
             </Text>
             <Text size="sm">
-              {pendingDelete.total_tasks} {pendingDelete.total_tasks === 1 ? "task" : "tasks"},{" "}
-              {pendingDelete.attachment_count}{" "}
-              {pendingDelete.attachment_count === 1 ? "attachment" : "attachments"}, and{" "}
-              {pendingDelete.status_count} {pendingDelete.status_count === 1 ? "status" : "statuses"} will
-              be deleted.
+              {t("boards.deleteCounts", {
+                tasks: t("boards.taskCount", { count: pendingDelete.total_tasks }),
+                attachments: t("boards.attachmentCount", { count: pendingDelete.attachment_count }),
+                statuses: t("boards.statusCount", { count: pendingDelete.status_count }),
+              })}
             </Text>
             <Text size="sm" c="red">
-              This action cannot be undone.
+              {t("boards.cannotUndo")}
             </Text>
             <TextInput
-              label="Type the board name to confirm"
+              label={t("boards.typeNameToConfirm")}
               value={deleteName}
               onChange={(event) => setDeleteName(event.currentTarget.value)}
             />
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setPendingDelete(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 color="red"
@@ -373,7 +374,7 @@ export function ManageBoardsModal({ opened, onClose, currentBoardId }: ManageBoa
                 loading={remove.isPending}
                 disabled={deleteName !== pendingDelete.name}
               >
-                Delete permanently
+                {t("boards.deletePermanently")}
               </Button>
             </Group>
           </Stack>

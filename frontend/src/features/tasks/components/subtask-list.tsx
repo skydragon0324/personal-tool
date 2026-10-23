@@ -1,26 +1,28 @@
-"use client";
-
 import { move } from "@dnd-kit/helpers";
 import { ActionIcon, Button, Checkbox, Group, Text, TextInput } from "@mantine/core";
 import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useEffect, useRef, useState } from "react";
 
+import { AssigneeAvatars } from "@/features/board/components/assignee-avatars";
 import type { BoardQueryParams, TaskSubtask } from "@/features/board/types";
 import { moveAnchors } from "@/features/board/utils/move-anchors";
+import { formatDisplayDate } from "@/lib/dates";
 import { subtaskProgressLabel, canAddSubtask, useSubtaskMutations } from "../hooks/use-subtasks";
+import { PriorityBadge } from "./priority-badge";
+import { t } from "@/i18n";
 
 function SubtaskRow({
   item,
   index,
   onToggle,
-  onRename,
+  onOpen,
   onDelete,
 }: {
   item: TaskSubtask;
   index: number;
   onToggle: (checked: boolean) => void;
-  onRename: (title: string) => void;
+  onOpen: () => void;
   onDelete: () => void;
 }) {
   const { ref, handleRef } = useSortable({
@@ -30,39 +32,48 @@ function SubtaskRow({
     accept: "subtask",
     group: "subtasks",
   });
-  const [title, setTitle] = useState(item.title);
-
-  useEffect(() => {
-    setTitle(item.title);
-  }, [item.title]);
 
   return (
     <div
       ref={ref}
-      className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5"
+      className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-1.5"
     >
       <button
         type="button"
         ref={handleRef}
-        aria-label={`Reorder ${item.title}`}
+        aria-label={t("tasks.reorderItem", { title: item.title })}
         className="cursor-grab text-[var(--app-text-muted)]"
       >
         ⋮⋮
       </button>
       <Checkbox
+        aria-label={
+          item.is_completed
+            ? t("tasks.markNotDone", { title: item.title })
+            : t("tasks.markDone", { title: item.title })
+        }
         checked={item.is_completed}
         onChange={(event) => onToggle(event.currentTarget.checked)}
       />
-      <TextInput
-        className="flex-1"
-        variant="unstyled"
-        value={title}
-        onChange={(event) => setTitle(event.currentTarget.value)}
-        onBlur={() => {
-          if (title.trim() && title.trim() !== item.title) onRename(title.trim());
-        }}
-      />
-      <ActionIcon variant="subtle" color="red" aria-label="Delete subtask" onClick={onDelete}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-[var(--app-surface-muted)]"
+      >
+        <span
+          className={`min-w-0 flex-1 truncate text-sm ${
+            item.is_completed ? "text-[var(--app-text-muted)] line-through" : "text-[var(--app-text)]"
+          }`}
+        >
+          {item.title}
+        </span>
+        <span className="hidden shrink-0 text-xs text-[var(--app-text-muted)] sm:inline">
+          {formatDisplayDate(item.due_date)}
+        </span>
+        <PriorityBadge priority={item.priority} />
+        {item.assignees?.length ? <AssigneeAvatars people={item.assignees} size={20} max={3} /> : null}
+      </button>
+      <ActionIcon variant="subtle" color="red" aria-label={t("tasks.deleteItem", { title: item.title })} onClick={onDelete}>
         ×
       </ActionIcon>
     </div>
@@ -73,12 +84,17 @@ export function SubtaskList({
   taskId,
   query,
   subtasks,
+  onOpen,
+  onDelete,
 }: {
   taskId: string;
   query: BoardQueryParams;
   subtasks: TaskSubtask[];
+  /** Open a sub-task as a full task. */
+  onOpen: (subtaskId: string) => void;
+  onDelete: (subtask: TaskSubtask) => void;
 }) {
-  const { create, update, remove, reorder } = useSubtaskMutations(taskId, query);
+  const { create, update, reorder } = useSubtaskMutations(taskId, query);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState(subtasks);
@@ -99,7 +115,7 @@ export function SubtaskList({
       await create.mutateAsync(title);
       setDraft("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add subtask");
+      setError(err instanceof Error ? err.message : t("tasks.couldNotAddSubtask"));
     } finally {
       creatingRef.current = false;
     }
@@ -111,9 +127,9 @@ export function SubtaskList({
     <section className="space-y-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-3">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h3 className="font-medium text-[var(--app-text)]">Subtasks</h3>
+          <h3 className="font-medium text-[var(--app-text)]">{t("tasks.subtasks")}</h3>
           <Text size="xs" c="dimmed">
-            Separate from the checklist in the description.
+            {t("tasks.subtasksHint")}
           </Text>
         </div>
         {subtasks.length ? (
@@ -121,9 +137,9 @@ export function SubtaskList({
         ) : null}
       </div>
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-      {create.isPending ? <p className="text-xs text-[var(--app-text-muted)]">Saving…</p> : null}
+      {create.isPending ? <p className="text-xs text-[var(--app-text-muted)]">{t("common.saving")}</p> : null}
       {!items.length ? (
-        <p className="text-sm text-[var(--app-text-muted)]">No subtasks yet.</p>
+        <p className="text-sm text-[var(--app-text-muted)]">{t("tasks.noSubtasks")}</p>
       ) : (
         <DragDropProvider
           onDragOver={(event) => {
@@ -151,7 +167,7 @@ export function SubtaskList({
                 before_subtask_id: anchors.before_task_id,
               });
             } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not reorder subtasks");
+              setError(err instanceof Error ? err.message : t("tasks.couldNotReorderSubtasks"));
               setItems(subtasks);
               itemsRef.current = subtasks;
             }
@@ -164,10 +180,12 @@ export function SubtaskList({
                 item={item}
                 index={index}
                 onToggle={(is_completed) =>
-                  void update.mutateAsync({ subtaskId: item.id, payload: { is_completed } })
+                  void update
+                    .mutateAsync({ subtaskId: item.id, payload: { is_completed } })
+                    .catch((err) => setError(err instanceof Error ? err.message : t("tasks.couldNotUpdateSubtask")))
                 }
-                onRename={(title) => void update.mutateAsync({ subtaskId: item.id, payload: { title } })}
-                onDelete={() => void remove.mutateAsync(item.id)}
+                onOpen={() => onOpen(item.id)}
+                onDelete={() => onDelete(item)}
               />
             ))}
           </div>
@@ -176,8 +194,8 @@ export function SubtaskList({
       <Group align="center" wrap="nowrap" gap="sm">
         <TextInput
           className="flex-1"
-          placeholder="Add a subtask"
-          aria-label="Add a subtask"
+          placeholder={t("tasks.addSubtask")}
+          aria-label={t("tasks.addSubtask")}
           value={draft}
           disabled={!taskId || create.isPending}
           onChange={(event) => setDraft(event.currentTarget.value)}
@@ -194,7 +212,7 @@ export function SubtaskList({
           disabled={addDisabled}
           loading={create.isPending}
         >
-          Add
+          {t("common.add")}
         </Button>
       </Group>
     </section>

@@ -1,9 +1,8 @@
-"use client";
-
 import { ActionIcon, useMantineColorScheme } from "@mantine/core";
 import { useEffect, useState } from "react";
 
 import { normalizeStoredColorScheme } from "../utils/color-scheme";
+import { t } from "@/i18n";
 
 function SunIcon() {
   return (
@@ -45,7 +44,7 @@ export function ThemeToggle() {
   }, [colorScheme, setColorScheme]);
 
   const resolved = ready && colorScheme === "dark" ? "dark" : "light";
-  const label = resolved === "light" ? "Switch to dark mode" : "Switch to light mode";
+  const label = resolved === "light" ? t("shell.toDarkMode") : t("shell.toLightMode");
 
   return (
     <ActionIcon

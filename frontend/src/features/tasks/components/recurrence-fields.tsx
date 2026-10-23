@@ -1,8 +1,7 @@
-"use client";
-
 import { Checkbox, Group, NumberInput, Radio, Select, Stack, Text } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
 
+import { t, weekdayName } from "@/i18n";
+import { DatePickerInput } from "@/lib/date-pickers";
 import type { RecurrenceInput, RecurrenceRead } from "@/features/board/types";
 import { weekdayIndex } from "@/features/schedule/utils/schedule-time";
 
@@ -10,15 +9,7 @@ export type RepeatPreset = "none" | "daily" | "weekdays" | "weekly" | "monthly" 
 export type RepeatUnit = "days" | "weeks" | "months" | "years";
 export type RepeatEnd = "never" | "date" | "count";
 
-const WEEKDAYS = [
-  { value: 0, label: "Mon" },
-  { value: 1, label: "Tue" },
-  { value: 2, label: "Wed" },
-  { value: 3, label: "Thu" },
-  { value: 4, label: "Fri" },
-  { value: 5, label: "Sat" },
-  { value: 6, label: "Sun" },
-];
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 
 export function presetFromRecurrence(recurrence: RecurrenceRead | RecurrenceInput | null | undefined): RepeatPreset {
   if (!recurrence) return "none";
@@ -34,13 +25,13 @@ export function presetFromRecurrence(recurrence: RecurrenceRead | RecurrenceInpu
 
 export function recurrenceLabel(recurrence: RecurrenceRead): string {
   const preset = presetFromRecurrence(recurrence);
-  if (recurrence.status !== "active") return "Repeat stopped";
-  if (preset === "daily") return "Repeats daily";
-  if (preset === "weekdays") return "Repeats weekdays";
-  if (preset === "weekly") return "Repeats weekly";
-  if (preset === "monthly") return "Repeats monthly";
-  if (preset === "yearly") return "Repeats yearly";
-  return "Repeats on a custom schedule";
+  if (recurrence.status !== "active") return t("repeat.stopped");
+  if (preset === "daily") return t("repeat.repeatsDaily");
+  if (preset === "weekdays") return t("repeat.repeatsWeekdays");
+  if (preset === "weekly") return t("repeat.repeatsWeekly");
+  if (preset === "monthly") return t("repeat.repeatsMonthly");
+  if (preset === "yearly") return t("repeat.repeatsYearly");
+  return t("repeat.repeatsCustom");
 }
 
 export function repeatUnitFromRecurrence(
@@ -134,18 +125,18 @@ export function RecurrenceFields({
   allowNone?: boolean;
 }) {
   const presetOptions = [
-    ...(allowNone ? [{ value: "none", label: "Does not repeat" }] : []),
-    { value: "daily", label: "Daily" },
-    { value: "weekdays", label: "Weekdays" },
-    { value: "weekly", label: "Weekly" },
-    { value: "monthly", label: "Monthly" },
-    { value: "yearly", label: "Yearly" },
-    { value: "custom", label: "Custom" },
+    ...(allowNone ? [{ value: "none", label: t("repeat.doesNotRepeat") }] : []),
+    { value: "daily", label: t("repeat.daily") },
+    { value: "weekdays", label: t("repeat.weekdays") },
+    { value: "weekly", label: t("repeat.weekly") },
+    { value: "monthly", label: t("repeat.monthly") },
+    { value: "yearly", label: t("repeat.yearly") },
+    { value: "custom", label: t("repeat.custom") },
   ];
   return (
     <Stack gap="sm">
       <Select
-        label="Repeat"
+        label={t("repeat.repeat")}
         value={preset}
         onChange={(value) => {
           if (value) onPresetChange(value as RepeatPreset);
@@ -155,43 +146,43 @@ export function RecurrenceFields({
       {preset === "monthly" || preset === "yearly" ? (
         <Text size="xs" c="dimmed">
           {preset === "yearly"
-            ? "February 29 is skipped in non-leap years."
-            : "If a month has fewer days, that month is skipped."}
+            ? t("repeat.leapDaySkipped")
+            : t("repeat.shortMonthSkipped")}
         </Text>
       ) : null}
       {preset === "custom" ? (
         <>
           <Group grow>
             <NumberInput
-              label="Every"
+              label={t("repeat.every")}
               min={1}
               max={365}
               value={customInterval}
               onChange={(value) => onCustomIntervalChange(typeof value === "number" ? value : 1)}
             />
             <Select
-              label="Unit"
+              label={t("repeat.unit")}
               value={customUnit}
               onChange={(value) => {
                 if (value) onCustomUnitChange(value as RepeatUnit);
               }}
               data={[
-                { value: "days", label: "days" },
-                { value: "weeks", label: "weeks" },
-                { value: "months", label: "months" },
-                { value: "years", label: "years" },
+                { value: "days", label: t("repeat.unitDays") },
+                { value: "weeks", label: t("repeat.unitWeeks") },
+                { value: "months", label: t("repeat.unitMonths") },
+                { value: "years", label: t("repeat.unitYears") },
               ]}
             />
           </Group>
           {customUnit === "weeks" ? (
             <Checkbox.Group
-              label="Selected weekdays"
+              label={t("repeat.selectedWeekdays")}
               value={customWeekdays.map(String)}
               onChange={(values) => onCustomWeekdaysChange(values.map(Number).sort())}
             >
               <Group mt={6}>
                 {WEEKDAYS.map((day) => (
-                  <Checkbox key={day.value} value={String(day.value)} label={day.label} />
+                  <Checkbox key={day} value={String(day)} label={weekdayName(day)} />
                 ))}
               </Group>
             </Checkbox.Group>
@@ -199,10 +190,10 @@ export function RecurrenceFields({
         </>
       ) : null}
       {preset !== "none" ? (
-        <Radio.Group label="Ends" value={end} onChange={(value) => onEndChange(value as RepeatEnd)}>
+        <Radio.Group label={t("repeat.ends")} value={end} onChange={(value) => onEndChange(value as RepeatEnd)}>
           <Stack gap={6} mt={6}>
-            <Radio value="never" label="Never" />
-            <Radio value="date" label="On date" />
+            <Radio value="never" label={t("repeat.never")} />
+            <Radio value="date" label={t("repeat.onDate")} />
             {end === "date" ? (
               <DatePickerInput
                 value={untilDate}
@@ -210,7 +201,7 @@ export function RecurrenceFields({
                 valueFormat="MMM D, YYYY"
               />
             ) : null}
-            <Radio value="count" label="After a number of occurrences" />
+            <Radio value="count" label={t("repeat.afterOccurrences")} />
             {end === "count" ? (
               <NumberInput
                 min={1}

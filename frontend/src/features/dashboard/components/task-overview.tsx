@@ -1,8 +1,6 @@
-"use client";
-
 import { Button, Loader, SegmentedControl, Select, Table, Text, TextInput } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import { useMemo, useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
@@ -16,7 +14,7 @@ import { formatDisplayDate, todayISO } from "@/lib/dates";
 import { dashboardKeys } from "../hooks/use-dashboard";
 import type { DashboardTaskRow } from "../types";
 import {
-  DUE_BUCKET_LABELS,
+  dueBucketLabel,
   dueBucket,
   filterRows,
   sortRows,
@@ -24,6 +22,7 @@ import {
   type TaskRowFilters,
   type TaskSort,
 } from "../utils/task-rows";
+import { t } from "@/i18n";
 
 type State = "open" | "done" | "all";
 
@@ -88,14 +87,14 @@ export function TaskOverview() {
 
   return (
     <section
-      aria-label="Tasks"
+      aria-label={t("dashboard.tasks")}
       className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg text-[var(--app-text)]">Tasks</h2>
+          <h2 className="font-display text-lg text-[var(--app-text)]">{t("dashboard.tasks")}</h2>
           <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-            Every task across your boards: where it is, who has it and when it is due.
+            {t("dashboard.tasksHint")}
           </p>
         </div>
         <SegmentedControl
@@ -106,14 +105,14 @@ export function TaskOverview() {
             set("bucket", "");
           }}
           data={[
-            { value: "open", label: "Open" },
-            { value: "done", label: "Completed" },
-            { value: "all", label: "All" },
+            { value: "open", label: t("dashboard.open") },
+            { value: "done", label: t("dashboard.completed") },
+            { value: "all", label: t("dashboard.all") },
           ]}
         />
       </header>
 
-      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filter by due date">
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t("dashboard.filterByDue")}>
         {buckets.map((bucket) => (
           <button
             key={bucket}
@@ -124,7 +123,7 @@ export function TaskOverview() {
               filters.bucket === bucket ? "ring-2 ring-[var(--app-primary)]" : "hover:brightness-95"
             }`}
           >
-            <span className="block text-[11px] font-medium opacity-80">{DUE_BUCKET_LABELS[bucket]}</span>
+            <span className="block text-[11px] font-medium opacity-80">{dueBucketLabel(bucket)}</span>
             <span className="font-display text-lg leading-tight">{counts[bucket]}</span>
           </button>
         ))}
@@ -133,27 +132,27 @@ export function TaskOverview() {
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_12rem_12rem_9rem_10rem_auto]">
         <TextInput
           size="xs"
-          placeholder="Search title, board or category"
-          aria-label="Search tasks"
+          placeholder={t("dashboard.searchPlaceholder")}
+          aria-label={t("dashboard.searchLabel")}
           value={filters.query}
           onChange={(event) => set("query", event.currentTarget.value)}
         />
         <Select
           size="xs"
-          aria-label="Board"
-          placeholder="All boards"
-          data={[{ value: "", label: "All boards" }, ...boards]}
+          aria-label={t("dashboard.board")}
+          placeholder={t("dashboard.allBoards")}
+          data={[{ value: "", label: t("dashboard.allBoards") }, ...boards]}
           value={filters.boardId}
           onChange={(value) => set("boardId", value ?? "")}
         />
         <Select
           size="xs"
-          aria-label="Assignee"
-          placeholder="Anyone"
+          aria-label={t("filters.assignee")}
+          placeholder={t("filters.anyone")}
           data={[
-            { value: "", label: "Anyone" },
-            ...(user ? [{ value: user.id, label: "Assigned to me" }] : []),
-            { value: "unassigned", label: "Unassigned" },
+            { value: "", label: t("filters.anyone") },
+            ...(user ? [{ value: user.id, label: t("filters.assignedToMe") }] : []),
+            { value: "unassigned", label: t("filters.unassigned") },
             ...people,
           ]}
           value={filters.assigneeId}
@@ -161,32 +160,32 @@ export function TaskOverview() {
         />
         <Select
           size="xs"
-          aria-label="Priority"
-          placeholder="Any priority"
+          aria-label={t("task.priority")}
+          placeholder={t("dashboard.anyPriority")}
           data={[
-            { value: "", label: "Any priority" },
-            { value: "high", label: "High" },
-            { value: "medium", label: "Medium" },
-            { value: "low", label: "Low" },
+            { value: "", label: t("dashboard.anyPriority") },
+            { value: "high", label: t("task.priorityHigh") },
+            { value: "medium", label: t("task.priorityMedium") },
+            { value: "low", label: t("task.priorityLow") },
           ]}
           value={filters.priority}
           onChange={(value) => set("priority", value ?? "")}
         />
         <Select
           size="xs"
-          aria-label="Sort by"
+          aria-label={t("dashboard.sortBy")}
           data={[
-            { value: "due", label: "Sort: due date" },
-            { value: "priority", label: "Sort: priority" },
-            { value: "board", label: "Sort: board" },
-            { value: "updated", label: "Sort: recently updated" },
+            { value: "due", label: t("dashboard.sortDue") },
+            { value: "priority", label: t("dashboard.sortPriority") },
+            { value: "board", label: t("dashboard.sortBoard") },
+            { value: "updated", label: t("dashboard.sortUpdated") },
           ]}
           value={sort}
           onChange={(value) => setSort((value as TaskSort) ?? "due")}
           allowDeselect={false}
         />
         <Button size="xs" variant="default" disabled={!filtered} onClick={() => setFilters(EMPTY_FILTERS)}>
-          Clear
+          {t("dashboard.clear")}
         </Button>
       </div>
 
@@ -197,19 +196,19 @@ export function TaskOverview() {
           </div>
         ) : visible.length === 0 ? (
           <Text size="sm" c="dimmed" ta="center" py="xl">
-            {rows.length === 0 ? "No tasks here yet." : "No tasks match these filters."}
+            {rows.length === 0 ? t("dashboard.noTasksYet") : t("dashboard.noTasksMatch")}
           </Text>
         ) : (
           <Table stickyHeader highlightOnHover verticalSpacing={6} fz="sm">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Task</Table.Th>
-                <Table.Th>Board</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Assignee</Table.Th>
-                <Table.Th>Priority</Table.Th>
-                <Table.Th>Due</Table.Th>
-                <Table.Th>Sub-tasks</Table.Th>
+                <Table.Th>{t("task.task")}</Table.Th>
+                <Table.Th>{t("dashboard.board")}</Table.Th>
+                <Table.Th>{t("task.status")}</Table.Th>
+                <Table.Th>{t("filters.assignee")}</Table.Th>
+                <Table.Th>{t("task.priority")}</Table.Th>
+                <Table.Th>{t("dashboard.due")}</Table.Th>
+                <Table.Th>{t("dashboard.subTasks")}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -264,7 +263,7 @@ function TaskRow({
         </p>
         <p className="truncate text-xs text-[var(--app-text-muted)]">
           {row.category_name}
-          {row.is_recurring ? " · repeats" : ""}
+          {row.is_recurring ? t("dashboard.repeatsSuffix") : ""}
         </p>
       </Table.Td>
       <Table.Td>
@@ -290,7 +289,7 @@ function TaskRow({
         <PriorityBadge priority={row.priority} />
       </Table.Td>
       <Table.Td className={`whitespace-nowrap ${dueClass}`}>
-        {bucket === "overdue" ? "Overdue · " : bucket === "today" ? "Today · " : ""}
+        {bucket === "overdue" ? t("dashboard.overduePrefix") : bucket === "today" ? t("dashboard.todayPrefix") : ""}
         {formatDisplayDate(row.due_date)}
       </Table.Td>
       <Table.Td className="whitespace-nowrap text-[var(--app-text-muted)]">

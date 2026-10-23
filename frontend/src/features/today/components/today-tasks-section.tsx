@@ -1,5 +1,3 @@
-"use client";
-
 import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons";
 import { statusHeaderClass } from "@/features/board/utils/status-colors";
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
@@ -8,7 +6,7 @@ import { DashboardPanel, PanelEmpty } from "@/features/shell/components/dashboar
 import { NavIcon } from "@/features/shell/components/nav-icons";
 
 import type { TodayTask } from "../types";
-import { DEADLINE_STATUS_LABEL } from "../utils/labels";
+import { deadlineStatusLabel } from "../utils/labels";
 
 export function TodayTasksSection({
   title,
@@ -67,7 +65,7 @@ export function TodayTasksSection({
                       {task.status_name}
                     </span>
                     <PriorityBadge priority={task.priority} />
-                    <span>{DEADLINE_STATUS_LABEL[task.deadline_status]}</span>
+                    <span>{deadlineStatusLabel(task.deadline_status)}</span>
                   </div>
                   <p className="mt-1 text-xs text-[var(--app-text-muted)]">
                     {formatTaskPeriod(task.start_date, task.due_date)}

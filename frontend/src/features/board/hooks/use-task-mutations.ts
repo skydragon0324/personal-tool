@@ -1,5 +1,3 @@
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
@@ -50,6 +48,8 @@ export function useTaskMutations(
     }) => taskMutations.update(taskId, payload),
     onSuccess: (task) => {
       queryClient.setQueryData(taskKeys.detail(task.id), task);
+      // The parent lists its sub-tasks (title, dates, status), so refresh it too.
+      if (task.parent) void queryClient.invalidateQueries({ queryKey: taskKeys.detail(task.parent.id) });
       const apply = options?.shouldApplyToView?.(task) ?? true;
       if (apply) {
         queryClient.setQueryData<BoardView>(key, (current) =>
@@ -72,6 +72,8 @@ export function useTaskMutations(
     }) => taskMutations.remove(taskId, { deleteScope, confirmCompleted }),
     onSuccess: async () => {
       invalidateRelated();
+      // A deleted sub-task disappears from its parent's list.
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 

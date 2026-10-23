@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import type { PlanDay, PlanDetail, PlanItem } from "../types";
 import { patchItem, removeDay, removeItem, summaryFromDetail, upsertDay, upsertItem } from "./plan-cache";
 import { formatPlanDay, formatPlanRange, nextPlanDay } from "./plan-dates";

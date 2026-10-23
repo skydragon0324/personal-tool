@@ -1,5 +1,3 @@
-"use client";
-
 import { Checkbox } from "@mantine/core";
 
 import { statusHeaderClass } from "@/features/board/utils/status-colors";
@@ -9,8 +7,9 @@ import { DashboardPanel, PanelEmpty } from "@/features/shell/components/dashboar
 import { NavIcon } from "@/features/shell/components/nav-icons";
 
 import type { TodaySchedule } from "../types";
-import { SCHEDULE_KIND_LABEL } from "../utils/labels";
-import { SCHEDULE_STATUS_LABEL, scheduleTimeStatus } from "../utils/schedule-status";
+import { scheduleKindLabel } from "../utils/labels";
+import { scheduleStatusLabel, scheduleTimeStatus } from "../utils/schedule-status";
+import { t } from "@/i18n";
 
 const STATUS_CLASS: Record<string, string> = {
   upcoming: "bg-slate-100 text-slate-800 dark:bg-slate-500/25 dark:text-slate-100",
@@ -34,14 +33,14 @@ export function TodayScheduleSection({
 }) {
   return (
     <DashboardPanel
-      title="Today's schedule"
-      description="Time blocks planned for today"
+      title={t("today.scheduleTitle")}
+      description={t("today.scheduleHint")}
       icon={<NavIcon name="schedule" />}
       count={schedules.length}
       actionHref="/schedule"
-      actionLabel="Open schedule"
+      actionLabel={t("today.openSchedule")}
       empty={
-        schedules.length === 0 ? <PanelEmpty>Nothing scheduled for today.</PanelEmpty> : undefined
+        schedules.length === 0 ? <PanelEmpty>{t("today.nothingScheduled")}</PanelEmpty> : undefined
       }
     >
       <ol className="space-y-1">
@@ -78,10 +77,10 @@ export function TodayScheduleSection({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate font-medium text-[var(--app-text)]">{entry.title}</p>
                     <span className="rounded-full bg-[var(--app-surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--app-text-muted)]">
-                      {SCHEDULE_KIND_LABEL[entry.kind]}
+                      {scheduleKindLabel(entry.kind)}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[status]}`}>
-                      {SCHEDULE_STATUS_LABEL[status]}
+                      {scheduleStatusLabel(status)}
                     </span>
                     {entry.priority ? <PriorityBadge priority={entry.priority} /> : null}
                   </div>

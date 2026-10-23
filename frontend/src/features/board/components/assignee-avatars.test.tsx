@@ -1,7 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
-import { describe, expect, it } from "vitest";
 
 import { AssigneeAvatars, avatarColor } from "./assignee-avatars";
 

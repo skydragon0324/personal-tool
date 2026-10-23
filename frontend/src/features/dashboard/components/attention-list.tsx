@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import Link from "next/link";
 
@@ -7,6 +5,7 @@ import { PriorityBadge } from "@/features/tasks/components/priority-badge";
 import { formatDisplayDate } from "@/lib/dates";
 
 import type { DashboardAttentionItem } from "../types";
+import { t } from "@/i18n";
 
 export function AttentionList({
   empty,
@@ -57,23 +56,23 @@ export function AttentionTabs({
 
   return (
     <div>
-      <div role="tablist" aria-label="Attention lists" className="mb-3 flex gap-1 rounded-lg bg-[var(--app-surface-muted)] p-1">
+      <div role="tablist" aria-label={t("dashboard.attentionLists")} className="mb-3 flex gap-1 rounded-lg bg-[var(--app-surface-muted)] p-1">
         <TabButton
           selected={tab === "overdue"}
           onClick={() => setTab("overdue")}
-          label="Overdue"
+          label={t("dashboard.overdue")}
           count={overdue.length}
         />
         <TabButton
           selected={tab === "due_today"}
           onClick={() => setTab("due_today")}
-          label="Due today"
+          label={t("dashboard.dueToday")}
           count={dueToday.length}
         />
       </div>
       <div role="tabpanel">
         <AttentionList
-          empty={tab === "overdue" ? "No overdue tasks." : "Nothing due today."}
+          empty={tab === "overdue" ? t("dashboard.noOverdue") : t("dashboard.nothingDueToday")}
           items={items}
         />
       </div>

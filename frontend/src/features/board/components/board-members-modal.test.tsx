@@ -3,19 +3,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BoardMembers } from "../types";
 import { BoardMembersModal } from "./board-members-modal";
 
-const getBoardMembers = vi.fn();
-const inviteBoardMember = vi.fn();
-const removeBoardMember = vi.fn();
-const push = vi.fn();
+const getBoardMembers = jest.fn();
+const inviteBoardMember = jest.fn();
+const removeBoardMember = jest.fn();
+const push = jest.fn();
 let currentUserId = "owner-1";
 
-vi.mock("@/lib/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-client")>();
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -27,11 +26,11 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("@/features/auth/components/auth-provider", () => ({
+jest.mock("@/features/auth/components/auth-provider", () => ({
   useAuth: () => ({ user: { id: currentUserId, display_name: "Me", email: "me@example.com" } }),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+jest.mock("@/lib/navigation", () => ({ useRouter: () => ({ push }) }));
 
 function members(canManage: boolean): BoardMembers {
   return {
@@ -55,7 +54,7 @@ function renderModal() {
       createElement(
         MantineProvider,
         { env: "test" },
-        createElement(BoardMembersModal, { boardId: "board-1", boardName: "Work", opened: true, onClose: vi.fn() }),
+        createElement(BoardMembersModal, { boardId: "board-1", boardName: "Work", opened: true, onClose: jest.fn() }),
       ),
     ),
   );

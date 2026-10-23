@@ -1,4 +1,5 @@
 import type { Category } from "@/features/board/types";
+import { t } from "@/i18n";
 
 export const CATEGORY_COLORS = [
   "slate",
@@ -66,6 +67,6 @@ export function buildCategoryComboboxOptions(
   return {
     items,
     showCreate,
-    createLabel: trimmed ? `Create “${trimmed}”` : "",
+    createLabel: trimmed ? t("tasks.createCategory", { name: trimmed }) : "",
   };
 }

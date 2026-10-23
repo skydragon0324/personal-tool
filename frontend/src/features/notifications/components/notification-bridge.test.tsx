@@ -2,19 +2,20 @@ import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { createElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { stubGlobal, unstubAllGlobals } from "@/test/stub-globals";
 
 import type { NotificationFeed } from "../types";
 import { LAST_ANNOUNCED_KEY, PERMISSION_PROMPTED_KEY } from "../utils/notification-utils";
 import { NotificationBridge } from "./notification-bridge";
 
-const getNotifications = vi.fn();
-const markNotificationRead = vi.fn();
-const push = vi.fn();
-const show = vi.fn();
+const getNotifications = jest.fn();
+const markNotificationRead = jest.fn();
+const push = jest.fn();
+const show = jest.fn();
 
-vi.mock("@/lib/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-client")>();
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -25,20 +26,20 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("next/navigation", () => ({
+jest.mock("@/lib/navigation", () => ({
   useRouter: () => ({ push }),
   usePathname: () => "/today",
 }));
 
-vi.mock("@mantine/notifications", () => ({
-  notifications: { show: (...args: unknown[]) => show(...args), hide: vi.fn() },
+jest.mock("@mantine/notifications", () => ({
+  notifications: { show: (...args: unknown[]) => show(...args), hide: jest.fn() },
 }));
 
 const created: Array<{ title: string; options: NotificationOptions; instance: { onclick: (() => void) | null } }> = [];
 
 class FakeNotification {
   static permission: NotificationPermission = "granted";
-  static requestPermission = vi.fn(async () => FakeNotification.permission);
+  static requestPermission = jest.fn(async () => FakeNotification.permission);
   onclick: (() => void) | null = null;
   constructor(title: string, options: NotificationOptions) {
     created.push({ title, options, instance: this });
@@ -99,11 +100,11 @@ describe("NotificationBridge", () => {
     getNotifications.mockReset().mockResolvedValue(feed());
     window.localStorage.clear();
     FakeNotification.permission = "granted";
-    vi.stubGlobal("Notification", FakeNotification);
+    stubGlobal("Notification", FakeNotification);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it("shows an OS notification for new items only and opens the task on click", async () => {

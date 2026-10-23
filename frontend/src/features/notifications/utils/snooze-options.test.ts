@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { snoozeOptions } from "./snooze-options";
 
 describe("snoozeOptions", () => {

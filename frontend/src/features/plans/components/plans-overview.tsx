@@ -1,9 +1,8 @@
-"use client";
-
 import { Badge, Checkbox, Progress, Tooltip } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
+import { dateLocale, t } from "@/i18n";
 import { DashboardGrid, DashboardPanel, PanelEmpty } from "@/features/shell/components/dashboard-panel";
 import { NavIcon } from "@/features/shell/components/nav-icons";
 import { apiClient } from "@/lib/api-client";
@@ -13,11 +12,11 @@ import { planKeys } from "../api/plan-queries";
 import type { PlanInsight, PlanOverview, PlanState, PlanTimelinePoint } from "../types";
 import { formatPlanDay } from "../utils/plan-dates";
 
-const STATE_LABEL: Record<PlanState, string> = {
-  active: "In progress",
-  upcoming: "Upcoming",
-  finished: "Finished",
-  empty: "No days yet",
+const STATE_LABEL: Record<PlanState, () => string> = {
+  active: () => t("plans.stateActive"),
+  upcoming: () => t("plans.stateUpcoming"),
+  finished: () => t("plans.stateFinished"),
+  empty: () => t("plans.stateEmpty"),
 };
 
 const STATE_COLOR: Record<PlanState, string> = {
@@ -33,7 +32,7 @@ function percent(value: number): string {
 
 function shortDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(year, month - 1, day).toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
 }
 
 /**
@@ -43,16 +42,16 @@ function shortDate(isoDate: string): string {
 export function PlansOverview({ data }: { data: PlanOverview }) {
   const { totals } = data;
   return (
-    <DashboardGrid label="Plans overview">
-      <DashboardPanel title="Overview" description="All plans at a glance" icon={<NavIcon name="plans" />}>
+    <DashboardGrid label={t("plans.overviewLabel")}>
+      <DashboardPanel title={t("plans.overview")} description={t("plans.overviewHint")} icon={<NavIcon name="plans" />}>
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-          <Tile label="Plans" value={totals.plans} />
-          <Tile label="In progress" value={totals.active_plans} accent="today" />
-          <Tile label="Days planned" value={totals.days} />
-          <Tile label="Items done" value={`${totals.completed}/${totals.items}`} accent="complete" />
-          <Tile label="Completion" value={percent(totals.completion_rate)} accent="complete" />
+          <Tile label={t("plans.plans")} value={totals.plans} />
+          <Tile label={t("plans.inProgress")} value={totals.active_plans} accent="today" />
+          <Tile label={t("plans.daysPlanned")} value={totals.days} />
+          <Tile label={t("plans.itemsDone")} value={`${totals.completed}/${totals.items}`} accent="complete" />
+          <Tile label={t("plans.completion")} value={percent(totals.completion_rate)} accent="complete" />
           <Tile
-            label="Unfinished on past days"
+            label={t("plans.unfinishedPast")}
             value={totals.missed_items}
             accent={totals.missed_items ? "danger" : undefined}
           />
@@ -60,7 +59,7 @@ export function PlansOverview({ data }: { data: PlanOverview }) {
       </DashboardPanel>
 
       <DashboardPanel
-        title="Today"
+        title={t("plans.today")}
         description={formatPlanDay(data.today)}
         icon={<NavIcon name="today" />}
         count={totals.today_total}
@@ -69,19 +68,19 @@ export function PlansOverview({ data }: { data: PlanOverview }) {
       </DashboardPanel>
 
       <DashboardPanel
-        title="Daily progress"
-        description="Items done out of items planned, last two weeks and the week ahead"
+        title={t("plans.dailyProgress")}
+        description={t("plans.dailyProgressHint")}
         icon={<NavIcon name="schedule" />}
       >
         <DailyChart points={data.timeline} today={data.today} />
       </DashboardPanel>
 
       <DashboardPanel
-        title="Plan progress"
-        description="Where each plan stands"
+        title={t("plans.planProgress")}
+        description={t("plans.planProgressHint")}
         icon={<NavIcon name="plans" />}
         count={data.plans.length}
-        empty={data.plans.length === 0 ? <PanelEmpty>No plans yet</PanelEmpty> : undefined}
+        empty={data.plans.length === 0 ? <PanelEmpty>{t("plans.noPlans")}</PanelEmpty> : undefined}
       >
         <ul className="space-y-1">
           {data.plans.map((plan) => (
@@ -144,18 +143,18 @@ function TodayList({ data }: { data: PlanOverview }) {
     },
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(context.key, context.previous);
-      notifyApiError(error, "Could not update the item");
+      notifyApiError(error, t("plans.couldNotUpdateItem"));
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: planKeys.all }),
   });
 
   if (!data.today_items.length && !data.behind.length) {
-    return <PanelEmpty>Nothing planned for today.</PanelEmpty>;
+    return <PanelEmpty>{t("plans.nothingToday")}</PanelEmpty>;
   }
   return (
     <div className="space-y-4">
       {data.today_items.length ? (
-        <ul className="space-y-1" aria-label="Planned for today">
+        <ul className="space-y-1" aria-label={t("plans.plannedToday")}>
           {data.today_items.map((item) => (
             <li key={item.id} className="flex items-start gap-2 rounded-md px-1 py-1 hover:bg-[var(--app-surface-muted)]">
               <Checkbox
@@ -181,12 +180,12 @@ function TodayList({ data }: { data: PlanOverview }) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-[var(--app-text-muted)]">Nothing planned for today.</p>
+        <p className="text-sm text-[var(--app-text-muted)]">{t("plans.nothingToday")}</p>
       )}
       {data.behind.length ? (
         <div>
-          <p className="mb-1 text-xs font-medium text-[var(--app-text-muted)]">Left unfinished</p>
-          <ul className="space-y-1" aria-label="Past days with unfinished items">
+          <p className="mb-1 text-xs font-medium text-[var(--app-text-muted)]">{t("plans.leftUnfinished")}</p>
+          <ul className="space-y-1" aria-label={t("plans.pastUnfinished")}>
             {data.behind.map((day) => (
               <li key={day.day_id}>
                 <Link
@@ -197,7 +196,7 @@ function TodayList({ data }: { data: PlanOverview }) {
                     {day.plan_name} · {shortDate(day.day)}
                   </span>
                   <span className="shrink-0 text-xs text-rose-700 dark:text-rose-300">
-                    {day.open_items} of {day.total_items} open
+                    {t("plans.openOfTotal", { open: day.open_items, total: day.total_items })}
                   </span>
                 </Link>
               </li>
@@ -214,16 +213,16 @@ function DailyChart({ points, today }: { points: PlanTimelinePoint[]; today: str
   const max = Math.max(1, ...points.map((point) => point.planned));
   const hasData = points.some((point) => point.planned > 0);
   const todayIndex = points.findIndex((point) => point.day === today);
-  if (!hasData) return <PanelEmpty>No items planned in this period.</PanelEmpty>;
+  if (!hasData) return <PanelEmpty>{t("plans.nothingInPeriod")}</PanelEmpty>;
 
   return (
     <div className="flex h-full min-h-[11rem] flex-col">
       <div className="flex items-center gap-4 text-xs text-[var(--app-text-muted)]">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-slate-200 dark:bg-slate-700" aria-hidden /> Planned
+          <span className="h-2.5 w-2.5 rounded-sm bg-slate-200 dark:bg-slate-700" aria-hidden /> {t("plans.planned")}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-teal-600 dark:bg-teal-400" aria-hidden /> Done
+          <span className="h-2.5 w-2.5 rounded-sm bg-teal-600 dark:bg-teal-400" aria-hidden /> {t("plans.done")}
         </span>
       </div>
       <div className="mt-3 flex min-h-0 flex-1 items-end gap-[2px] border-b border-[var(--app-border)]" aria-hidden>
@@ -234,7 +233,11 @@ function DailyChart({ points, today }: { points: PlanTimelinePoint[]; today: str
             <Tooltip
               key={point.day}
               withinPortal
-              label={`${shortDate(point.day)}${isToday ? " (today)" : ""}: ${point.completed} of ${point.planned} done`}
+              label={t(isToday ? "plans.barLabelToday" : "plans.barLabel", {
+                date: shortDate(point.day),
+                done: point.completed,
+                planned: point.planned,
+              })}
             >
               {/* Hit target spans the full column height, larger than the bar itself. */}
               <div className="flex h-full min-w-0 flex-1 items-end justify-center px-[1px]">
@@ -261,18 +264,18 @@ function DailyChart({ points, today }: { points: PlanTimelinePoint[]; today: str
             className="absolute -translate-x-1/2 font-medium text-[var(--app-primary)]"
             style={{ left: `${((todayIndex + 0.5) / points.length) * 100}%` }}
           >
-            Today
+            {t("plans.today")}
           </span>
         ) : null}
         <span className="absolute right-0">{shortDate(points[points.length - 1].day)}</span>
       </div>
       <table className="sr-only">
-        <caption>Items done out of items planned per day</caption>
+        <caption>{t("plans.chartCaption")}</caption>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Planned</th>
-            <th>Done</th>
+            <th>{t("plans.date")}</th>
+            <th>{t("plans.planned")}</th>
+            <th>{t("plans.done")}</th>
           </tr>
         </thead>
         <tbody>
@@ -292,12 +295,12 @@ function DailyChart({ points, today }: { points: PlanTimelinePoint[]; today: str
 function PlanRow({ plan }: { plan: PlanInsight }) {
   const detail =
     plan.state === "upcoming" && plan.first_day
-      ? `Starts ${shortDate(plan.first_day)}`
+      ? t("plans.startsOn", { date: shortDate(plan.first_day) })
       : plan.state === "active"
-        ? `${plan.days_left} ${plan.days_left === 1 ? "day" : "days"} left`
+        ? t("plans.daysLeft", { count: plan.days_left })
         : plan.state === "finished" && plan.last_day
-          ? `Ended ${shortDate(plan.last_day)}`
-          : "Add days to get started";
+          ? t("plans.endedOn", { date: shortDate(plan.last_day) })
+          : t("plans.addDaysToStart");
   return (
     <Link
       href={`/plans/${plan.id}`}
@@ -306,7 +309,7 @@ function PlanRow({ plan }: { plan: PlanInsight }) {
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--app-text)]">{plan.name}</p>
         <Badge size="xs" variant="light" color={STATE_COLOR[plan.state]}>
-          {STATE_LABEL[plan.state]}
+          {STATE_LABEL[plan.state]()}
         </Badge>
         <span className="shrink-0 text-xs tabular-nums text-[var(--app-text-muted)]">
           {plan.completed_count}/{plan.item_count}
@@ -317,12 +320,12 @@ function PlanRow({ plan }: { plan: PlanInsight }) {
         mt={6}
         size="sm"
         color="teal"
-        aria-label={`${plan.name} ${percent(plan.completion_rate)} complete`}
+        aria-label={t("plans.percentComplete", { name: plan.name, percent: percent(plan.completion_rate) })}
       />
       <p className="mt-1 flex justify-between text-xs text-[var(--app-text-muted)]">
         <span>{detail}</span>
         {plan.missed_items ? (
-          <span className="text-rose-700 dark:text-rose-300">{plan.missed_items} unfinished on past days</span>
+          <span className="text-rose-700 dark:text-rose-300">{t("plans.unfinishedOnPast", { count: plan.missed_items })}</span>
         ) : null}
       </p>
     </Link>

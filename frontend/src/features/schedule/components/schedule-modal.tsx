@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Button,
   Checkbox,
@@ -16,7 +14,8 @@ import { useEffect, useState } from "react";
 import { STATUS_COLOR_OPTIONS } from "@/features/board/utils/status-colors";
 
 import type { ScheduleEntry, ScheduleEntryCreate, ScheduleKind, SchedulePriority } from "../types";
-import { WEEKDAY_LABELS, parseTimeToMinutes } from "../utils/schedule-time";
+import { parseTimeToMinutes, weekdayLabels } from "../utils/schedule-time";
+import { t } from "@/i18n";
 
 interface Draft {
   title: string;
@@ -120,15 +119,15 @@ export function ScheduleModal({
   async function handleSave() {
     const title = draft.title.trim();
     if (!title) {
-      setError("Title is required");
+      setError(t("schedule.titleRequired"));
       return;
     }
     if (!draft.weekdays.length) {
-      setError("Select at least one day");
+      setError(t("schedule.selectDay"));
       return;
     }
     if (parseTimeToMinutes(draft.end_time) <= parseTimeToMinutes(draft.start_time)) {
-      setError("End time must be later than start time");
+      setError(t("schedule.endAfterStart"));
       return;
     }
     const payload: ScheduleEntryCreate = {
@@ -150,13 +149,13 @@ export function ScheduleModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title={entry ? "Edit schedule" : "New schedule"}
+      title={entry ? t("schedule.editTitle") : t("schedule.newTitle")}
       radius="lg"
       size="lg"
     >
       <Stack gap="md">
         <TextInput
-          label="Title"
+          label={t("schedule.title")}
           required
           value={draft.title}
           onChange={(event) => {
@@ -165,10 +164,10 @@ export function ScheduleModal({
           }}
         />
         <Select
-          label="Type"
+          label={t("schedule.type")}
           data={[
-            { value: "routine", label: "Routine" },
-            { value: "this_week", label: "This week only" },
+            { value: "routine", label: t("schedule.routine") },
+            { value: "this_week", label: t("schedule.thisWeekOnly") },
           ]}
           value={draft.kind}
           allowDeselect={false}
@@ -178,23 +177,23 @@ export function ScheduleModal({
         />
         <div>
           <Text size="sm" fw={500} mb={6}>
-            {draft.kind === "routine" ? "Repeat days" : "Day"}
+            {draft.kind === "routine" ? t("schedule.repeatDays") : t("schedule.day")}
           </Text>
           {draft.kind === "routine" ? (
             <Group gap="xs" mb="xs">
               <Button size="xs" variant="light" onClick={() => applyQuick([0, 1, 2, 3, 4, 5, 6])}>
-                Every day
+                {t("schedule.everyDay")}
               </Button>
               <Button size="xs" variant="light" onClick={() => applyQuick([0, 1, 2, 3, 4])}>
-                Weekdays
+                {t("schedule.weekdays")}
               </Button>
               <Button size="xs" variant="light" onClick={() => applyQuick([5, 6])}>
-                Weekend
+                {t("schedule.weekend")}
               </Button>
             </Group>
           ) : null}
           <Group gap="xs">
-            {WEEKDAY_LABELS.map((label, index) => (
+            {weekdayLabels().map((label, index) => (
               <Checkbox
                 key={label}
                 label={label}
@@ -207,7 +206,7 @@ export function ScheduleModal({
         <Group grow>
           <TextInput
             type="time"
-            label="Start time"
+            label={t("schedule.startTime")}
             value={toInputTime(draft.start_time)}
             onChange={(event) => {
               const start_time = fromInputTime(event.currentTarget.value);
@@ -216,7 +215,7 @@ export function ScheduleModal({
           />
           <TextInput
             type="time"
-            label="End time"
+            label={t("schedule.endTime")}
             value={toInputTime(draft.end_time)}
             onChange={(event) => {
               const end_time = fromInputTime(event.currentTarget.value);
@@ -226,12 +225,12 @@ export function ScheduleModal({
         </Group>
         <Group grow>
           <Select
-            label="Priority"
+            label={t("schedule.priority")}
             data={[
-              { value: "none", label: "None" },
-              { value: "low", label: "Low" },
-              { value: "medium", label: "Medium" },
-              { value: "high", label: "High" },
+              { value: "none", label: t("common.none") },
+              { value: "low", label: t("task.priorityLow") },
+              { value: "medium", label: t("task.priorityMedium") },
+              { value: "high", label: t("task.priorityHigh") },
             ]}
             value={draft.priority}
             allowDeselect={false}
@@ -243,7 +242,7 @@ export function ScheduleModal({
             }
           />
           <Select
-            label="Color"
+            label={t("schedule.color")}
             data={STATUS_COLOR_OPTIONS.map((item) => ({
               value: item.value,
               label: item.label[0].toUpperCase() + item.label.slice(1),
@@ -254,7 +253,7 @@ export function ScheduleModal({
           />
         </Group>
         <Textarea
-          label="Notes"
+          label={t("schedule.notes")}
           minRows={3}
           autosize
           value={draft.notes}
@@ -271,17 +270,17 @@ export function ScheduleModal({
         <Group justify="space-between">
           {entry && onDelete ? (
             <Button color="red" variant="light" onClick={() => onDelete(entry)}>
-              Delete
+              {t("common.delete")}
             </Button>
           ) : (
             <span />
           )}
           <Group>
             <Button variant="default" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => void handleSave()} loading={submitting}>
-              Save
+              {t("common.save")}
             </Button>
           </Group>
         </Group>

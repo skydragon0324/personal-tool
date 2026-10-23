@@ -1,5 +1,3 @@
-"use client";
-
 import { Anchor, Button, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
 import Link from "next/link";
 import { useState } from "react";
@@ -8,6 +6,7 @@ import { useAuth } from "@/features/auth/components/auth-provider";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { validateEmail, validatePassword } from "@/features/auth/utils/validation";
 import { ApiError } from "@/lib/api-client";
+import { t } from "@/i18n";
 
 export function LoginForm() {
   const { login } = useAuth();
@@ -28,7 +27,7 @@ export function LoginForm() {
     try {
       await login({ email: email.trim(), password });
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Could not sign in";
+      const message = error instanceof ApiError ? error.message : t("auth.couldNotSignIn");
       setErrors({ form: message });
     } finally {
       setSubmitting(false);
@@ -36,11 +35,11 @@ export function LoginForm() {
   }
 
   return (
-    <AuthCard title="Welcome back" subtitle="Sign in to open your personal workspace.">
+    <AuthCard title={t("auth.welcomeBack")} subtitle={t("auth.signInSubtitle")}>
       <form onSubmit={handleSubmit}>
         <Stack gap="md">
           <TextInput
-            label="Email"
+            label={t("auth.email")}
             type="email"
             autoComplete="email"
             value={email}
@@ -48,7 +47,7 @@ export function LoginForm() {
             error={errors.email}
           />
           <PasswordInput
-            label="Password"
+            label={t("auth.password")}
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.currentTarget.value)}
@@ -60,12 +59,12 @@ export function LoginForm() {
             </Text>
           ) : null}
           <Button type="submit" loading={submitting}>
-            Sign in
+            {t("auth.signIn")}
           </Button>
           <Text size="sm" c="dimmed">
-            Need an account?{" "}
+            {t("auth.needAccount")}{" "}
             <Anchor component={Link} href="/register">
-              Create one
+              {t("auth.createOne")}
             </Anchor>
           </Text>
         </Stack>

@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { formatDisplayDate, formatLongDate, formatTaskPeriod, greetingForName } from "./dates";
 
 describe("en-US date formatting", () => {

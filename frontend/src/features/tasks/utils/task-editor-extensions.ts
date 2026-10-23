@@ -1,5 +1,3 @@
-"use client";
-
 import { Extension } from "@tiptap/core";
 import { Color } from "@tiptap/extension-color";
 import FontFamily from "@tiptap/extension-font-family";

@@ -1,17 +1,21 @@
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
 import { boardKeys, taskKeys } from "@/features/board/api/board-queries";
+import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
+import { todayKeys } from "@/features/today/api/today-queries";
 import type { BoardQueryParams, TaskDetail, TaskSubtask } from "@/features/board/types";
+import { t } from "@/i18n";
 
 export function useSubtaskMutations(taskId: string, query: BoardQueryParams) {
   const queryClient = useQueryClient();
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+    // The parent and the sub-task itself (ticking one done moves it to another status).
+    await queryClient.invalidateQueries({ queryKey: taskKeys.all });
     await queryClient.invalidateQueries({ queryKey: boardKeys.view(query) });
+    void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+    void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
   };
 
   const create = useMutation({
@@ -73,7 +77,7 @@ export function useSubtaskMutations(taskId: string, query: BoardQueryParams) {
 export function subtaskProgressLabel(subtasks: TaskSubtask[]): string {
   const total = subtasks.length;
   const completed = subtasks.filter((item) => item.is_completed).length;
-  return `${completed} of ${total} completed`;
+  return t("tasks.subtaskProgress", { done: completed, total });
 }
 
 export function canAddSubtask(title: string, isSaving: boolean): boolean {

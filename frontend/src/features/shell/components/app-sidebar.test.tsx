@@ -1,34 +1,34 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
 
 import { AppSidebar } from "./app-sidebar";
 
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
+  __esModule: true,
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) =>
     createElement("a", { href, ...props }, children),
 }));
 
-vi.mock("next/navigation", () => ({
+jest.mock("@/lib/navigation", () => ({
   usePathname: () => "/boards/board-1",
 }));
 
-vi.mock("@/features/auth/components/auth-provider", () => ({
+jest.mock("@/features/auth/components/auth-provider", () => ({
   useAuth: () => ({
     user: { display_name: "Ada", email: "ada@example.com" },
-    logout: vi.fn(),
+    logout: jest.fn(),
   }),
 }));
 
-vi.mock("@/features/board/hooks/use-boards", () => ({
+jest.mock("@/features/board/hooks/use-boards", () => ({
   useBoards: () => ({
     data: [{ id: "board-1", name: "Personal", color: "teal", icon_name: "home", archived_at: null }],
   }),
   activeBoards: (boards: Array<{ id: string; name: string }> | undefined) => boards ?? [],
 }));
 
-vi.mock("@/features/notifications/components/notification-bell", () => ({
+jest.mock("@/features/notifications/components/notification-bell", () => ({
   NotificationBell: () => createElement("button", { type: "button", "aria-label": "Notifications" }),
 }));
 

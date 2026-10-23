@@ -1,3 +1,5 @@
+import { t } from "@/i18n";
+
 export interface SnoozeOption {
   label: string;
   at: Date;
@@ -13,9 +15,9 @@ export function snoozeOptions(now: Date = new Date()): SnoozeOption[] {
   nextMonday.setDate(now.getDate() + (((8 - now.getDay()) % 7) || 7));
   nextMonday.setHours(9, 0, 0, 0);
   return [
-    { label: "In 1 hour", at: inHours(1) },
-    { label: "In 3 hours", at: inHours(3) },
-    { label: "Tomorrow at 9:00", at: tomorrowMorning },
-    { label: "Next Monday at 9:00", at: nextMonday },
+    { label: t("notifications.inOneHour"), at: inHours(1) },
+    { label: t("notifications.inThreeHours"), at: inHours(3) },
+    { label: t("notifications.tomorrowAtNine"), at: tomorrowMorning },
+    { label: t("notifications.nextMondayAtNine"), at: nextMonday },
   ];
 }

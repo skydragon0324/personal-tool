@@ -1,5 +1,3 @@
-"use client";
-
 import { Alert, Button, Group, Modal, Select, Stack, Text } from "@mantine/core";
 import { useEffect, useMemo, useState } from "react";
 
@@ -7,6 +5,7 @@ import { useBoardMembers } from "../hooks/use-board-members";
 import { activeBoards, useBoards } from "../hooks/use-boards";
 import { activeColumns, useColumns } from "../hooks/use-columns";
 import type { TaskAssignee } from "../types";
+import { t } from "@/i18n";
 
 export interface MovableTask {
   id: string;
@@ -61,20 +60,20 @@ export function MoveToBoardModal({
   const names = (list: TaskAssignee[]) => list.map((person) => person.display_name).join(", ");
 
   return (
-    <Modal opened={task !== null} onClose={onClose} title="Move to another board" radius="lg">
+    <Modal opened={task !== null} onClose={onClose} title={t("boards.moveTitle")} radius="lg">
       <Stack gap="sm">
         <Text size="sm" c="dimmed">
-          “{task?.title}” moves with its content, sub-tasks, links and files.
+          {t("boards.moveIntro", { title: task?.title ?? "" })}
         </Text>
         {boards.length === 0 && boardsQuery.isSuccess ? (
-          <Alert color="gray">You don&apos;t have another board yet. Create one first.</Alert>
+          <Alert color="gray">{t("boards.noOtherBoard")}</Alert>
         ) : null}
         <Select
-          label="Board"
-          placeholder="Choose a board"
+          label={t("board.board")}
+          placeholder={t("boards.chooseBoard")}
           data={boards.map((board) => ({
             value: board.id,
-            label: board.role === "member" ? `${board.name} (shared)` : board.name,
+            label: board.role === "member" ? t("boards.sharedSuffix", { name: board.name }) : board.name,
           }))}
           value={boardId}
           onChange={(value) => {
@@ -85,8 +84,8 @@ export function MoveToBoardModal({
           data-autofocus
         />
         <Select
-          label="Status"
-          placeholder={boardId ? "Choose a status" : "Choose a board first"}
+          label={t("task.status")}
+          placeholder={boardId ? t("boards.chooseStatus") : t("boards.chooseBoardFirst")}
           data={columns.map((column) => ({ value: column.id, label: column.name }))}
           value={columnId}
           onChange={setColumnId}
@@ -96,25 +95,25 @@ export function MoveToBoardModal({
         {assignees.length > 0 && boardId && membersQuery.data ? (
           <Text size="sm" c={dropped.length ? "orange" : "dimmed"}>
             {dropped.length
-              ? `${names(dropped)} ${dropped.length === 1 ? "is" : "are"} not on that board and will be unassigned.`
-              : "Everyone assigned is on that board and stays assigned."}
+              ? t("boards.willBeUnassigned", { names: names(dropped), count: dropped.length })
+              : t("boards.everyoneStays")}
           </Text>
         ) : null}
         {task?.repeating ? (
           <Text size="sm" c="dimmed">
-            This occurrence leaves its repeating series and becomes a one-off task.
+            {t("boards.leavesSeries")}
           </Text>
         ) : null}
         <Group justify="flex-end" mt="xs">
           <Button variant="default" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             disabled={!boardId || !columnId}
             loading={submitting}
             onClick={() => boardId && onMove(boardId, columnId)}
           >
-            Move task
+            {t("boards.moveTask")}
           </Button>
         </Group>
       </Stack>

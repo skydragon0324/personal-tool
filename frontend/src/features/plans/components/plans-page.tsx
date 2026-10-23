@@ -1,8 +1,6 @@
-"use client";
-
 import { ActionIcon, Button, Group, Loader, Menu, Progress, Text } from "@mantine/core";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import { useEffect, useState } from "react";
 
 import { PageHeader } from "@/features/shell/components/page-header";
@@ -14,6 +12,7 @@ import type { PlanSummary } from "../types";
 import { formatPlanRange } from "../utils/plan-dates";
 import { ConfirmDeleteDialog, PlanFormModal } from "./plan-dialogs";
 import { PlansOverview } from "./plans-overview";
+import { t } from "@/i18n";
 
 export function PlansPage() {
   const router = useRouter();
@@ -34,8 +33,8 @@ export function PlansPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Plans" description="Plan activities for specific days.">
-        <Button onClick={() => setCreating(true)}>New plan</Button>
+      <PageHeader title={t("shell.plans")} description={t("plans.pageDescription")}>
+        <Button onClick={() => setCreating(true)}>{t("plans.newPlan")}</Button>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
@@ -46,27 +45,27 @@ export function PlansPage() {
           ) : null}
           {plansQuery.isError ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Text>Could not load plans.</Text>
+              <Text>{t("plans.couldNotLoad")}</Text>
               <Button variant="light" onClick={() => void plansQuery.refetch()}>
-                Retry
+                {t("common.retry")}
               </Button>
             </div>
           ) : null}
           {plansQuery.isSuccess && plans.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-center">
-              <h2 className="font-display text-2xl text-[var(--app-text)]">No plans yet</h2>
+              <h2 className="font-display text-2xl text-[var(--app-text)]">{t("plans.noPlans")}</h2>
               <Text c="dimmed" maw={420}>
-                Create a plan, add the days it covers, and list what you want to get done each day.
+                {t("plans.noPlansHint")}
               </Text>
-              <Button onClick={() => setCreating(true)}>Create plan</Button>
+              <Button onClick={() => setCreating(true)}>{t("plans.createPlan")}</Button>
             </div>
           ) : null}
           {plans.length > 0 && overviewQuery.data ? <PlansOverview data={overviewQuery.data} /> : null}
           {plans.length > 0 ? (
-            <h2 className="pt-2 font-display text-lg text-[var(--app-text)]">All plans</h2>
+            <h2 className="pt-2 font-display text-lg text-[var(--app-text)]">{t("plans.allPlans")}</h2>
           ) : null}
           {plans.length > 0 ? (
-            <ul aria-label="Your plans" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <ul aria-label={t("plans.yourPlans")} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {plans.map((plan) => (
                 <PlanCard
                   key={plan.id}
@@ -82,8 +81,8 @@ export function PlansPage() {
 
       <PlanFormModal
         opened={creating}
-        title="New plan"
-        submitLabel="Create plan"
+        title={t("plans.newPlan")}
+        submitLabel={t("plans.createPlan")}
         submitting={create.isPending}
         onClose={() => setCreating(false)}
         onSubmit={async (payload) => {
@@ -92,14 +91,14 @@ export function PlansPage() {
             setCreating(false);
             router.push(`/plans/${plan.id}`);
           } catch (error) {
-            notifyApiError(error, "Could not create the plan");
+            notifyApiError(error, t("plans.couldNotCreate"));
           }
         }}
       />
       <PlanFormModal
         opened={renaming !== null}
-        title="Rename plan"
-        submitLabel="Save"
+        title={t("plans.renamePlan")}
+        submitLabel={t("common.save")}
         initial={renaming ? { name: renaming.name, description: renaming.description } : undefined}
         submitting={update.isPending}
         onClose={() => setRenaming(null)}
@@ -109,14 +108,14 @@ export function PlansPage() {
             await update.mutateAsync({ planId: renaming.id, payload });
             setRenaming(null);
           } catch (error) {
-            notifyApiError(error, "Could not rename the plan");
+            notifyApiError(error, t("plans.couldNotRename"));
           }
         }}
       />
       <ConfirmDeleteDialog
         opened={deleting !== null}
-        title="Delete this plan?"
-        message={`“${deleting?.name ?? ""}” and all of its days and items will be permanently removed.`}
+        title={t("plans.deletePlanTitle")}
+        message={t("plans.deletePlanBody", { name: deleting?.name ?? "" })}
         submitting={remove.isPending}
         onClose={() => setDeleting(null)}
         onConfirm={async () => {
@@ -125,7 +124,7 @@ export function PlansPage() {
             await remove.mutateAsync(deleting.id);
             setDeleting(null);
           } catch (error) {
-            notifyApiError(error, "Could not delete the plan");
+            notifyApiError(error, t("plans.couldNotDelete"));
           }
         }}
       />
@@ -156,11 +155,11 @@ function PlanCard({
           <p className="mt-0.5 line-clamp-2 text-xs text-[var(--app-text-muted)]">{plan.description}</p>
         ) : null}
         <p className="mt-2 text-xs text-[var(--app-text-muted)]">
-          {plan.day_count} {plan.day_count === 1 ? "day" : "days"}
+          {t("plans.dayCount", { count: plan.day_count })}
           {range ? ` · ${range}` : ""}
         </p>
         <div className="mt-2 flex items-center gap-2">
-          <Progress value={percent} size="sm" className="flex-1" aria-label={`${plan.name} progress`} />
+          <Progress value={percent} size="sm" className="flex-1" aria-label={t("plans.planProgressLabel", { name: plan.name })} />
           <span className="text-xs tabular-nums text-[var(--app-text-muted)]">
             {plan.completed_count}/{plan.item_count}
           </span>
@@ -169,14 +168,14 @@ function PlanCard({
       <div className="absolute right-2 top-2">
         <Menu shadow="md" position="bottom-end" withinPortal>
           <Menu.Target>
-            <ActionIcon variant="subtle" color="gray" size="sm" aria-label={`Plan menu for ${plan.name}`}>
+            <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t("plans.menuFor", { name: plan.name })}>
               ⋯
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item onClick={onRename}>Rename</Menu.Item>
+            <Menu.Item onClick={onRename}>{t("plans.rename")}</Menu.Item>
             <Menu.Item color="red" onClick={onDelete}>
-              Delete
+              {t("common.delete")}
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

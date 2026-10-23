@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Group, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEffect, useRef } from "react";
@@ -9,6 +7,8 @@ import { useOpenNotification } from "../hooks/use-open-notification";
 import type { AppNotification, NotificationKind } from "../types";
 import {
   desktopPermission,
+  notificationBody,
+  notificationTitle,
   readDesktopEnabled,
   readPermissionPrompted,
   requestDesktopPermission,
@@ -17,6 +17,7 @@ import {
   writeDesktopEnabled,
   writePermissionPrompted,
 } from "../utils/notification-utils";
+import { t } from "@/i18n";
 
 /** Individual pop-ups per poll; anything beyond is summarized so a backlog does not flood the screen. */
 const MAX_INDIVIDUAL = 3;
@@ -62,14 +63,17 @@ export function NotificationBridge() {
     const hiddenCount = fresh.length - shown.length;
 
     for (const item of shown) {
-      if (desktop) showDesktopNotification(item, () => openRef.current(item));
+      if (desktop) {
+        const text = { id: item.id, title: notificationTitle(item), body: notificationBody(item) };
+        showDesktopNotification(text, () => openRef.current(item));
+      }
       if (visible) showToast(item, () => openRef.current(item));
     }
     if (hiddenCount > 0) {
       const summary = {
         id: `summary-${shown[shown.length - 1].id}`,
-        title: `${hiddenCount} more notification${hiddenCount === 1 ? "" : "s"}`,
-        body: "Open the bell in the sidebar to see them all.",
+        title: t("notifications.moreNotifications", { count: hiddenCount }),
+        body: t("notifications.openBell"),
       };
       if (desktop) showDesktopNotification(summary, () => window.focus());
       if (visible) notifications.show({ title: summary.title, message: summary.body, color: "gray" });
@@ -89,11 +93,11 @@ export function NotificationBridge() {
       id: PERMISSION_TOAST_ID,
       autoClose: false,
       color: "teal",
-      title: "Turn on desktop notifications?",
+      title: t("notifications.turnOnTitle"),
       message: (
         <div>
           <Text size="sm" c="dimmed">
-            Get reminders and schedule alerts from your operating system while Life Management is open.
+            {t("notifications.turnOnBody")}
           </Text>
           <Group gap="xs" mt="xs">
             <Button
@@ -106,7 +110,7 @@ export function NotificationBridge() {
                 });
               }}
             >
-              Turn on
+              {t("notifications.turnOn")}
             </Button>
             <Button
               size="xs"
@@ -117,7 +121,7 @@ export function NotificationBridge() {
                 notifications.hide(PERMISSION_TOAST_ID);
               }}
             >
-              Not now
+              {t("notifications.notNow")}
             </Button>
           </Group>
         </div>
@@ -133,11 +137,11 @@ function showToast(item: AppNotification, onOpen: () => void) {
   notifications.show({
     id,
     color: KIND_COLOR[item.kind],
-    title: item.title,
+    title: notificationTitle(item),
     autoClose: 8000,
     message: (
       <div>
-        {item.body ? <Text size="sm">{item.body}</Text> : null}
+        {notificationBody(item) ? <Text size="sm">{notificationBody(item)}</Text> : null}
         <Button
           size="compact-xs"
           variant="subtle"
@@ -148,7 +152,7 @@ function showToast(item: AppNotification, onOpen: () => void) {
             onOpen();
           }}
         >
-          Open
+          {t("notifications.open")}
         </Button>
       </div>
     ),

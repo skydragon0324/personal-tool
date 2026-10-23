@@ -2,22 +2,22 @@ import { QueryClient } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "@/features/auth/components/login-form";
 import { RegisterForm } from "@/features/auth/components/register-form";
 import { MantineProvider } from "@mantine/core";
 
-const login = vi.fn();
-const register = vi.fn();
+const login = jest.fn();
+const register = jest.fn();
 
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
+  __esModule: true,
   default: ({ href, children }: { href: string; children: ReactNode }) =>
     createElement("a", { href }, children),
 }));
 
-vi.mock("@/features/auth/components/auth-provider", () => ({
-  useAuth: () => ({ login, register, logout: vi.fn(), user: null, isLoading: false }),
+jest.mock("@/features/auth/components/auth-provider", () => ({
+  useAuth: () => ({ login, register, logout: jest.fn(), user: null, isLoading: false }),
 }));
 
 function wrap(ui: ReactNode) {

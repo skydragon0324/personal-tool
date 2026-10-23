@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
@@ -13,5 +11,5 @@ export function GuestOnly({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   if (isLoading || user) return <WorkspaceLoadingScreen />;
-  return children;
+  return <>{children}</>;
 }

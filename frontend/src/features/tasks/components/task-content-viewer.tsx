@@ -1,10 +1,9 @@
-"use client";
-
 import { RichTextEditor } from "@mantine/tiptap";
 import { useEditor } from "@tiptap/react";
 import { useEffect, useMemo } from "react";
 
 import type { TiptapJSON } from "@/features/board/types";
+import { editorLabels } from "@/i18n/editor-labels";
 import { createTaskEditorExtensions } from "../utils/task-editor-extensions";
 
 export function TaskContentViewer({ value }: { value: TiptapJSON | null }) {
@@ -29,7 +28,7 @@ export function TaskContentViewer({ value }: { value: TiptapJSON | null }) {
   }
 
   return (
-    <RichTextEditor editor={editor} className="pointer-events-auto">
+    <RichTextEditor editor={editor} className="pointer-events-auto" labels={editorLabels()}>
       <RichTextEditor.Content mih={120} />
     </RichTextEditor>
   );

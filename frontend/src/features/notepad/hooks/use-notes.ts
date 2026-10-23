@@ -1,5 +1,3 @@
-"use client";
-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, apiClient } from "@/lib/api-client";
@@ -9,6 +7,7 @@ import { notifyApiError } from "@/lib/notify";
 import { noteKeys } from "../api/note-queries";
 import type { Note, NoteCreate, NoteListParams, NoteUpdate } from "../types";
 import { removeNoteFromLists, replaceNoteInLists, sortNotes } from "../utils/note-cache";
+import { t } from "@/i18n";
 
 export function useNotes(params: NoteListParams) {
   return useQuery({
@@ -64,7 +63,7 @@ export function useNoteMutations() {
         );
         void invalidateLists();
       }
-      notifyApiError(error, "Could not update note");
+      notifyApiError(error, t("notes.couldNotUpdate"));
     },
     onSuccess: (note) => {
       queryClient.setQueriesData<Note[]>({ queryKey: noteKeys.all }, (current) =>

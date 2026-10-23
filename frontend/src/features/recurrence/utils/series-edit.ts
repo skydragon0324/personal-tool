@@ -15,15 +15,17 @@ import type {
   RecurrenceSeriesRead,
   RecurrenceSeriesUpdatePayload,
 } from "../types";
+import { t } from "@/i18n";
 
 export const AUTOMATIC_COLUMN = "__automatic__";
 export const STALE_SERIES_VERSION_DETAIL = "Recurrence series version is stale; refresh and try again";
 
 export function isStaleSeriesVersion(error: unknown) {
+  // Match on the stable code: `message` is shown in the user's language, so it is not English.
   return (
     error instanceof ApiError &&
     error.status === 409 &&
-    error.message === STALE_SERIES_VERSION_DETAIL
+    (error.code === "series_version_stale" || error.message === STALE_SERIES_VERSION_DETAIL)
   );
 }
 
@@ -152,25 +154,25 @@ export function columnPayloadValue(columnChoice: string): string | null {
 
 export function validateSeriesEditForm(values: SeriesEditFormValues): Record<string, string> {
   const errors: Record<string, string> = {};
-  if (values.preset === "none") errors.repeat = "Choose a repeat rule.";
-  if (!values.title.trim()) errors.title = "Enter a title.";
-  if (!values.categoryId) errors.category = "Choose a category.";
+  if (values.preset === "none") errors.repeat = t("recurring.chooseRepeat");
+  if (!values.title.trim()) errors.title = t("taskForm.enterTitle");
+  if (!values.categoryId) errors.category = t("taskForm.chooseCategory");
   if (!Number.isFinite(values.durationDays) || values.durationDays < 0) {
-    errors.duration = "Duration must be 0 or more days.";
+    errors.duration = t("recurring.durationInvalid");
   }
   if (values.preset === "custom" && (!Number.isFinite(values.customInterval) || values.customInterval < 1)) {
-    errors.interval = "Repeat interval must be at least 1.";
+    errors.interval = t("recurring.intervalInvalid");
   }
   if (values.preset === "custom" && values.customUnit === "weeks" && values.customWeekdays.length === 0) {
-    errors.weekdays = "Choose at least one weekday.";
+    errors.weekdays = t("recurring.chooseWeekday");
   }
   if (values.preset !== "none" && values.end === "date") {
-    if (!values.untilDate) errors.until = "Choose an end date.";
-    else if (values.untilDate < values.dtstart) errors.until = "End date cannot be before the series start date.";
+    if (!values.untilDate) errors.until = t("recurring.chooseEndDate");
+    else if (values.untilDate < values.dtstart) errors.until = t("recurring.endBeforeStart");
   }
   if (values.preset !== "none" && values.end === "count") {
     if (!Number.isFinite(values.occurrenceCount) || values.occurrenceCount < 1) {
-      errors.count = "Occurrence count must be at least 1.";
+      errors.count = t("recurring.countInvalid");
     }
   }
   values.links.forEach((link, index) => {

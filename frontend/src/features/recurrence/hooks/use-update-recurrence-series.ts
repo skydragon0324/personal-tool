@@ -1,5 +1,3 @@
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { boardKeys } from "@/features/board/api/board-queries";
@@ -11,6 +9,7 @@ import { notifyApiError, notifySuccess } from "@/lib/notify";
 import { recurrenceKeys } from "../api/recurrence-queries";
 import type { RecurrenceSeriesUpdatePayload } from "../types";
 import { isStaleSeriesVersion } from "../utils/series-edit";
+import { t } from "@/i18n";
 
 export function useUpdateRecurrenceSeries() {
   const queryClient = useQueryClient();
@@ -33,11 +32,11 @@ export function useUpdateRecurrenceSeries() {
         queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
         queryClient.invalidateQueries({ queryKey: boardKeys.views(vars.boardId) }),
       ]);
-      notifySuccess("Recurring task updated");
+      notifySuccess(t("recurring.updated"));
     },
     onError: (error) => {
       if (isStaleSeriesVersion(error)) return;
-      notifyApiError(error, "Could not update recurring task");
+      notifyApiError(error, t("recurring.couldNotUpdate"));
     },
   });
 }

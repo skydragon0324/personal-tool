@@ -1,8 +1,7 @@
-"use client";
-
 import { Button, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from "@mantine/core";
 
 import type { RecurrenceSeriesLinkInput } from "@/features/recurrence/types";
+import { t } from "@/i18n";
 
 export function TaskLinkListEditor({
   links,
@@ -18,7 +17,7 @@ export function TaskLinkListEditor({
   return (
     <Stack gap="sm">
       <Group justify="space-between">
-        <Title order={5}>Reference links</Title>
+        <Title order={5}>{t("taskForm.referenceLinks")}</Title>
         <Button
           size="xs"
           variant="light"
@@ -28,14 +27,14 @@ export function TaskLinkListEditor({
             onChange([...links, { label: "", url: "https://", position: links.length }])
           }
         >
-          Add link
+          {t("taskForm.addLink")}
         </Button>
       </Group>
       {links.map((link, index) => (
         <Paper key={link.id ?? `link-${index}`} withBorder p="sm" radius="md">
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <TextInput
-              label="Name"
+              label={t("taskForm.linkName")}
               value={link.label}
               error={errors?.[`link-${index}`]}
               disabled={disabled}
@@ -45,7 +44,7 @@ export function TaskLinkListEditor({
               }}
             />
             <TextInput
-              label="URL"
+              label={t("taskForm.linkUrl")}
               value={link.url}
               error={errors?.[`link-${index}`] ? " " : undefined}
               disabled={disabled}
@@ -64,14 +63,14 @@ export function TaskLinkListEditor({
               disabled={disabled}
               onClick={() => onChange(links.filter((_, i) => i !== index))}
             >
-              Remove
+              {t("taskForm.remove")}
             </Button>
           </Group>
         </Paper>
       ))}
       {links.length === 0 ? (
         <Text size="sm" c="dimmed">
-          No reference links.
+          {t("taskForm.noReferenceLinks")}
         </Text>
       ) : null}
     </Stack>

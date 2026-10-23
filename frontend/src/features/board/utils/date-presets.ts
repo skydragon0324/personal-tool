@@ -1,3 +1,5 @@
+import { dateLocale, t } from "@/i18n";
+
 export type DateRangeMode = "year" | "month" | "week" | "day" | "custom" | "all";
 export type DateField = "due_date" | "created_at";
 export type DateRangeValue = [string | null, string | null];
@@ -141,7 +143,7 @@ export function formatYearLabel(iso: string): string {
 }
 
 export function formatMonthLabel(iso: string): string {
-  return parseISODate(iso).toLocaleDateString("en-US", {
+  return parseISODate(iso).toLocaleDateString(dateLocale(), {
     month: "long",
     year: "numeric",
   });
@@ -150,10 +152,15 @@ export function formatMonthLabel(iso: string): string {
 export function formatWeekRangeLabel(start: string, end: string): string {
   const startDate = parseISODate(start);
   const endDate = parseISODate(end);
-  const startPart = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const endPart = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const startPart = startDate.toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
+  const endPart = endDate.toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
   if (startDate.getFullYear() === endDate.getFullYear()) {
-    return `${startPart} – ${endPart}, ${endDate.getFullYear()}`;
+    return t("filters.weekRange", { start: startPart, end: endPart, year: endDate.getFullYear() });
   }
-  return `${startPart}, ${startDate.getFullYear()} – ${endPart}, ${endDate.getFullYear()}`;
+  return t("filters.weekRangeAcrossYears", {
+    start: startPart,
+    startYear: startDate.getFullYear(),
+    end: endPart,
+    endYear: endDate.getFullYear(),
+  });
 }

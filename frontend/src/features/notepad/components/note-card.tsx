@@ -1,11 +1,10 @@
-"use client";
-
 import { ActionIcon, Menu } from "@mantine/core";
 
 import { PriorityBadge } from "@/features/tasks/components/priority-badge";
 import { formatDateTime } from "@/lib/dates";
 
 import type { Note } from "../types";
+import { t } from "@/i18n";
 
 interface NoteCardProps {
   note: Note;
@@ -27,7 +26,7 @@ export function NoteCard({ note, pinning, onOpen, onTogglePin, onDelete }: NoteC
       <div className="flex items-start gap-2">
         <h2 className="min-w-0 flex-1 truncate font-medium text-[var(--app-text)]">{note.title}</h2>
         {note.is_pinned ? (
-          <span className="mt-0.5 shrink-0 text-[var(--app-primary)]" title="Pinned" aria-label="Pinned">
+          <span className="mt-0.5 shrink-0 text-[var(--app-primary)]" title={t("notes.pinned")} aria-label={t("notes.pinned")}>
             <PinIcon filled />
           </span>
         ) : null}
@@ -39,13 +38,13 @@ export function NoteCard({ note, pinning, onOpen, onTogglePin, onDelete }: NoteC
         />
       </div>
       <p className="mt-2 min-h-[2.5rem] flex-1 whitespace-pre-wrap break-words text-sm text-[var(--app-text-muted)] line-clamp-2">
-        {note.body.trim() || "No additional text"}
+        {note.body.trim() || t("notes.noText")}
       </p>
       <div className="mt-3 flex items-center justify-between gap-2">
         {note.priority ? (
           <PriorityBadge priority={note.priority} />
         ) : (
-          <span className="text-xs text-[var(--app-text-muted)]">None</span>
+          <span className="text-xs text-[var(--app-text-muted)]">{t("notes.none")}</span>
         )}
         <time className="truncate text-xs text-[var(--app-text-muted)]" dateTime={note.updated_at}>
           {formatDateTime(note.updated_at)}
@@ -74,7 +73,7 @@ export function NoteActionsMenu({
     >
       <Menu shadow="md" width={160} position="bottom-end" withinPortal={false}>
         <Menu.Target>
-          <ActionIcon variant="subtle" color="gray" aria-label="Note actions" disabled={pinning}>
+          <ActionIcon variant="subtle" color="gray" aria-label={t("notes.noteActions")} disabled={pinning}>
             <MoreIcon />
           </ActionIcon>
         </Menu.Target>
@@ -86,7 +85,7 @@ export function NoteActionsMenu({
               onTogglePin();
             }}
           >
-            {pinned ? "Unpin" : "Pin"}
+            {pinned ? t("notes.unpin") : t("notes.pin")}
           </Menu.Item>
           <Menu.Item
             color="red"
@@ -95,7 +94,7 @@ export function NoteActionsMenu({
               onDelete();
             }}
           >
-            Delete
+            {t("common.delete")}
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>

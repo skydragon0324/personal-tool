@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 
 import { nextCliCommand, resolveNextDistDir } from "./resolve-next-dist-dir";
 

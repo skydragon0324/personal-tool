@@ -1,5 +1,3 @@
-"use client";
-
 import {
   FormEvent,
   useCallback,
@@ -9,7 +7,6 @@ import {
   useState,
 } from "react";
 import { MultiSelect, Select } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
 import {
   Alert,
   Button,
@@ -36,6 +33,7 @@ import type {
   TaskLinkInput,
   TiptapJSON,
 } from "@/features/board/types";
+import { DatePickerInput } from "@/lib/date-pickers";
 import { useBoardMembers } from "@/features/board/hooks/use-board-members";
 import { useCategories, useCreateCategory } from "@/features/board/hooks/use-categories";
 import { todayISO } from "@/lib/dates";
@@ -58,12 +56,77 @@ import {
   sanitizeContentForPersist,
 } from "../utils/pending-images";
 import { TaskRichTextEditor } from "./task-rich-text-editor";
+import { t } from "@/i18n";
 
 interface PendingFile {
   id: string;
   file: File;
   previewUrl?: string;
   error?: string;
+}
+
+interface FormValues {
+  title: string;
+  priority: Priority;
+  startDate: string;
+  dueDate: string;
+  categoryId: string | null;
+  content: TiptapJSON | null;
+  links: TaskLinkInput[];
+  assigneeIds: string[];
+  repeatPreset: RepeatPreset;
+  customInterval: number;
+  customUnit: RepeatUnit;
+  customWeekdays: number[];
+  repeatEnd: RepeatEnd;
+  untilDate: string | null;
+  occurrenceCount: number;
+}
+
+/** What the form shows for a task (or a blank new one) before any edits. */
+function formValuesFrom(initial: TaskDetail | null | undefined): FormValues {
+  if (!initial) {
+    return {
+      title: "",
+      priority: "medium",
+      startDate: todayISO(),
+      dueDate: todayISO(),
+      categoryId: null,
+      content: null,
+      links: [],
+      assigneeIds: [],
+      repeatPreset: "none",
+      customInterval: 1,
+      customUnit: "weeks",
+      customWeekdays: [0, 1, 2, 3, 4],
+      repeatEnd: "never",
+      untilDate: null,
+      occurrenceCount: 10,
+    };
+  }
+  const recurrence = initial.recurrence;
+  return {
+    title: initial.title,
+    priority: initial.priority,
+    startDate: initial.start_date ?? initial.due_date,
+    dueDate: initial.due_date,
+    categoryId: initial.category.id,
+    content: initial.content ?? (initial.description ? descriptionToDoc(initial.description) : null),
+    links: initial.links.map((link) => ({
+      id: link.id,
+      label: link.label,
+      url: link.url,
+      position: link.position,
+    })),
+    assigneeIds: (initial.assignees ?? []).map((person) => person.id),
+    repeatPreset: presetFromRecurrence(recurrence),
+    customInterval: recurrence?.interval ?? 1,
+    customUnit: repeatUnitFromRecurrence(recurrence),
+    customWeekdays: recurrence?.weekdays?.length ? recurrence.weekdays : [0, 1, 2, 3, 4],
+    repeatEnd: recurrence?.until_date ? "date" : recurrence?.occurrence_limit ? "count" : "never",
+    untilDate: recurrence?.until_date ?? null,
+    occurrenceCount: recurrence?.occurrence_limit ?? 10,
+  };
 }
 
 interface TaskFormProps {
@@ -78,6 +141,8 @@ interface TaskFormProps {
   onPatchContent?: (taskId: string, content: TiptapJSON) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
   uploading?: boolean;
+  /** Called when the form gains or loses unsaved edits. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function TaskForm({
@@ -92,6 +157,7 @@ export function TaskForm({
   onPatchContent,
   onDeleteAttachment,
   uploading,
+  onDirtyChange,
 }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -141,54 +207,55 @@ export function TaskForm({
   initialRef.current = initial;
   const initialId = initial?.id ?? null;
 
+  // The form as last reset; anything different from it is an unsaved edit.
+  const [baseline, setBaseline] = useState(() => JSON.stringify(formValuesFrom(initial)));
+
   useEffect(() => {
-    const initial = initialRef.current;
-    if (initial) {
-      setTitle(initial.title);
-      setPriority(initial.priority);
-      setTaskStartDate(initial.start_date ?? initial.due_date);
-      setTaskDueDate(initial.due_date);
-      setCategoryId(initial.category.id);
-      setContent(
-        initial.content ??
-          (initial.description ? descriptionToDoc(initial.description) : null),
-      );
-      setLinks(
-        initial.links.map((link) => ({
-          id: link.id,
-          label: link.label,
-          url: link.url,
-          position: link.position,
-        })),
-      );
-      setSavedTaskId(initial.id);
-      setAssigneeIds((initial.assignees ?? []).map((person) => person.id));
-      setRepeatPreset(presetFromRecurrence(initial.recurrence));
-      setCustomInterval(initial.recurrence?.interval ?? 1);
-      setCustomUnit(repeatUnitFromRecurrence(initial.recurrence));
-      setCustomWeekdays(initial.recurrence?.weekdays?.length ? initial.recurrence.weekdays : [0, 1, 2, 3, 4]);
-      setRepeatEnd(
-        initial.recurrence?.until_date ? "date" : initial.recurrence?.occurrence_limit ? "count" : "never",
-      );
-      setUntilDate(initial.recurrence?.until_date ?? null);
-      setOccurrenceCount(initial.recurrence?.occurrence_limit ?? 10);
-    } else {
-      setTitle("");
-      setPriority("medium");
-      setTaskStartDate(todayISO());
-      setTaskDueDate(todayISO());
-      setCategoryId(null);
-      setContent(null);
-      setLinks([]);
-      setSavedTaskId(null);
-      setAssigneeIds([]);
-      setRepeatPreset("none");
-      setRepeatEnd("never");
-    }
+    const values = formValuesFrom(initialRef.current);
+    setBaseline(JSON.stringify(values));
+    setTitle(values.title);
+    setPriority(values.priority);
+    setTaskStartDate(values.startDate);
+    setTaskDueDate(values.dueDate);
+    setCategoryId(values.categoryId);
+    setContent(values.content);
+    setLinks(values.links);
+    setSavedTaskId(initialRef.current?.id ?? null);
+    setAssigneeIds(values.assigneeIds);
+    setRepeatPreset(values.repeatPreset);
+    setCustomInterval(values.customInterval);
+    setCustomUnit(values.customUnit);
+    setCustomWeekdays(values.customWeekdays);
+    setRepeatEnd(values.repeatEnd);
+    setUntilDate(values.untilDate);
+    setOccurrenceCount(values.occurrenceCount);
     setPendingFiles([]);
     setPendingImages([]);
     setError(null);
   }, [initialId, dueDate]);
+
+  // Unsaved edits: the form differs from what it was reset to, or files are waiting to upload.
+  const currentValues: FormValues = {
+    title,
+    priority,
+    startDate: taskStartDate,
+    dueDate: taskDueDate,
+    categoryId,
+    content,
+    links,
+    assigneeIds,
+    repeatPreset,
+    customInterval,
+    customUnit,
+    customWeekdays,
+    repeatEnd,
+    untilDate,
+    occurrenceCount,
+  };
+  const dirty = JSON.stringify(currentValues) !== baseline || pendingFiles.length > 0 || pendingImages.length > 0;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   const handleEditorReady = useCallback((editor: Editor | null) => {
     editorRef.current = editor;
@@ -236,7 +303,7 @@ export function TaskForm({
           .run();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Image upload failed");
+      setError(err instanceof Error ? err.message : t("taskForm.imageUploadFailed"));
     }
   }
 
@@ -268,9 +335,9 @@ export function TaskForm({
     const failed: PendingInlineImage[] = [];
     for (const image of images) {
       try {
-        if (!onUploadFile) throw new Error("Uploads are not available");
+        if (!onUploadFile) throw new Error(t("taskForm.uploadsUnavailable"));
         const uploaded = await onUploadFile(taskId, image.file);
-        if (!uploaded.download_url) throw new Error("Upload URL was not returned");
+        if (!uploaded.download_url) throw new Error(t("taskForm.noUploadUrl"));
         replacements.push({ pendingId: image.pendingId, src: uploaded.download_url });
       } catch (err) {
         failed.push({
@@ -305,7 +372,7 @@ export function TaskForm({
         return failed.length ? [...remaining, ...failed] : remaining;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Image retry failed");
+      setError(err instanceof Error ? err.message : t("taskForm.imageRetryFailed"));
     }
   }
 
@@ -313,15 +380,15 @@ export function TaskForm({
     event.preventDefault();
     setError(null);
     if (!title.trim()) {
-      setError("Enter a title.");
+      setError(t("taskForm.enterTitle"));
       return;
     }
     if (!categoryId) {
-      setError("Choose a category.");
+      setError(t("taskForm.chooseCategory"));
       return;
     }
     if (taskStartDate > taskDueDate) {
-      setError("Start date must be on or before due date.");
+      setError(t("taskForm.startAfterDue"));
       return;
     }
     try {
@@ -362,7 +429,7 @@ export function TaskForm({
       }
       await submitPayload(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the task.");
+      setError(err instanceof Error ? err.message : t("taskForm.couldNotSave"));
     }
   }
 
@@ -385,13 +452,13 @@ export function TaskForm({
         setContent(nextContent);
         setPendingImages(failed);
         if (failed.length) {
-          setError("The task was saved, but some inline images failed to upload.");
+          setError(t("taskForm.inlineImagesFailed"));
           return;
         }
       }
       onCancel?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the task");
+      setError(err instanceof Error ? err.message : t("taskForm.couldNotSave"));
     }
   }
 
@@ -413,9 +480,9 @@ export function TaskForm({
     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
         <section className="space-y-3">
-          <Title order={5}>Basics</Title>
+          <Title order={5}>{t("taskForm.basics")}</Title>
           <TextInput
-            label="Title"
+            label={t("taskForm.title")}
             value={title}
             onChange={(e) => setTitle(e.currentTarget.value)}
             maxLength={160}
@@ -431,7 +498,7 @@ export function TaskForm({
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <DatePickerInput
-              label="Start date"
+              label={t("taskForm.startDate")}
               value={taskStartDate}
               onChange={(value) => {
                 if (typeof value === "string" && value) setTaskStartDate(value);
@@ -439,7 +506,7 @@ export function TaskForm({
               valueFormat="MMM D, YYYY"
             />
             <DatePickerInput
-              label="Due date"
+              label={t("taskForm.dueDate")}
               value={taskDueDate}
               onChange={(value) => {
                 if (typeof value === "string" && value) setTaskDueDate(value);
@@ -448,15 +515,15 @@ export function TaskForm({
             />
           </SimpleGrid>
           <MultiSelect
-            label="Assign to"
+            label={t("task.assignTo")}
             description={
               initial?.recurrence?.series_id
-                ? "They get a notification. Future repeats go to the same people."
+                ? t("taskForm.assignHintRepeating")
                 : shared
-                  ? "They get a notification when you save."
-                  : "Use Share on the board to invite teammates you can assign."
+                  ? t("taskForm.assignHintShared")
+                  : t("taskForm.assignHintSolo")
             }
-            placeholder={assigneeIds.length ? undefined : "Unassigned"}
+            placeholder={assigneeIds.length ? undefined : t("filters.unassigned")}
             data={assigneeOptions}
             value={assigneeIds}
             onChange={setAssigneeIds}
@@ -465,28 +532,30 @@ export function TaskForm({
             hidePickedOptions
             maw={520}
           />
-          <RecurrenceFields
-            preset={repeatPreset}
-            onPresetChange={setRepeatPreset}
-            customInterval={customInterval}
-            onCustomIntervalChange={setCustomInterval}
-            customUnit={customUnit}
-            onCustomUnitChange={setCustomUnit}
-            customWeekdays={customWeekdays}
-            onCustomWeekdaysChange={setCustomWeekdays}
-            end={repeatEnd}
-            onEndChange={setRepeatEnd}
-            untilDate={untilDate}
-            onUntilDateChange={setUntilDate}
-            occurrenceCount={occurrenceCount}
-            onOccurrenceCountChange={setOccurrenceCount}
-          />
+          {initial?.parent ? null : (
+            <RecurrenceFields
+              preset={repeatPreset}
+              onPresetChange={setRepeatPreset}
+              customInterval={customInterval}
+              onCustomIntervalChange={setCustomInterval}
+              customUnit={customUnit}
+              onCustomUnitChange={setCustomUnit}
+              customWeekdays={customWeekdays}
+              onCustomWeekdaysChange={setCustomWeekdays}
+              end={repeatEnd}
+              onEndChange={setRepeatEnd}
+              untilDate={untilDate}
+              onUntilDateChange={setUntilDate}
+              occurrenceCount={occurrenceCount}
+              onOccurrenceCountChange={setOccurrenceCount}
+            />
+          )}
           <Select
-              label="Priority"
+              label={t("task.priority")}
               data={[
-                { value: "low", label: "Low" },
-                { value: "medium", label: "Medium" },
-                { value: "high", label: "High" },
+                { value: "low", label: t("task.priorityLow") },
+                { value: "medium", label: t("task.priorityMedium") },
+                { value: "high", label: t("task.priorityHigh") },
               ]}
               value={priority}
               onChange={(value) => {
@@ -498,7 +567,7 @@ export function TaskForm({
         <Divider />
 
         <section className="space-y-3">
-          <Title order={5}>Details</Title>
+          <Title order={5}>{t("taskForm.details")}</Title>
           <TaskRichTextEditor
             value={content}
             onChange={setContent}
@@ -518,7 +587,7 @@ export function TaskForm({
                     type="button"
                     loading={uploading}
                   >
-                    Insert image
+                    {t("taskForm.insertImage")}
                   </Button>
                 )}
               </FileButton>
@@ -530,7 +599,7 @@ export function TaskForm({
                 <Alert
                   key={image.pendingId}
                   color={image.error ? "red" : "yellow"}
-                  title={image.error ? "Inline image failed" : "Will upload after save"}
+                  title={image.error ? t("taskForm.inlineImageFailed") : t("taskForm.willUploadAfterSave")}
                 >
                   <Group justify="space-between">
                     <Text size="sm">{image.alt || image.file.name}</Text>
@@ -540,7 +609,7 @@ export function TaskForm({
                         type="button"
                         onClick={() => void retryInlineImage(image.pendingId)}
                       >
-                        Retry
+                        {t("common.retry")}
                       </Button>
                     ) : null}
                   </Group>
@@ -554,7 +623,7 @@ export function TaskForm({
 
         <section className="space-y-3">
           <Group justify="space-between">
-            <Title order={5}>Reference links</Title>
+            <Title order={5}>{t("taskForm.referenceLinks")}</Title>
             <Button
               size="xs"
               variant="light"
@@ -566,7 +635,7 @@ export function TaskForm({
                 ])
               }
             >
-              Add link
+              {t("taskForm.addLink")}
             </Button>
           </Group>
           <Stack gap="sm">
@@ -574,7 +643,7 @@ export function TaskForm({
               <Paper key={link.id ?? index} withBorder p="sm" radius="md">
                 <SimpleGrid cols={{ base: 1, sm: 2 }}>
                   <TextInput
-                    label="Name"
+                    label={t("taskForm.linkName")}
                     value={link.label}
                     onChange={(e) => {
                       const label = e.currentTarget.value;
@@ -586,7 +655,7 @@ export function TaskForm({
                     }}
                   />
                   <TextInput
-                    label="URL"
+                    label={t("taskForm.linkUrl")}
                     value={link.url}
                     onChange={(e) => {
                       const url = e.currentTarget.value;
@@ -608,14 +677,14 @@ export function TaskForm({
                       setLinks((current) => current.filter((_, i) => i !== index))
                     }
                   >
-                    Remove
+                    {t("taskForm.remove")}
                   </Button>
                 </Group>
               </Paper>
             ))}
             {links.length === 0 ? (
               <Text size="sm" c="dimmed">
-                No reference links.
+                {t("taskForm.noReferenceLinks")}
               </Text>
             ) : null}
           </Stack>
@@ -625,7 +694,7 @@ export function TaskForm({
 
         <section className="space-y-3">
           <Group justify="space-between">
-            <Title order={5}>Attachments</Title>
+            <Title order={5}>{t("taskForm.attachments")}</Title>
             <FileButton
               multiple
               onChange={(files) => {
@@ -636,7 +705,7 @@ export function TaskForm({
             >
               {(props) => (
                 <Button {...props} size="xs" variant="light" type="button">
-                  Add files
+                  {t("taskForm.addFiles")}
                 </Button>
               )}
             </FileButton>
@@ -645,7 +714,7 @@ export function TaskForm({
           {pendingFiles.length > 0 ? (
             <Stack gap="xs">
               <Text size="sm" fw={500}>
-                Will upload after save
+                {t("taskForm.willUploadAfterSave")}
               </Text>
               {pendingFiles.map((item) => (
                 <Paper key={item.id} withBorder p="xs" radius="md">
@@ -662,7 +731,7 @@ export function TaskForm({
                         )
                       }
                     >
-                      Remove
+                      {t("taskForm.remove")}
                     </Button>
                   </Group>
                   {item.error ? (
@@ -699,7 +768,7 @@ export function TaskForm({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Download
+                          {t("taskForm.download")}
                         </Text>
                       ) : null}
                     </div>
@@ -708,7 +777,7 @@ export function TaskForm({
                         variant="subtle"
                         color="red"
                         onClick={() => void onDeleteAttachment(attachment.id)}
-                        aria-label="Remove attachment"
+                        aria-label={t("taskForm.removeAttachment")}
                       >
                         ×
                       </ActionIcon>
@@ -722,7 +791,7 @@ export function TaskForm({
           {imageAttachments.length > 0 ? (
             <div>
               <Text size="sm" fw={500} mb="xs">
-                Image gallery
+                {t("taskForm.imageGallery")}
               </Text>
               <SimpleGrid cols={{ base: 2, sm: 3 }}>
                 {imageAttachments.map((image) =>
@@ -751,11 +820,11 @@ export function TaskForm({
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--app-border)] pt-3">
         <Button type="submit" loading={submitting || createCategory.isPending}>
-          {initial || savedTaskId ? "Save changes" : "Add task"}
+          {initial || savedTaskId ? t("taskForm.saveChanges") : t("taskForm.addTask")}
         </Button>
         {onCancel ? (
           <Button type="button" variant="default" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         ) : null}
       </div>
@@ -763,22 +832,22 @@ export function TaskForm({
       <Modal
         opened={altFile !== null}
         onClose={() => setAltFile(null)}
-        title="Image alt text"
+        title={t("taskForm.imageAltTitle")}
         size="sm"
       >
         <Stack>
           <TextInput
-            label="Alt text"
+            label={t("taskForm.altText")}
             value={altDraft}
             onChange={(event) => setAltDraft(event.currentTarget.value)}
-            description="Describe the image for accessibility."
+            description={t("taskForm.altTextHint")}
           />
           <Group justify="flex-end">
             <Button variant="default" type="button" onClick={() => setAltFile(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="button" onClick={confirmImageAlt}>
-              Insert
+              {t("taskForm.insert")}
             </Button>
           </Group>
         </Stack>
@@ -803,16 +872,16 @@ export function TaskForm({
       <Modal
         opened={pendingStopPayload !== null}
         onClose={() => setPendingStopPayload(null)}
-        title="Stop repeating?"
+        title={t("taskForm.stopRepeatingTitle")}
         size="sm"
       >
         <Stack>
           <Text size="sm">
-            This series will stop repeating. Existing tasks are kept.
+            {t("taskForm.stopRepeatingBody")}
           </Text>
           <Group justify="flex-end">
             <Button variant="default" type="button" onClick={() => setPendingStopPayload(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -828,7 +897,7 @@ export function TaskForm({
                 void submitPayload(next);
               }}
             >
-              Stop repeating
+              {t("taskForm.stopRepeating")}
             </Button>
           </Group>
         </Stack>

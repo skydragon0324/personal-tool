@@ -1,10 +1,10 @@
-"use client";
-
 import { Button, Group, Modal, Stack, Text, TextInput, Textarea } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
 import { useEffect, useState } from "react";
 
+import { DatePickerInput } from "@/lib/date-pickers";
+
 import type { PlanDayCreate, PlanCreate } from "../types";
+import { t } from "@/i18n";
 
 export function PlanFormModal({
   opened,
@@ -44,8 +44,8 @@ export function PlanFormModal({
       >
         <Stack gap="sm">
           <TextInput
-            label="Name"
-            placeholder="e.g. Learning Plan"
+            label={t("plans.name")}
+            placeholder={t("plans.namePlaceholder")}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             maxLength={120}
@@ -53,8 +53,8 @@ export function PlanFormModal({
             data-autofocus
           />
           <Textarea
-            label="Description"
-            placeholder="Optional"
+            label={t("plans.description")}
+            placeholder={t("plans.optional")}
             value={description}
             onChange={(event) => setDescription(event.currentTarget.value)}
             autosize
@@ -64,7 +64,7 @@ export function PlanFormModal({
           />
           <Group justify="flex-end" mt="xs">
             <Button variant="default" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={submitting} disabled={!trimmed}>
               {submitLabel}
@@ -118,24 +118,24 @@ export function PlanDayModal({
       >
         <Stack gap="sm">
           <DatePickerInput
-            label="Date"
+            label={t("plans.date")}
             value={day}
             onChange={setDay}
             valueFormat="dddd, MMMM D, YYYY"
             excludeDate={(value) => taken.has(value)}
-            error={clash ? "This plan already has that day" : undefined}
+            error={clash ? t("plans.dayTaken") : undefined}
             required
           />
           <TextInput
-            label="Label"
-            placeholder="Optional, e.g. Rest day"
+            label={t("plans.label")}
+            placeholder={t("plans.labelPlaceholder")}
             value={label}
             onChange={(event) => setLabel(event.currentTarget.value)}
             maxLength={120}
           />
           <Group justify="flex-end" mt="xs">
             <Button variant="default" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={submitting} disabled={!day || clash}>
               {submitLabel}
@@ -169,10 +169,10 @@ export function ConfirmDeleteDialog({
       </Text>
       <Group justify="flex-end" mt="md">
         <Button variant="default" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button color="red" onClick={onConfirm} loading={submitting}>
-          Delete
+          {t("common.delete")}
         </Button>
       </Group>
     </Modal>
