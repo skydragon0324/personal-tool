@@ -8,7 +8,7 @@ import { AssigneeAvatars } from "@/features/board/components/assignee-avatars";
 import type { BoardQueryParams, TaskSubtask } from "@/features/board/types";
 import { moveAnchors } from "@/features/board/utils/move-anchors";
 import { formatDisplayDate } from "@/lib/dates";
-import { subtaskProgressLabel, canAddSubtask, useSubtaskMutations } from "../hooks/use-subtasks";
+import { canAddSubtask, useSubtaskMutations } from "../hooks/use-subtasks";
 import { PriorityBadge } from "./priority-badge";
 import { t } from "@/i18n";
 
@@ -124,18 +124,11 @@ export function SubtaskList({
   const addDisabled = !canAddSubtask(draft, create.isPending || creatingRef.current) || !taskId;
 
   return (
-    <section className="space-y-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-3">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h3 className="font-medium text-[var(--app-text)]">{t("tasks.subtasks")}</h3>
-          <Text size="xs" c="dimmed">
-            {t("tasks.subtasksHint")}
-          </Text>
-        </div>
-        {subtasks.length ? (
-          <p className="text-xs text-[var(--app-text-muted)]">{subtaskProgressLabel(subtasks)}</p>
-        ) : null}
-      </div>
+    // The surrounding section supplies the frame, heading and progress count.
+    <div className="space-y-3">
+      <Text size="xs" c="dimmed">
+        {t("tasks.subtasksHint")}
+      </Text>
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
       {create.isPending ? <p className="text-xs text-[var(--app-text-muted)]">{t("common.saving")}</p> : null}
       {!items.length ? (
@@ -215,6 +208,6 @@ export function SubtaskList({
           {t("common.add")}
         </Button>
       </Group>
-    </section>
+    </div>
   );
 }

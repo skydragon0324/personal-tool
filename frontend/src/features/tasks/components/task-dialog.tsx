@@ -101,6 +101,10 @@ export function TaskDialog({
                   submitting={submitting}
                   onSubmit={onSubmit}
                   onCancel={requestClose}
+                  onSaved={() => {
+                    setDirty(false);
+                    onClose();
+                  }}
                   onDirtyChange={setDirty}
                   onUploadFile={onUploadFile}
                   onPatchContent={onPatchContent}

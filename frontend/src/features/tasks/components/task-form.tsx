@@ -137,6 +137,8 @@ interface TaskFormProps {
   submitting?: boolean;
   onSubmit: (payload: TaskCreate, pendingFiles: File[], existingId?: string) => Promise<TaskDetail>;
   onCancel?: () => void;
+  /** Called after a successful save; leaves the form without asking about unsaved edits. Defaults to onCancel. */
+  onSaved?: () => void;
   onUploadFile?: (taskId: string, file: File) => Promise<{ download_url: string | null }>;
   onPatchContent?: (taskId: string, content: TiptapJSON) => Promise<void>;
   onDeleteAttachment?: (attachmentId: string) => Promise<void>;
@@ -153,6 +155,7 @@ export function TaskForm({
   submitting = false,
   onSubmit,
   onCancel,
+  onSaved,
   onUploadFile,
   onPatchContent,
   onDeleteAttachment,
@@ -456,7 +459,7 @@ export function TaskForm({
           return;
         }
       }
-      onCancel?.();
+      (onSaved ?? onCancel)?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("taskForm.couldNotSave"));
     }
