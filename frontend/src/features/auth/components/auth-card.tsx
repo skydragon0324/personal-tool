@@ -1,8 +1,7 @@
-"use client";
-
 import { Paper, Text } from "@mantine/core";
 import type { ReactNode } from "react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/features/board/components/theme-toggle";
 
 export function AuthCard({
@@ -16,7 +15,8 @@ export function AuthCard({
 }) {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-[var(--app-bg)] px-4 py-10">
-      <div className="absolute right-4 top-4">
+      <div className="absolute right-4 top-4 flex items-center gap-1">
+        <LanguageSwitcher />
         <ThemeToggle />
       </div>
       <Paper

@@ -2,41 +2,41 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DashboardSummary } from "../types";
 import { BoardsDashboardPage } from "./boards-dashboard-page";
 
-const summaryQuery = vi.hoisted(() => ({
+const summaryQuery = {
   isLoading: false,
   isError: false,
   data: null as DashboardSummary | null,
-  refetch: vi.fn(),
-}));
+  refetch: jest.fn(),
+};
 
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
+  __esModule: true,
   default: ({ href, children }: { href: string; children: ReactNode }) =>
     createElement("a", { href }, children),
 }));
 
-vi.mock("@/features/shell/components/workspace-chrome", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/shell/components/workspace-chrome")>();
+jest.mock("@/features/shell/components/workspace-chrome", () => {
+  const actual = jest.requireActual<typeof import("@/features/shell/components/workspace-chrome")>("@/features/shell/components/workspace-chrome");
   return {
     ...actual,
     useWorkspaceChrome: () => ({
-      openNewBoard: vi.fn(),
-      openManageBoards: vi.fn(),
-      openSidebar: vi.fn(),
-      toggleSidebar: vi.fn(),
-      closeSidebar: vi.fn(),
+      openNewBoard: jest.fn(),
+      openManageBoards: jest.fn(),
+      openSidebar: jest.fn(),
+      toggleSidebar: jest.fn(),
+      closeSidebar: jest.fn(),
       sidebarOpened: false,
     }),
   };
 });
 
-vi.mock("./task-overview", () => ({ TaskOverview: () => null }));
+jest.mock("./task-overview", () => ({ TaskOverview: () => null }));
 
-vi.mock("../hooks/use-dashboard", () => ({
+jest.mock("../hooks/use-dashboard", () => ({
   useDashboardSummary: () => summaryQuery,
 }));
 

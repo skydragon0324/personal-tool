@@ -1,5 +1,6 @@
 import type { BoardFilters, TaskDetail, TaskSummary } from "../types";
 import { createdAtDate, dateInRange, type DateField } from "./date-presets";
+import { t } from "@/i18n";
 
 export interface DateViewState {
   startDate: string | null;
@@ -53,7 +54,7 @@ export function createSaveNotice(
 } {
   const jumpDate = taskDateValue(task, view.dateField);
   return {
-    message: `Task saved for ${task.due_date}`,
+    message: t("board.savedFor", { date: task.due_date }),
     outOfRange: !isTaskInDateView(task, view),
     hiddenByFilters: isTaskHiddenByFilters(
       {

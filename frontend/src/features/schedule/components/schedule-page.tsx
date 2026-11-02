@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Group, Loader, Modal, SegmentedControl, Text } from "@mantine/core";
 import { useEffect, useMemo, useState } from "react";
 
@@ -18,6 +16,7 @@ import {
 } from "../utils/schedule-time";
 import { ScheduleGrid } from "./schedule-grid";
 import { ScheduleModal, type SchedulePrefill } from "./schedule-modal";
+import { t } from "@/i18n";
 
 export function SchedulePage() {
   const today = todayISO();
@@ -61,7 +60,7 @@ export function SchedulePage() {
       });
       setModalOpen(false);
     } catch (error) {
-      notifyApiError(error, "Could not create schedule");
+      notifyApiError(error, t("schedule.couldNotCreate"));
     }
   }
 
@@ -77,7 +76,7 @@ export function SchedulePage() {
       setModalOpen(false);
       setEditing(null);
     } catch (error) {
-      notifyApiError(error, "Could not update schedule");
+      notifyApiError(error, t("schedule.couldNotUpdate"));
     }
   }
 
@@ -89,39 +88,39 @@ export function SchedulePage() {
       setModalOpen(false);
       setEditing(null);
     } catch (error) {
-      notifyApiError(error, "Could not delete schedule");
+      notifyApiError(error, t("schedule.couldNotDelete"));
     }
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Schedule">
+      <PageHeader title={t("shell.schedule")}>
         <SegmentedControl
           value={view}
           onChange={(value) => setView(value as ScheduleView)}
           data={[
-            { value: "day", label: "Day" },
-            { value: "week", label: "Week" },
+            { value: "day", label: t("schedule.viewDay") },
+            { value: "week", label: t("schedule.viewWeek") },
           ]}
         />
         <Button variant="default" onClick={() => setAnchor(today)}>
-          Today
+          {t("schedule.today")}
         </Button>
         <Button
           variant="default"
-          aria-label={view === "week" ? "Previous week" : "Previous day"}
+          aria-label={view === "week" ? t("schedule.previousWeek") : t("schedule.previousDay")}
           onClick={() => setAnchor((current) => shiftIso(current, view, -1))}
         >
-          Previous
+          {t("schedule.previous")}
         </Button>
         <Button
           variant="default"
-          aria-label={view === "week" ? "Next week" : "Next day"}
+          aria-label={view === "week" ? t("schedule.nextWeek") : t("schedule.nextDay")}
           onClick={() => setAnchor((current) => shiftIso(current, view, 1))}
         >
-          Next
+          {t("schedule.next")}
         </Button>
-        <Button onClick={() => openCreate()}>New schedule</Button>
+        <Button onClick={() => openCreate()}>{t("schedule.newSchedule")}</Button>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6">
@@ -132,19 +131,19 @@ export function SchedulePage() {
           ) : null}
           {scheduleQuery.isError ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Text>Could not load schedule.</Text>
+              <Text>{t("schedule.couldNotLoad")}</Text>
               <Button variant="light" onClick={() => void scheduleQuery.refetch()}>
-                Retry
+                {t("common.retry")}
               </Button>
             </div>
           ) : null}
           {empty ? (
             <div className="mb-6 flex flex-col items-center gap-3 py-8 text-center">
-              <h2 className="font-display text-2xl text-[var(--app-text)]">No schedules yet</h2>
+              <h2 className="font-display text-2xl text-[var(--app-text)]">{t("schedule.empty")}</h2>
               <Text c="dimmed" maw={420}>
-                Add a repeating routine or a one-week block by using the button or clicking an empty time slot.
+                {t("schedule.emptyHint")}
               </Text>
-              <Button onClick={() => openCreate()}>Add your first schedule</Button>
+              <Button onClick={() => openCreate()}>{t("schedule.addFirst")}</Button>
             </div>
           ) : null}
           {!scheduleQuery.isLoading && !scheduleQuery.isError ? (
@@ -186,18 +185,18 @@ export function SchedulePage() {
       <Modal
         opened={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        title="Delete this schedule?"
+        title={t("schedule.deleteTitle")}
         radius="lg"
       >
         <Text size="sm" c="dimmed">
-          “{pendingDelete?.title}” will be permanently removed.
+          {t("schedule.willBeRemoved", { title: pendingDelete?.title ?? "" })}
         </Text>
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => setPendingDelete(null)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button color="red" onClick={() => void handleDelete()} loading={mutations.remove.isPending}>
-            Delete
+            {t("common.delete")}
           </Button>
         </Group>
       </Modal>

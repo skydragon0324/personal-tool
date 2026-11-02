@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
 import { todayKeys } from "@/features/today/api/today-queries";
@@ -11,10 +10,10 @@ import type { ScheduleWeek } from "../types";
 import { scheduleKeys } from "./use-schedule";
 import { useScheduleOccurrence } from "./use-schedule-occurrence";
 
-const setScheduleOccurrence = vi.fn();
+const setScheduleOccurrence = jest.fn();
 
-vi.mock("@/lib/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api-client")>("@/lib/api-client");
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -24,8 +23,8 @@ vi.mock("@/lib/api-client", async () => {
   };
 });
 
-vi.mock("@/lib/notify", () => ({
-  notifyApiError: vi.fn(),
+jest.mock("@/lib/notify", () => ({
+  notifyApiError: jest.fn(),
 }));
 
 const weekKey = scheduleKeys.week("2026-08-17", "2026-08-20");
@@ -119,7 +118,7 @@ describe("useScheduleOccurrence", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
-    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const invalidate = jest.spyOn(client, "invalidateQueries");
     client.setQueryData(weekKey, week);
     client.setQueryData(todayKey, today);
     setScheduleOccurrence.mockResolvedValue({

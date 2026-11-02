@@ -1,11 +1,10 @@
-"use client";
-
 import { Button, ScrollArea, Text } from "@mantine/core";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/features/board/components/theme-toggle";
 import { useBoards, activeBoards } from "@/features/board/hooks/use-boards";
 import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons";
@@ -15,6 +14,7 @@ import { boardsGroupExpanded, readBoardsNavCollapsed, writeBoardsNavCollapsed } 
 import { boardIdFromPath, isBoardsIndexPath, sectionFromPath } from "../utils/navigation";
 import { NavIcon } from "./nav-icons";
 import { useWorkspaceChrome } from "./workspace-chrome";
+import { t } from "@/i18n";
 
 let savedBoardListScrollTop = 0;
 
@@ -45,10 +45,10 @@ export function AppSidebar() {
   return (
     <div className="flex h-full flex-col bg-[var(--app-surface)]">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--app-border)] px-4 py-4">
-        <p className="font-display text-lg text-[var(--app-text)]">Life Management</p>
+        <p className="font-display text-lg text-[var(--app-text)]">{t("common.appName")}</p>
         <NotificationBell />
       </div>
-      <nav aria-label="Application" className="flex min-h-0 flex-1 flex-col px-2 py-3">
+      <nav aria-label={t("shell.navigation")} className="flex min-h-0 flex-1 flex-col px-2 py-3">
         <Link
           href="/today"
           aria-current={section === "today" ? "page" : undefined}
@@ -56,7 +56,7 @@ export function AppSidebar() {
           className={`shrink-0 ${navItemClass(section === "today")}`}
         >
           <NavIcon name="today" />
-          Today
+          {t("shell.today")}
         </Link>
         <div className="mt-1 flex items-center gap-1">
           <Link
@@ -69,11 +69,11 @@ export function AppSidebar() {
             className={`flex-1 ${navItemClass(boardsParentActive)}`}
           >
             <NavIcon name="boards" />
-            Boards
+            {t("shell.boards")}
           </Link>
           <button
             type="button"
-            aria-label={expanded ? "Collapse boards" : "Expand boards"}
+            aria-label={expanded ? t("shell.collapseBoards") : t("shell.expandBoards")}
             aria-expanded={expanded}
             onClick={() => setCollapsed(expanded)}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
@@ -95,7 +95,7 @@ export function AppSidebar() {
           className={`mt-1 shrink-0 ${navItemClass(section === "plans")}`}
         >
           <NavIcon name="plans" />
-          Plans
+          {t("shell.plans")}
         </Link>
         <Link
           href="/notepad"
@@ -104,7 +104,7 @@ export function AppSidebar() {
           className={`mt-1 shrink-0 ${navItemClass(section === "notepad")}`}
         >
           <NavIcon name="notepad" />
-          Notepad
+          {t("shell.notepad")}
         </Link>
         <Link
           href="/schedule"
@@ -113,7 +113,7 @@ export function AppSidebar() {
           className={`mt-1 shrink-0 ${navItemClass(section === "schedule")}`}
         >
           <NavIcon name="schedule" />
-          Schedule
+          {t("shell.schedule")}
         </Link>
       </nav>
       <div className="border-t border-[var(--app-border)] px-3 py-3">
@@ -125,9 +125,12 @@ export function AppSidebar() {
         ) : null}
         <div className="flex items-center justify-between gap-2">
           <Button variant="subtle" color="gray" onClick={() => void logout()}>
-            Logout
+            {t("shell.logout")}
           </Button>
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </div>
@@ -179,7 +182,7 @@ function BoardList({
 
   return (
     <div
-      aria-label="Your boards"
+      aria-label={t("shell.yourBoards")}
       className="mt-1 ml-3 max-h-[min(40vh,320px)] min-h-0 shrink-0 overflow-hidden border-l border-[var(--app-border)] pl-3"
     >
       <ScrollArea className="h-full max-h-[min(40vh,320px)]" type="auto" viewportRef={viewportRef}>
@@ -208,8 +211,8 @@ function BoardList({
                 {board.role === "member" ? (
                   <span
                     className="shrink-0 text-[var(--app-text-muted)]"
-                    title={board.owner_name ? `Shared by ${board.owner_name}` : "Shared with you"}
-                    aria-label="Shared with you"
+                    title={board.owner_name ? t("shell.sharedBy", { name: board.owner_name }) : t("shell.sharedWithYou")}
+                    aria-label={t("shell.sharedWithYou")}
                   >
                     <SharedIcon />
                   </span>
@@ -219,7 +222,7 @@ function BoardList({
           })}
           {!boards.length ? (
             <Text size="xs" c="dimmed" px="xs">
-              No boards yet
+              {t("shell.noBoards")}
             </Text>
           ) : null}
         </div>

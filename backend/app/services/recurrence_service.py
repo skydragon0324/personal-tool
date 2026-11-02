@@ -9,7 +9,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Board, BoardColumn, Category, Task, TaskAssignee, TaskLink, TaskSubtask, User
+from app.models import Board, BoardColumn, Category, Task, TaskAssignee, TaskLink, User
 from app.models.task_recurrence import (
     TaskRecurrenceException,
     TaskRecurrenceLinkTemplate,
@@ -460,9 +460,23 @@ def _materialize_occurrence(
         for item in series.link_templates:
             task.links.append(TaskLink(label=item.label, url=item.url, position=item.position))
         for item in series.subtask_templates:
-            task.subtasks.append(
-                TaskSubtask(title=item.title, is_completed=False, position=item.position)
+            db.add(
+                Task(
+                    column_id=column.id,
+                    category_id=series.category_id,
+                    title=item.title[:160],
+                    start_date=occurrence,
+                    due_date=due,
+                    priority="medium",
+                    position=_next_position(db, column.id),
+                    version=1,
+                    completed_at=completed_at,
+                    content_schema_version=1,
+                    parent_task_id=task.id,
+                    subtask_position=item.position,
+                )
             )
+            db.flush()
         for user_id in series.assignee_ids or []:
             db.add(TaskAssignee(task_id=task.id, user_id=user_id))
         db.flush()
@@ -798,15 +812,17 @@ def _delete_storage_keys(storage_keys: list[str]) -> None:
         storage.delete(key)
 
 
-def _delete_task_row(db: Session, task: Task, *, delete_files: bool) -> tuple[list[str], uuid.UUID]:
-    column_id = task.column_id
-    storage_keys = [attachment.storage_key for attachment in (task.attachments or [])]
+def _delete_task_row(db: Session, task: Task, *, delete_files: bool) -> tuple[list[str], set[uuid.UUID]]:
+    """Delete a task and its sub-tasks; returns their files and the columns to renumber."""
+    removed = [task, *(task.subtasks or [])]
+    column_ids = {item.column_id for item in removed}
+    storage_keys = [attachment.storage_key for item in removed for attachment in (item.attachments or [])]
     db.delete(task)
     db.flush()
     if delete_files:
         _delete_storage_keys(storage_keys)
-        return [], column_id
-    return storage_keys, column_id
+        return [], column_ids
+    return storage_keys, column_ids
 
 
 def _add_exception(db: Session, series_id: uuid.UUID, original: date) -> None:
@@ -821,9 +837,9 @@ def _add_exception(db: Session, series_id: uuid.UUID, original: date) -> None:
 
 
 def _collect_delete(db: Session, task: Task, keys: list[str], columns: set[uuid.UUID]) -> None:
-    storage_keys, column_id = _delete_task_row(db, task, delete_files=False)
+    storage_keys, column_ids = _delete_task_row(db, task, delete_files=False)
     keys.extend(storage_keys)
-    columns.add(column_id)
+    columns |= column_ids
 
 
 def delete_with_scope(
@@ -1047,9 +1063,9 @@ def _purge_open_attached(
             continue
         if only_invalid_for is not None and _date_matches_rule(only_invalid_for, item.original_occurrence_date):
             continue
-        storage_keys, column_id = _delete_task_row(db, item, delete_files=delete_files)
+        storage_keys, column_ids = _delete_task_row(db, item, delete_files=delete_files)
         keys.extend(storage_keys)
-        columns.add(column_id)
+        columns |= column_ids
     _renumber_columns(db, columns)
     return keys
 

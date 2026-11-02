@@ -1,6 +1,4 @@
-"use client";
-
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "@/lib/navigation";
 import { useCallback } from "react";
 
 import { dispatchOpenTask } from "@/lib/open-task-event";

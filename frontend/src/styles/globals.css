@@ -1,0 +1,122 @@
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Manrope";
+  --font-display: "Fraunces";
+  --app-bg: #f6f7fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f0f3f7;
+  --app-text: #172033;
+  --app-text-muted: #65738b;
+  --app-border: #e1e7ef;
+  --app-primary: #0f766e;
+}
+
+[data-mantine-color-scheme="dark"] {
+  --app-bg: #0b1220;
+  --app-surface: #111a2b;
+  --app-surface-muted: #172236;
+  --app-text: #eaf0f7;
+  --app-text-muted: #9aa8bd;
+  --app-border: #29374d;
+  --app-primary: #2dd4bf;
+}
+
+/* Slightly denser than the 16px browser default; Tailwind and Mantine both size in rem. */
+html {
+  font-size: 15px;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
+.text-ink {
+  color: var(--app-text);
+}
+
+/*
+ * Lists in the task rich-text editor and viewer. Tailwind's base reset removes list markers,
+ * so bring back numbers and bullets, and keep each checklist checkbox on the same line as its text.
+ */
+.mantine-RichTextEditor-content .ProseMirror ul:not([data-type="taskList"]),
+.mantine-RichTextEditor-content .ProseMirror ol {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul:not([data-type="taskList"]) {
+  list-style: disc;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+  list-style: circle;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+  list-style: square;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ol {
+  list-style: decimal;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ol ol {
+  list-style: lower-alpha;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ol ol ol {
+  list-style: lower-roman;
+}
+
+.mantine-RichTextEditor-content .ProseMirror li > p {
+  margin: 0;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  margin: 0.25rem 0;
+  padding-left: 0.25rem;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul[data-type="taskList"] ul[data-type="taskList"] {
+  padding-left: 1.5rem;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul[data-type="taskList"] > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul[data-type="taskList"] > li > label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  /* Line the checkbox up with the first line of text. */
+  height: 1.55em;
+  margin: 0;
+  user-select: none;
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul[data-type="taskList"] > li > label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--app-primary);
+}
+
+.mantine-RichTextEditor-content .ProseMirror ul[data-type="taskList"] > li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}

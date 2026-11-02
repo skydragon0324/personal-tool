@@ -1,3 +1,5 @@
+import { dateLocale, t } from "@/i18n";
+
 /** Local calendar date as YYYY-MM-DD. */
 export function todayISO(): string {
   const now = new Date();
@@ -11,7 +13,7 @@ export function todayISO(): string {
 export function formatDisplayDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -27,7 +29,7 @@ export function formatRangeLabel(start: string, end: string): string {
 export function formatLongDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -37,7 +39,7 @@ export function formatLongDate(isoDate: string): string {
 export function formatDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(dateLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -49,7 +51,7 @@ export function formatDateTime(iso: string): string {
 export function formatWeekdayDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale(), {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -63,8 +65,8 @@ export function formatTaskPeriod(startDate: string, dueDate: string): string {
 }
 
 export function greetingForName(name: string, hour = new Date().getHours()): string {
-  const display = name.trim() || "there";
-  if (hour < 12) return `Good morning, ${display}`;
-  if (hour < 17) return `Good afternoon, ${display}`;
-  return `Good evening, ${display}`;
+  const display = name.trim() || t("dates.greetingFallbackName");
+  if (hour < 12) return t("dates.goodMorning", { name: display });
+  if (hour < 17) return t("dates.goodAfternoon", { name: display });
+  return t("dates.goodEvening", { name: display });
 }

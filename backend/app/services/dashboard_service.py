@@ -4,9 +4,9 @@ import uuid
 from datetime import date
 
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
-from app.models import Board, BoardColumn, Category, Task, TaskSubtask, User
+from app.models import Board, BoardColumn, Category, Task, User
 from app.services.ownership import board_access
 from app.schemas.dashboard import (
     DashboardAttention,
@@ -69,7 +69,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
                     BoardColumn.archived_at.is_(None),
                 ),
             )
-            .outerjoin(Task, Task.column_id == BoardColumn.id)
+            .outerjoin(Task, and_(Task.column_id == BoardColumn.id, Task.parent_task_id.is_(None)))
             .where(board_access(user_id), Board.archived_at.is_(None))
             .group_by(Board.id)
         ).all()
@@ -96,6 +96,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
                 board_access(user_id),
                 Board.archived_at.is_(None),
                 BoardColumn.archived_at.is_(None),
+                Task.parent_task_id.is_(None),
             )
             .group_by(Task.priority)
         ).all()
@@ -123,6 +124,7 @@ def get_dashboard_summary(db: Session, user_id: uuid.UUID, today: date) -> Dashb
                 BoardColumn.archived_at.is_(None),
                 BoardColumn.is_done.is_(False),
                 due_filter,
+                Task.parent_task_id.is_(None),
             )
             .order_by(
                 Task.due_date,
@@ -215,13 +217,15 @@ def list_tasks(
     ``state`` is "open", "done" or "all". Filtering by assignee, priority and text happens on the
     client, which keeps this endpoint simple and the table responsive.
     """
+    child = aliased(Task)
     subtasks = (
         select(
-            TaskSubtask.task_id.label("task_id"),
-            func.count(TaskSubtask.id).label("total"),
-            func.count(TaskSubtask.id).filter(TaskSubtask.is_completed.is_(True)).label("done"),
+            child.parent_task_id.label("task_id"),
+            func.count(child.id).label("total"),
+            func.count(child.id).filter(child.completed_at.is_not(None)).label("done"),
         )
-        .group_by(TaskSubtask.task_id)
+        .where(child.parent_task_id.is_not(None))
+        .group_by(child.parent_task_id)
         .subquery()
     )
     query = (
@@ -230,7 +234,12 @@ def list_tasks(
         .join(Board, Board.id == BoardColumn.board_id)
         .join(Category, Category.id == Task.category_id)
         .outerjoin(subtasks, subtasks.c.task_id == Task.id)
-        .where(board_access(user_id), Board.archived_at.is_(None), BoardColumn.archived_at.is_(None))
+        .where(
+            board_access(user_id),
+            Board.archived_at.is_(None),
+            BoardColumn.archived_at.is_(None),
+            Task.parent_task_id.is_(None),
+        )
         .order_by(Task.due_date, Task.title)
     )
     if state == "open":

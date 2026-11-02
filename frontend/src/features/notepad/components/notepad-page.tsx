@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Group, Loader, SegmentedControl, Select, Text, TextInput } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useEffect, useMemo, useState } from "react";
@@ -12,15 +10,18 @@ import type { Note, NoteCreate, NotePriority, NoteUpdate } from "../types";
 import { readNotepadView, writeNotepadView, type NotepadView } from "../utils/notepad-view";
 import { DeleteNoteDialog } from "./delete-note-dialog";
 import { NoteCard } from "./note-card";
-import { NoteDrawer } from "./note-drawer";
+import { NoteModal } from "./note-modal";
 import { NoteTable } from "./note-table";
+import { t } from "@/i18n";
 
-const PRIORITY_FILTERS = [
-  { value: "all", label: "All priorities" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
+function priorityFilters() {
+  return [
+    { value: "all", label: t("notes.allPriorities") },
+    { value: "high", label: t("task.priorityHigh") },
+    { value: "medium", label: t("task.priorityMedium") },
+    { value: "low", label: t("task.priorityLow") },
+  ];
+}
 
 export function NotepadPage() {
   const [search, setSearch] = useState("");
@@ -28,7 +29,7 @@ export function NotepadPage() {
   const [priority, setPriority] = useState<NotePriority | "all">("all");
   const [view, setView] = useState<NotepadView>("cards");
   const [viewReady, setViewReady] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Note | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
 
@@ -60,31 +61,31 @@ export function NotepadPage() {
 
   function openCreate() {
     setEditing(null);
-    setDrawerOpen(true);
+    setEditorOpen(true);
   }
 
   function openEdit(note: Note) {
     setEditing(note);
-    setDrawerOpen(true);
+    setEditorOpen(true);
   }
 
   async function handleCreate(payload: NoteCreate) {
     try {
       await mutations.create.mutateAsync(payload);
-      setDrawerOpen(false);
+      setEditorOpen(false);
       setEditing(null);
     } catch (error) {
-      notifyApiError(error, "Could not create note");
+      notifyApiError(error, t("notes.couldNotCreate"));
     }
   }
 
   async function handleUpdate(noteId: string, payload: NoteUpdate) {
     try {
       await mutations.update.mutateAsync({ noteId, payload });
-      setDrawerOpen(false);
+      setEditorOpen(false);
       setEditing(null);
     } catch (error) {
-      notifyApiError(error, "Could not update note");
+      notifyApiError(error, t("notes.couldNotUpdate"));
     }
   }
 
@@ -98,45 +99,45 @@ export function NotepadPage() {
     try {
       await mutations.remove.mutateAsync(pendingDelete.id);
       if (editing?.id === pendingDelete.id) {
-        setDrawerOpen(false);
+        setEditorOpen(false);
         setEditing(null);
       }
       setPendingDelete(null);
     } catch (error) {
-      notifyApiError(error, "Could not delete note");
+      notifyApiError(error, t("notes.couldNotDelete"));
     }
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Notepad">
+      <PageHeader title={t("shell.notepad")}>
         {viewReady ? (
           <SegmentedControl
             value={view}
             onChange={(value) => changeView(value as NotepadView)}
             data={[
-              { value: "cards", label: "Cards" },
-              { value: "table", label: "Table" },
+              { value: "cards", label: t("notes.cards") },
+              { value: "table", label: t("notes.table") },
             ]}
           />
         ) : (
           <div className="h-9 w-[148px]" />
         )}
-        <Button onClick={openCreate}>New note</Button>
+        <Button onClick={openCreate}>{t("notes.newNote")}</Button>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             <TextInput
               className="min-w-[16rem] flex-1"
-              placeholder="Search"
+              placeholder={t("notes.search")}
               value={search}
               onChange={(event) => setSearch(event.currentTarget.value)}
-              aria-label="Search notes"
+              aria-label={t("notes.searchLabel")}
             />
             <Select
-              aria-label="Priority filter"
-              data={PRIORITY_FILTERS}
+              aria-label={t("notes.priorityFilter")}
+              data={priorityFilters()}
               value={priority}
               onChange={(value) => setPriority((value as NotePriority | "all") || "all")}
               allowDeselect={false}
@@ -150,24 +151,24 @@ export function NotepadPage() {
           ) : null}
           {notesQuery.isError ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Text>Could not load notes.</Text>
+              <Text>{t("notes.couldNotLoad")}</Text>
               <Button variant="light" onClick={() => void notesQuery.refetch()}>
-                Retry
+                {t("common.retry")}
               </Button>
             </div>
           ) : null}
           {empty ? (
             <div className="flex flex-col items-center gap-3 py-20 text-center">
-              <h2 className="font-display text-2xl text-[var(--app-text)]">No notes yet</h2>
+              <h2 className="font-display text-2xl text-[var(--app-text)]">{t("notes.noNotes")}</h2>
               <Text c="dimmed" maw={420}>
-                Capture ideas, information, and anything you want to remember.
+                {t("notes.noNotesHint")}
               </Text>
-              <Button onClick={openCreate}>Create note</Button>
+              <Button onClick={openCreate}>{t("notes.createNote")}</Button>
             </div>
           ) : null}
           {!notesQuery.isLoading && !notesQuery.isError && !empty && notes.length === 0 ? (
             <Text c="dimmed" py="xl" ta="center">
-              No matching notes.
+              {t("notes.noMatches")}
             </Text>
           ) : null}
           {!empty && notes.length > 0 && view === "cards" ? (
@@ -196,12 +197,12 @@ export function NotepadPage() {
         </div>
       </div>
 
-      <NoteDrawer
-        opened={drawerOpen}
+      <NoteModal
+        opened={editorOpen}
         note={editing}
         submitting={mutations.create.isPending || mutations.update.isPending}
         onClose={() => {
-          setDrawerOpen(false);
+          setEditorOpen(false);
           setEditing(null);
         }}
         onCreate={handleCreate}

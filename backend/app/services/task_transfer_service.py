@@ -19,11 +19,11 @@ from app.models import (
     Task,
     TaskAttachment,
     TaskLink,
-    TaskSubtask,
 )
 from app.schemas.task import TaskDetailRead, TaskMoveToBoard
 from app.services.ownership import get_board_for_user, get_task_for_user
 from app.services.storage import get_storage
+from app.services.task_ordering_service import renumber_columns
 from app.services.task_serializers import to_detail
 
 COPY_SUFFIX = " (copy)"
@@ -45,11 +45,53 @@ def _copy_content(content: dict | None, url_map: dict[str, str]) -> dict | None:
     return json.loads(raw)
 
 
+def _copy_attached(db: Session, original: Task, copy_task: Task, new_keys: list[str]) -> None:
+    """Copy files, rich content (pointing inline images at the copied files) and links."""
+    storage = get_storage()
+    url_map: dict[str, str] = {}
+
+    # Read children straight from the database rather than possibly stale relationships.
+    def children(model):
+        return db.scalars(select(model).where(model.task_id == original.id).order_by(model.created_at)).all()
+
+    for attachment in children(TaskAttachment):
+        data = storage.open(attachment.storage_key).read_bytes()
+        key, kind, size = storage.save(
+            original_name=attachment.original_name,
+            content_type=attachment.content_type,
+            data=data,
+        )
+        new_keys.append(key)
+        copied = TaskAttachment(
+            id=uuid.uuid4(),
+            task_id=copy_task.id,
+            original_name=attachment.original_name,
+            storage_key=key,
+            content_type=attachment.content_type,
+            size_bytes=size,
+            attachment_kind=kind,
+        )
+        db.add(copied)
+        url_map[_attachment_path(original.id, attachment.id)] = _attachment_path(copy_task.id, copied.id)
+
+    copy_task.content = _copy_content(original.content, url_map)
+    copy_task.content_text = original.content_text
+    for link in children(TaskLink):
+        db.add(TaskLink(task_id=copy_task.id, label=link.label, url=link.url, position=link.position))
+
+
+def _next_position(db: Session, column_id: uuid.UUID) -> int:
+    max_pos = db.scalar(
+        select(func.coalesce(func.max(Task.position), -1)).where(Task.column_id == column_id)
+    )
+    return int(max_pos if max_pos is not None else -1) + 1
+
+
 def duplicate_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskDetailRead:
     """Copy a task with its content, links, sub-tasks and files, right below the original.
 
     The copy is a standalone task: it is not assigned to anyone, has no reminder and does not
-    repeat, even when the original does.
+    repeat, even when the original does. Copying a sub-task adds a sibling under the same parent.
     """
     original = get_task_for_user(db, user_id, task_id, with_details=True)
     column = db.get(BoardColumn, original.column_id)
@@ -65,6 +107,14 @@ def duplicate_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskD
     title = original.title
     if len(title) + len(COPY_SUFFIX) <= 160:
         title += COPY_SUFFIX
+    subtask_position = None
+    if original.parent_task_id is not None:
+        last = db.scalar(
+            select(func.coalesce(func.max(Task.subtask_position), -1)).where(
+                Task.parent_task_id == original.parent_task_id
+            )
+        )
+        subtask_position = int(last if last is not None else -1) + 1
     duplicate = Task(
         id=uuid.uuid4(),
         column_id=original.column_id,
@@ -78,57 +128,40 @@ def duplicate_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskD
         version=1,
         completed_at=now if column.is_done else None,
         content_schema_version=original.content_schema_version,
+        parent_task_id=original.parent_task_id,
+        subtask_position=subtask_position,
     )
     db.add(duplicate)
     db.flush()
 
-    storage = get_storage()
     new_keys: list[str] = []
-    url_map: dict[str, str] = {}
     try:
-        # Read children straight from the database rather than possibly stale relationships.
-        def children(model):
-            return db.scalars(select(model).where(model.task_id == original.id).order_by(model.created_at)).all()
-
-        for attachment in children(TaskAttachment):
-            data = storage.open(attachment.storage_key).read_bytes()
-            key, kind, size = storage.save(
-                original_name=attachment.original_name,
-                content_type=attachment.content_type,
-                data=data,
-            )
-            new_keys.append(key)
-            copied = TaskAttachment(
+        _copy_attached(db, original, duplicate, new_keys)
+        for subtask in list(original.subtasks):
+            sub_copy = Task(
                 id=uuid.uuid4(),
-                task_id=duplicate.id,
-                original_name=attachment.original_name,
-                storage_key=key,
-                content_type=attachment.content_type,
-                size_bytes=size,
-                attachment_kind=kind,
+                column_id=subtask.column_id,
+                category_id=subtask.category_id,
+                title=subtask.title,
+                description=subtask.description,
+                start_date=subtask.start_date,
+                due_date=subtask.due_date,
+                priority=subtask.priority,
+                position=_next_position(db, subtask.column_id),
+                version=1,
+                completed_at=subtask.completed_at,
+                content_schema_version=subtask.content_schema_version,
+                parent_task_id=duplicate.id,
+                subtask_position=subtask.subtask_position,
             )
-            db.add(copied)
-            url_map[_attachment_path(original.id, attachment.id)] = _attachment_path(duplicate.id, copied.id)
-
-        duplicate.content = _copy_content(original.content, url_map)
-        duplicate.content_text = original.content_text
-        for link in children(TaskLink):
-            db.add(
-                TaskLink(task_id=duplicate.id, label=link.label, url=link.url, position=link.position)
-            )
-        for subtask in children(TaskSubtask):
-            db.add(
-                TaskSubtask(
-                    task_id=duplicate.id,
-                    title=subtask.title,
-                    is_completed=subtask.is_completed,
-                    position=subtask.position,
-                )
-            )
+            db.add(sub_copy)
+            db.flush()
+            _copy_attached(db, subtask, sub_copy, new_keys)
         db.commit()
         db.expire(duplicate)
     except Exception:
         db.rollback()
+        storage = get_storage()
         for key in new_keys:
             storage.delete(key)
         raise
@@ -203,6 +236,11 @@ def move_to_board(
             status_code=status.HTTP_409_CONFLICT,
             detail="Task version is stale; refresh and try again",
         )
+    if task.parent_task_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Move the parent task to move its sub-tasks",
+        )
     source_column = db.get(BoardColumn, task.column_id)
     assert source_column is not None
     target_board = get_board_for_user(db, user_id, payload.board_id)
@@ -259,5 +297,51 @@ def move_to_board(
     db.execute(
         update(Notification).where(Notification.task_id == task.id).values(board_id=target_board.id)
     )
+    _move_subtasks(db, task, target_board, target_column, allowed, now)
     db.commit()
     return to_detail(get_task_for_user(db, user_id, task.id, with_details=True))
+
+
+def _move_subtasks(
+    db: Session,
+    parent: Task,
+    board: Board,
+    parent_column: BoardColumn,
+    allowed: set[uuid.UUID],
+    now: datetime,
+) -> None:
+    """Bring a moved task's sub-tasks along: done ones to the first done status, the rest open."""
+    subtasks = list(parent.subtasks)
+    if not subtasks:
+        return
+    columns = list(
+        db.scalars(
+            select(BoardColumn)
+            .where(BoardColumn.board_id == board.id, BoardColumn.archived_at.is_(None))
+            .order_by(BoardColumn.position)
+        ).all()
+    )
+    done_column = next((column for column in columns if column.is_done), None)
+    open_column = (
+        parent_column
+        if not parent_column.is_done
+        else next((column for column in columns if not column.is_done), parent_column)
+    )
+    old_columns = {item.column_id for item in subtasks}
+    for child in subtasks:
+        target = done_column if child.completed_at is not None and done_column else open_column
+        child.category = _matching_category(db, child.category, board.id)
+        child.assignees = [user for user in child.assignees if user.id in allowed]
+        child.column_id = target.id
+        child.position = _next_position(db, target.id)
+        db.flush()
+        if target.is_done:
+            child.completed_at = child.completed_at or now
+        else:
+            child.completed_at = None
+        child.version += 1
+        child.updated_at = now
+        db.execute(
+            update(Notification).where(Notification.task_id == child.id).values(board_id=board.id)
+        )
+    renumber_columns(db, old_columns)

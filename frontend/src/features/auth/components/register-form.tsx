@@ -1,5 +1,3 @@
-"use client";
-
 import { Anchor, Button, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
 import Link from "next/link";
 import { useState } from "react";
@@ -14,6 +12,7 @@ import {
   validatePassword,
 } from "@/features/auth/utils/validation";
 import { ApiError } from "@/lib/api-client";
+import { t } from "@/i18n";
 
 export function RegisterForm() {
   const { register } = useAuth();
@@ -49,7 +48,7 @@ export function RegisterForm() {
         timezone: browserTimezone(),
       });
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Could not create your account";
+      const message = error instanceof ApiError ? error.message : t("auth.couldNotRegister");
       setErrors({ form: message });
     } finally {
       setSubmitting(false);
@@ -57,18 +56,18 @@ export function RegisterForm() {
   }
 
   return (
-    <AuthCard title="Create your workspace" subtitle="Register to keep boards, notes, and schedules private.">
+    <AuthCard title={t("auth.createWorkspace")} subtitle={t("auth.registerSubtitle")}>
       <form onSubmit={handleSubmit}>
         <Stack gap="md">
           <TextInput
-            label="Name"
+            label={t("auth.name")}
             autoComplete="name"
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             error={errors.name}
           />
           <TextInput
-            label="Email"
+            label={t("auth.email")}
             type="email"
             autoComplete="email"
             value={email}
@@ -76,14 +75,14 @@ export function RegisterForm() {
             error={errors.email}
           />
           <PasswordInput
-            label="Password"
+            label={t("auth.password")}
             autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.currentTarget.value)}
             error={errors.password}
           />
           <PasswordInput
-            label="Confirm password"
+            label={t("auth.confirmPassword")}
             autoComplete="new-password"
             value={confirm}
             onChange={(event) => setConfirm(event.currentTarget.value)}
@@ -95,12 +94,12 @@ export function RegisterForm() {
             </Text>
           ) : null}
           <Button type="submit" loading={submitting}>
-            Create account
+            {t("auth.createAccount")}
           </Button>
           <Text size="sm" c="dimmed">
-            Already have an account?{" "}
+            {t("auth.haveAccount")}{" "}
             <Anchor component={Link} href="/login">
-              Sign in
+              {t("auth.signIn")}
             </Anchor>
           </Text>
         </Stack>

@@ -1,14 +1,13 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 const SRC = join(__dirname, "../../..");
 
 describe("auth routes", () => {
   it("does not render the workspace sidebar on login or register", () => {
-    const login = readFileSync(join(SRC, "app/login/page.tsx"), "utf8");
-    const register = readFileSync(join(SRC, "app/register/page.tsx"), "utf8");
-    const rootLayout = readFileSync(join(SRC, "app/layout.tsx"), "utf8");
+    const login = readFileSync(join(SRC, "pages/login.tsx"), "utf8");
+    const register = readFileSync(join(SRC, "pages/register.tsx"), "utf8");
+    const rootLayout = readFileSync(join(SRC, "pages/_app.tsx"), "utf8");
     expect(login).toContain("LoginForm");
     expect(login).toContain("GuestOnly");
     expect(login).not.toContain("LifeManagementShell");
@@ -19,7 +18,7 @@ describe("auth routes", () => {
   });
 
   it("protects workspace routes with the authenticated shell", () => {
-    const workspace = readFileSync(join(SRC, "app/(workspace)/layout.tsx"), "utf8");
+    const workspace = readFileSync(join(SRC, "features/shell/components/workspace-layout.tsx"), "utf8");
     expect(workspace).toContain("LifeManagementShell");
     expect(workspace).toContain("WorkspaceLoadingScreen");
     expect(workspace).toContain('router.replace("/login")');

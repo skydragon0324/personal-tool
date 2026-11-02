@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { isOccurrenceCompleted, occurrenceKey } from "./occurrence-state";
 
 describe("occurrence state helpers", () => {

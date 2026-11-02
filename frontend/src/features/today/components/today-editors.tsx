@@ -1,15 +1,13 @@
-"use client";
-
 import { Button, Group, Modal, Text } from "@mantine/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { TaskDetailDrawer } from "@/features/tasks/components/task-detail-drawer";
+import { TaskDetailModal } from "@/features/tasks/components/task-detail-modal";
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
 import { RecurrenceScopeDialog } from "@/features/tasks/components/recurrence-scope-dialog";
 import { useColumns } from "@/features/board/hooks/use-columns";
 import { useTaskMutations } from "@/features/board/hooks/use-task-mutations";
 import type { BoardColumn, BoardQueryParams, TaskCreate, TaskDetail } from "@/features/board/types";
-import { NoteDrawer } from "@/features/notepad/components/note-drawer";
+import { NoteModal } from "@/features/notepad/components/note-modal";
 import { DeleteNoteDialog } from "@/features/notepad/components/delete-note-dialog";
 import { useNoteMutations } from "@/features/notepad/hooks/use-notes";
 import type { Note, NoteCreate, NoteUpdate } from "@/features/notepad/types";
@@ -22,8 +20,9 @@ import { todayISO } from "@/lib/dates";
 import { notifyApiError } from "@/lib/notify";
 
 import type { TodaySchedule } from "../types";
+import { t } from "@/i18n";
 
-export function TodayTaskDrawer({
+export function TodayTaskModal({
   taskId,
   boardId,
   onClose,
@@ -42,13 +41,20 @@ export function TodayTaskDrawer({
   };
   const columnsQuery = useColumns(boardId ?? "", false);
   const { update, remove, stopRecurrence, uploadAttachment, deleteAttachment } = useTaskMutations(query);
+  // The task on screen: the one Today opened, or one of its sub-tasks (or back to the parent).
+  const [openId, setOpenId] = useState(taskId);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [deleting, setDeleting] = useState<{
     id: string;
     title: string;
     repeating?: boolean;
     completed?: boolean;
+    parentId?: string | null;
   } | null>(null);
+
+  useEffect(() => {
+    setOpenId(taskId);
+  }, [taskId]);
 
   const columns: BoardColumn[] = useMemo(
     () =>
@@ -59,9 +65,16 @@ export function TodayTaskDrawer({
     [columnsQuery.data],
   );
 
+  function finishDelete(parentId?: string | null) {
+    setDeleting(null);
+    // A deleted sub-task returns to its parent; anything else closes the modal.
+    if (parentId) setOpenId(parentId);
+    else onClose();
+  }
+
   async function handleSubmit(payload: TaskCreate, pendingFiles: File[], existingId?: string): Promise<TaskDetail> {
-    const taskIdToUse = existingId ?? taskId;
-    if (!taskIdToUse) throw new Error("Task is not loaded");
+    const taskIdToUse = existingId ?? openId;
+    if (!taskIdToUse) throw new Error(t("boardPage.taskNotLoaded"));
     const saved = await update.mutateAsync({
       taskId: taskIdToUse,
       payload: {
@@ -87,8 +100,8 @@ export function TodayTaskDrawer({
 
   return (
     <>
-      <TaskDetailDrawer
-        taskId={taskId}
+      <TaskDetailModal
+        taskId={openId}
         mode={mode}
         boardId={boardId ?? ""}
         query={query}
@@ -99,14 +112,15 @@ export function TodayTaskDrawer({
           setMode("view");
           onClose();
         }}
+        onOpenTask={setOpenId}
         onSubmit={handleSubmit}
         onUploadFile={(id, file) => uploadAttachment.mutateAsync({ taskId: id, file })}
         onPatchContent={async (id, content) => {
           await update.mutateAsync({ taskId: id, payload: { content } });
         }}
         onDeleteAttachment={(attachmentId) => {
-          if (!taskId) return Promise.resolve();
-          return deleteAttachment.mutateAsync({ taskId, attachmentId });
+          if (!openId) return Promise.resolve();
+          return deleteAttachment.mutateAsync({ taskId: openId, attachmentId });
         }}
         onDelete={(id, title, meta) =>
           setDeleting({
@@ -114,6 +128,7 @@ export function TodayTaskDrawer({
             title,
             repeating: Boolean(meta?.repeating),
             completed: Boolean(meta?.completed),
+            parentId: meta?.parentId ?? null,
           })
         }
         onStopRepeat={async (seriesId) => {
@@ -136,11 +151,10 @@ export function TodayTaskDrawer({
                 confirmCompleted: Boolean(confirmCompleted || deleting.completed),
               });
             } catch (error) {
-              notifyApiError(error, "Could not delete the task");
+              notifyApiError(error, t("boardPage.couldNotDelete"));
               return;
             }
-            setDeleting(null);
-            onClose();
+            finishDelete(deleting.parentId);
           }}
         />
       ) : (
@@ -154,11 +168,10 @@ export function TodayTaskDrawer({
             try {
               await remove.mutateAsync({ taskId: deleting.id });
             } catch (error) {
-              notifyApiError(error, "Could not delete the task");
+              notifyApiError(error, t("boardPage.couldNotDelete"));
               return;
             }
-            setDeleting(null);
-            onClose();
+            finishDelete(deleting.parentId);
           }}
         />
       )}
@@ -166,7 +179,7 @@ export function TodayTaskDrawer({
   );
 }
 
-export function TodayNoteDrawer({
+export function TodayNoteModal({
   note,
   onClose,
 }: {
@@ -188,7 +201,7 @@ export function TodayNoteDrawer({
 
   return (
     <>
-      <NoteDrawer
+      <NoteModal
         opened={note !== null}
         note={note}
         submitting={mutations.create.isPending || mutations.update.isPending}
@@ -206,7 +219,7 @@ export function TodayNoteDrawer({
           try {
             await mutations.remove.mutateAsync(pendingDelete.id);
           } catch (error) {
-            notifyApiError(error, "Could not delete note");
+            notifyApiError(error, t("notes.couldNotDelete"));
             return;
           }
           setPendingDelete(null);
@@ -263,7 +276,7 @@ export function TodayScheduleEditor({
     try {
       await mutations.remove.mutateAsync(pendingDelete.id);
     } catch (error) {
-      notifyApiError(error, "Could not delete schedule");
+      notifyApiError(error, t("schedule.couldNotDelete"));
       return;
     }
     setPendingDelete(null);
@@ -285,18 +298,18 @@ export function TodayScheduleEditor({
       <Modal
         opened={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        title="Delete this schedule?"
+        title={t("schedule.deleteTitle")}
         radius="lg"
       >
         <Text size="sm" c="dimmed">
-          “{pendingDelete?.title}” will be permanently removed.
+          {t("schedule.willBeRemoved", { title: pendingDelete?.title ?? "" })}
         </Text>
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => setPendingDelete(null)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button color="red" onClick={() => void handleDelete()} loading={mutations.remove.isPending}>
-            Delete
+            {t("common.delete")}
           </Button>
         </Group>
       </Modal>

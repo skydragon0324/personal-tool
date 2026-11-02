@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { isViewMode } from "./view-mode";
 
 describe("view mode", () => {

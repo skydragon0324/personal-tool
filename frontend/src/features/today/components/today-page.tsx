@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Loader, Text } from "@mantine/core";
 import { useEffect, useState } from "react";
 
@@ -14,11 +12,12 @@ import { useScheduleOccurrence } from "@/features/schedule/hooks/use-schedule-oc
 
 import { useToday } from "../hooks/use-today";
 import type { TodayPinnedNote, TodaySchedule, TodayTask } from "../types";
-import { loadNote, TodayNoteDrawer, TodayScheduleEditor, TodayTaskDrawer } from "./today-editors";
+import { loadNote, TodayNoteModal, TodayScheduleEditor, TodayTaskModal } from "./today-editors";
 import { TodayNotesSection } from "./today-notes-section";
 import { TodaySummaryStrip } from "./today-progress";
 import { TodayScheduleSection } from "./today-schedule-section";
 import { TodayTasksSection } from "./today-tasks-section";
+import { t } from "@/i18n";
 
 export function TodayPage() {
   const date = todayISO();
@@ -42,7 +41,7 @@ export function TodayPage() {
     try {
       setOpenNote(await loadNote(note.id));
     } catch (error) {
-      notifyApiError(error, "Could not load note");
+      notifyApiError(error, t("today.couldNotLoadNote"));
     }
   }
 
@@ -52,7 +51,7 @@ export function TodayPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)]">
-      <PageHeader title="Today">
+      <PageHeader title={t("shell.today")}>
         <Text size="sm" c="dimmed">
           {formatWeekdayDate(date)}
         </Text>
@@ -60,7 +59,7 @@ export function TodayPage() {
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
           <p className="text-sm text-[var(--app-text-muted)]">
-            Your tasks, schedule, and pinned notes for today.
+            {t("today.intro")}
           </p>
           {todayQuery.isLoading ? (
             <div className="flex justify-center py-16">
@@ -69,9 +68,9 @@ export function TodayPage() {
           ) : null}
           {todayQuery.isError && !todayQuery.isLoading ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Text>Could not load today.</Text>
+              <Text>{t("today.couldNotLoad")}</Text>
               <Button variant="light" onClick={() => void todayQuery.refetch()}>
-                Retry
+                {t("common.retry")}
               </Button>
             </div>
           ) : null}
@@ -83,7 +82,7 @@ export function TodayPage() {
                 tasks={data.task_progress}
                 schedule={data.schedule_progress}
               />
-              <DashboardGrid label="Today dashboard">
+              <DashboardGrid label={t("today.gridLabel")}>
                 <TodayScheduleSection
                   date={data.date}
                   schedules={data.schedules}
@@ -92,19 +91,19 @@ export function TodayPage() {
                   onOpen={setOpenSchedule}
                 />
                 <TodayTasksSection
-                  title="Active tasks"
-                  description="Tasks whose active period includes today"
-                  emptyText="No tasks are scheduled for today."
+                  title={t("today.activeTasks")}
+                  description={t("today.activeTasksHint")}
+                  emptyText={t("today.noActiveTasks")}
                   emptyActionHref="/boards"
-                  emptyActionLabel="Open boards"
+                  emptyActionLabel={t("today.openBoards")}
                   icon="boards"
                   tasks={data.active_tasks}
                   onOpen={setOpenTask}
                 />
                 <TodayTasksSection
-                  title="Needs attention"
-                  description="Unfinished tasks past their due date"
-                  emptyText="You're all caught up."
+                  title={t("today.needsAttention")}
+                  description={t("today.needsAttentionHint")}
+                  emptyText={t("today.allCaughtUp")}
                   icon="today"
                   tasks={data.overdue_tasks}
                   onOpen={setOpenTask}
@@ -119,12 +118,12 @@ export function TodayPage() {
           ) : null}
         </div>
       </div>
-      <TodayTaskDrawer
+      <TodayTaskModal
         taskId={openTask?.id ?? null}
         boardId={openTask?.board_id ?? null}
         onClose={() => setOpenTask(null)}
       />
-      <TodayNoteDrawer note={openNote} onClose={() => setOpenNote(null)} />
+      <TodayNoteModal note={openNote} onClose={() => setOpenNote(null)} />
       <TodayScheduleEditor
         entry={openSchedule}
         weekStart={mondayOf(date)}

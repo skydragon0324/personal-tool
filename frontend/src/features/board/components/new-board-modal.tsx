@@ -1,5 +1,3 @@
-"use client";
-
 import { move } from "@dnd-kit/helpers";
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { DragDropProvider } from "@dnd-kit/react";
@@ -7,15 +5,16 @@ import { useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { Button, Checkbox, Group, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 
 import { ApiError } from "@/lib/api-client";
 import { notifyApiError, notifySuccess } from "@/lib/notify";
 import { useBoardMutations } from "../hooks/use-boards";
 import type { BoardStatusSeed } from "../types";
-import { BOARD_COLORS, BOARD_ICONS, BoardGlyph, boardColorClass } from "../utils/board-icons";
+import { BOARD_COLORS, BOARD_ICONS, BoardGlyph, boardColorClass, boardIconLabel } from "../utils/board-icons";
 import { writeLastBoardId } from "../utils/last-board";
 import { STATUS_COLORS, statusHeaderClass } from "../utils/status-colors";
+import { colorName, t } from "@/i18n";
 
 interface NewBoardModalProps {
   opened: boolean;
@@ -39,19 +38,19 @@ function browserTimezone(): string {
 
 function defaultStatuses(): DraftStatus[] {
   return [
-    { key: "todo", name: "To Do", color: "slate", is_done: false },
-    { key: "progress", name: "In Progress", color: "blue", is_done: false },
-    { key: "done", name: "Done", color: "teal", is_done: true },
+    { key: "todo", name: t("boards.defaultTodo"), color: "slate", is_done: false },
+    { key: "progress", name: t("boards.defaultInProgress"), color: "blue", is_done: false },
+    { key: "done", name: t("boards.defaultDone"), color: "teal", is_done: true },
   ];
 }
 
 function validateStatuses(items: DraftStatus[]): string | null {
-  if (items.length < 1) return "Add at least one status";
-  if (items.length > 20) return "A board can have at most 20 statuses";
-  if (items.some((item) => !item.name.trim())) return "Status names cannot be empty";
+  if (items.length < 1) return t("boards.needOneStatus");
+  if (items.length > 20) return t("boards.tooManyStatuses");
+  if (items.some((item) => !item.name.trim())) return t("boards.emptyStatusName");
   const names = items.map((item) => item.name.trim().toLowerCase());
-  if (new Set(names).size !== names.length) return "Status names must be unique";
-  if (!items.some((item) => item.is_done)) return "Add at least one completed status";
+  if (new Set(names).size !== names.length) return t("boards.uniqueStatusNames");
+  if (!items.some((item) => item.is_done)) return t("boards.needCompletedStatus");
   return null;
 }
 
@@ -83,14 +82,14 @@ function SortableDraftStatus({
           type="button"
           ref={handleRef}
           className="mt-1 cursor-grab rounded-md border border-[var(--app-border)] px-2 py-1 text-[var(--app-text-muted)]"
-          aria-label={`Reorder ${status.name || "status"}`}
+          aria-label={t("boards.reorderStatus", { name: status.name || t("boards.statusFallback") })}
         >
           ⋮⋮
         </button>
         <div className={`mt-1 h-8 w-1.5 rounded-full ${statusHeaderClass(status.color)}`} />
         <div className="min-w-0 flex-1 space-y-2">
           <TextInput
-            label="Name"
+            label={t("boards.name")}
             value={status.name}
             onChange={(event) => onChange({ name: event.currentTarget.value })}
           />
@@ -103,17 +102,17 @@ function SortableDraftStatus({
                   status.color === color ? "ring-2 ring-[var(--app-primary)] ring-offset-2" : ""
                 }`}
                 onClick={() => onChange({ color })}
-                aria-label={color}
+                aria-label={colorName(color)}
               />
             ))}
           </Group>
           <Checkbox
-            label="Counts as completed"
+            label={t("status.countsAsCompleted")}
             checked={status.is_done}
             onChange={(event) => onChange({ is_done: event.currentTarget.checked })}
           />
           <Button size="xs" color="red" variant="light" onClick={onRemove} disabled={!canRemove}>
-            Remove
+            {t("boards.remove")}
           </Button>
         </div>
       </div>
@@ -173,16 +172,16 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
         statuses: payloadStatuses,
       });
       writeLastBoardId(created.id, window.localStorage);
-      notifySuccess(`Created ${created.name}`);
+      notifySuccess(t("boards.created", { name: created.name }));
       reset();
       onClose();
       router.push(`/boards/${created.id}`);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        notifyApiError(error, "A board with that name already exists");
+        notifyApiError(error, t("boards.nameTaken"));
         return;
       }
-      notifyApiError(error, "Could not create board");
+      notifyApiError(error, t("boards.couldNotCreate"));
     }
   }
 
@@ -192,21 +191,21 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
       onClose={() => {
         if (!create.isPending) onClose();
       }}
-      title="New board"
+      title={t("boards.newTitle")}
       size="xl"
       radius="lg"
       styles={{ body: { maxHeight: "min(80vh, 760px)", overflowY: "auto" } }}
     >
       <Stack>
         <TextInput
-          label="Name"
+          label={t("boards.name")}
           required
           value={name}
           onChange={(event) => setName(event.currentTarget.value)}
-          placeholder="Work"
+          placeholder={t("boards.namePlaceholder")}
         />
         <div>
-          <p className="mb-2 text-sm font-medium">Color</p>
+          <p className="mb-2 text-sm font-medium">{t("boards.color")}</p>
           <Group gap="xs">
             {BOARD_COLORS.map((item) => (
               <button
@@ -216,13 +215,13 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
                   color === item ? "ring-2 ring-[var(--app-primary)] ring-offset-2" : ""
                 }`}
                 onClick={() => setColor(item)}
-                aria-label={item}
+                aria-label={colorName(item)}
               />
             ))}
           </Group>
         </div>
         <div>
-          <p className="mb-2 text-sm font-medium">Icon</p>
+          <p className="mb-2 text-sm font-medium">{t("boards.icon")}</p>
           <Group gap="xs">
             {BOARD_ICONS.map((item) => (
               <button
@@ -234,7 +233,7 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
                     : "border-[var(--app-border)] text-[var(--app-text-muted)]"
                 }`}
                 onClick={() => setIcon(item)}
-                aria-label={item}
+                aria-label={boardIconLabel(item)}
               >
                 <BoardGlyph name={item} />
               </button>
@@ -242,17 +241,16 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
           </Group>
         </div>
         <TextInput
-          label="Timezone"
+          label={t("boards.timezone")}
           value={timezone}
           onChange={(event) => setTimezone(event.currentTarget.value)}
           placeholder="America/New_York"
         />
 
         <div>
-          <Text fw={600}>Initial statuses</Text>
+          <Text fw={600}>{t("boards.initialStatuses")}</Text>
           <Text size="sm" c="dimmed" mb="sm">
-            These statuses are created with the board. You can rename, recolor, reorder, add, or
-            remove them first.
+            {t("boards.initialStatusesHint")}
           </Text>
           <DragDropProvider
             onDragOver={(event) => {
@@ -295,14 +293,14 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
                 ...current,
                 {
                   key: `status-${Date.now()}`,
-                  name: "New status",
+                  name: t("boards.newStatus"),
                   color: "slate",
                   is_done: false,
                 },
               ])
             }
           >
-            Add status
+            {t("status.addStatus")}
           </Button>
           {statusError ? (
             <Text size="sm" c="red" mt="xs">
@@ -313,14 +311,14 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
 
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose} disabled={create.isPending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => void handleSubmit()}
             loading={create.isPending}
             disabled={!name.trim() || Boolean(statusError)}
           >
-            Create board
+            {t("boards.createBoard")}
           </Button>
         </Group>
       </Stack>

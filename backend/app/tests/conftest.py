@@ -150,7 +150,6 @@ def uncategorized_id(db: Session) -> UUID:
 
 @pytest.fixture()
 def seed_tasks(db: Session, today: date, uncategorized_id: UUID) -> list[Task]:
-    db.execute(text("DELETE FROM task_subtasks"))
     db.execute(text("DELETE FROM tasks"))
     db.commit()
 

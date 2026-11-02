@@ -1,14 +1,15 @@
 import type { DashboardTaskRow } from "../types";
+import { t } from "@/i18n";
 
 export type DueBucket = "overdue" | "today" | "week" | "later" | "done";
 
-export const DUE_BUCKET_LABELS: Record<DueBucket, string> = {
-  overdue: "Overdue",
-  today: "Due today",
-  week: "Next 7 days",
-  later: "Later",
-  done: "Completed",
-};
+export function dueBucketLabel(bucket: DueBucket): string {
+  if (bucket === "overdue") return t("dashboard.bucketOverdue");
+  if (bucket === "today") return t("dashboard.bucketToday");
+  if (bucket === "week") return t("dashboard.bucketWeek");
+  if (bucket === "later") return t("dashboard.bucketLater");
+  return t("dashboard.bucketDone");
+}
 
 function addDays(isoDate: string, days: number): string {
   const [year, month, day] = isoDate.split("-").map(Number);

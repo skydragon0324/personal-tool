@@ -1,13 +1,21 @@
+import { translateServerText } from "@/i18n";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
 export class ApiError extends Error {
   status: number;
+  /** Stable error code from the server (see the backend's error_codes.py), when it sent one. */
+  code: string | null;
+  params: Record<string, unknown>;
 
-  constructor(message: string, status: number) {
+  /** `message` is in the user's language. */
+  constructor(message: string, status: number, code: string | null = null, params: Record<string, unknown> = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
+    this.params = params;
   }
 }
 
@@ -66,16 +74,24 @@ function isCsrfFailure(detail: string): boolean {
   return detail.toLowerCase().includes("csrf");
 }
 
-async function readErrorDetail(response: Response): Promise<string> {
-  let detail = response.statusText;
+interface ErrorBody {
+  /** The server's English text (null when it sent something else, e.g. a list of field errors). */
+  detail: string | null;
+  code: string | null;
+  params: Record<string, unknown>;
+}
+
+async function readErrorBody(response: Response): Promise<ErrorBody> {
   try {
-    const body = (await response.json()) as { detail?: string | unknown };
-    if (typeof body.detail === "string") detail = body.detail;
-    else if (body.detail) detail = JSON.stringify(body.detail);
+    const body = (await response.json()) as { detail?: unknown; code?: unknown; params?: unknown };
+    return {
+      detail: typeof body.detail === "string" ? body.detail : null,
+      code: typeof body.code === "string" ? body.code : null,
+      params: body.params && typeof body.params === "object" ? (body.params as Record<string, unknown>) : {},
+    };
   } catch {
-    /* ignore */
+    return { detail: response.statusText || null, code: null, params: {} };
   }
-  return detail;
 }
 
 async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
@@ -109,14 +125,14 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
     if (response.status === 401 && !isAuthApiPath(path)) {
       unauthorizedHandler?.();
     }
-    const detail = await readErrorDetail(response);
+    const error = await readErrorBody(response);
     const canRetryCsrf =
       !retried &&
       !isFormData &&
       response.status === 403 &&
       MUTATING.has(method) &&
       !PUBLIC_MUTATIONS.has(path) &&
-      isCsrfFailure(detail);
+      isCsrfFailure(error.detail ?? "");
     if (canRetryCsrf) {
       setCsrfToken(null);
       const token = await fetchCsrfToken();
@@ -124,7 +140,12 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
       retryHeaders.set("X-CSRF-Token", token);
       return request<T>(path, { ...init, headers: retryHeaders }, true);
     }
-    throw new ApiError(detail, response.status);
+    throw new ApiError(
+      translateServerText("serverErrors", error.code, error.params, error.detail),
+      response.status,
+      error.code,
+      error.params,
+    );
   }
 
   if (response.status === 204) {

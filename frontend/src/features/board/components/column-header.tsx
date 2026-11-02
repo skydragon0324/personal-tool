@@ -1,5 +1,3 @@
-"use client";
-
 import { ActionIcon, Button, Group, Menu, Modal, Select, Text, TextInput } from "@mantine/core";
 import { useState } from "react";
 
@@ -8,6 +6,7 @@ import { notifyApiError, notifySuccess } from "@/lib/notify";
 import { useColumnMutations } from "../hooks/use-columns";
 import type { BoardColumn } from "../types";
 import { STATUS_COLORS, statusHeaderClass } from "../utils/status-colors";
+import { colorName, t } from "@/i18n";
 
 interface ColumnHeaderProps {
   boardId: string;
@@ -35,7 +34,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
   function save(payload: { name?: string; color?: string; is_done?: boolean }) {
     update.mutate(
       { columnId: column.id, payload },
-      { onError: (error) => notifyApiError(error, "Could not update the status") },
+      { onError: (error) => notifyApiError(error, t("status.couldNotUpdate")) },
     );
   }
 
@@ -49,17 +48,17 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
   function move(offset: -1 | 1) {
     reorder.mutate(
       { columnId: column.id, targetPosition: index + offset },
-      { onError: (error) => notifyApiError(error, "Could not move the status") },
+      { onError: (error) => notifyApiError(error, t("status.couldNotMove")) },
     );
   }
 
   async function confirmDelete() {
     try {
       await removeMovingTasks.mutateAsync({ columnId: column.id, moveToColumnId: moveTo });
-      notifySuccess(`Deleted ${column.name}`);
+      notifySuccess(t("status.deleted", { name: column.name }));
       setDeleting(false);
     } catch (error) {
-      notifyApiError(error, "Could not delete the status");
+      notifyApiError(error, t("status.couldNotDelete"));
     }
   }
 
@@ -74,7 +73,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
             value={name}
             autoFocus
             maxLength={50}
-            aria-label="Status name"
+            aria-label={t("status.nameLabel")}
             onChange={(event) => setName(event.currentTarget.value)}
             onBlur={commitName}
             onKeyDown={(event) => {
@@ -88,7 +87,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
         ) : (
           <h2
             className={`truncate font-display text-lg leading-tight ${canManage ? "cursor-text" : ""}`}
-            title={canManage ? "Double-click to rename" : undefined}
+            title={canManage ? t("status.doubleClickToRename") : undefined}
             onDoubleClick={() => {
               if (!canManage) return;
               setName(column.name);
@@ -100,7 +99,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
         )}
         <p className="text-xs text-white/80">
           {taskCount}
-          {column.is_done ? " · counts as completed" : ""}
+          {column.is_done ? t("status.countsAsCompletedSuffix") : ""}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
@@ -109,7 +108,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
           onClick={() => onAdd(column.id)}
           className="rounded-lg bg-white/15 px-2.5 py-1 text-sm font-medium hover:bg-white/25"
         >
-          Add
+          {t("common.add")}
         </button>
         {canManage ? (
           <Menu shadow="md" position="bottom-end" width={220} withinPortal>
@@ -117,7 +116,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
               <ActionIcon
                 variant="subtle"
                 color="white"
-                aria-label={`Status menu for ${column.name}`}
+                aria-label={t("status.menuFor", { name: column.name })}
                 className="hover:!bg-white/20"
               >
                 ⋯
@@ -130,15 +129,15 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
                   setEditing(true);
                 }}
               >
-                Rename
+                {t("status.rename")}
               </Menu.Item>
-              <Menu.Label>Color</Menu.Label>
+              <Menu.Label>{t("status.color")}</Menu.Label>
               <div className="grid grid-cols-7 gap-1.5 px-3 pb-2">
                 {STATUS_COLORS.map((color) => (
                   <button
                     key={color}
                     type="button"
-                    aria-label={`Color ${color}`}
+                    aria-label={t("status.colorOption", { color: colorName(color) })}
                     aria-pressed={column.color === color}
                     onClick={() => save({ color })}
                     className={`h-5 w-5 rounded-full ${statusHeaderClass(color)} ${
@@ -151,14 +150,14 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
                 onClick={() => save({ is_done: !column.is_done })}
                 rightSection={column.is_done ? "✓" : null}
               >
-                Counts as completed
+                {t("status.countsAsCompleted")}
               </Menu.Item>
               <Menu.Divider />
               <Menu.Item disabled={index <= 0} onClick={() => move(-1)}>
-                Move left
+                {t("status.moveLeft")}
               </Menu.Item>
               <Menu.Item disabled={index < 0 || index >= columns.length - 1} onClick={() => move(1)}>
-                Move right
+                {t("status.moveRight")}
               </Menu.Item>
               <Menu.Divider />
               <Menu.Item
@@ -169,20 +168,20 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
                   setDeleting(true);
                 }}
               >
-                Delete status
+                {t("status.deleteStatus")}
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
         ) : null}
       </div>
 
-      <Modal opened={deleting} onClose={() => setDeleting(false)} title={`Delete “${column.name}”?`} radius="lg">
+      <Modal opened={deleting} onClose={() => setDeleting(false)} title={t("status.deleteTitle", { name: column.name })} radius="lg">
         <Text size="sm" c="dimmed">
-          The status is removed from the board. Its tasks are kept and moved to the status you pick.
+          {t("status.deleteBody")}
         </Text>
         <Select
           mt="md"
-          label="Move its tasks to"
+          label={t("status.moveTasksTo")}
           data={others.map((item) => ({ value: item.id, label: item.name }))}
           value={moveTo}
           onChange={setMoveTo}
@@ -190,10 +189,10 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
         />
         <Group justify="flex-end" mt="lg">
           <Button variant="default" onClick={() => setDeleting(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button color="red" onClick={() => void confirmDelete()} loading={removeMovingTasks.isPending} disabled={!moveTo}>
-            Delete status
+            {t("status.deleteStatus")}
           </Button>
         </Group>
       </Modal>
@@ -217,7 +216,7 @@ export function AddStatusColumn({ boardId, columns }: { boardId: string; columns
       setName("");
       setOpen(false);
     } catch (error) {
-      notifyApiError(error, "Could not add the status");
+      notifyApiError(error, t("status.couldNotAdd"));
     }
   }
 
@@ -233,8 +232,8 @@ export function AddStatusColumn({ boardId, columns }: { boardId: string; columns
         >
           <TextInput
             size="sm"
-            placeholder="Status name, e.g. Review"
-            aria-label="New status name"
+            placeholder={t("status.newNamePlaceholder")}
+            aria-label={t("status.newNameLabel")}
             value={name}
             autoFocus
             maxLength={50}
@@ -245,10 +244,10 @@ export function AddStatusColumn({ boardId, columns }: { boardId: string; columns
           />
           <Group gap="xs" mt="xs">
             <Button type="submit" size="xs" loading={create.isPending} disabled={!name.trim()}>
-              Add status
+              {t("status.addStatus")}
             </Button>
             <Button size="xs" variant="subtle" color="gray" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </Group>
         </form>
@@ -258,7 +257,7 @@ export function AddStatusColumn({ boardId, columns }: { boardId: string; columns
           onClick={() => setOpen(true)}
           className="flex h-12 w-full items-center justify-center rounded-2xl border-2 border-dashed border-[var(--app-border)] text-sm font-medium text-[var(--app-text-muted)] hover:border-[var(--app-primary)] hover:text-[var(--app-primary)]"
         >
-          + Add status
+          {t("status.addStatusPlus")}
         </button>
       )}
     </div>

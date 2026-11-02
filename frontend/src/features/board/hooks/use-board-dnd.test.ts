@@ -1,22 +1,21 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
 import type { TaskSummary } from "../types";
 import { useBoardDnd } from "./use-board-dnd";
 
-const moveMutate = vi.fn();
-const notifyApiError = vi.fn();
-const notifyConflict = vi.fn();
+const moveMutate = jest.fn();
+const notifyApiError = jest.fn();
+const notifyConflict = jest.fn();
 
-vi.mock("./use-move-task", () => ({
+jest.mock("./use-move-task", () => ({
   useMoveTask: () => ({
     mutateAsync: (...args: unknown[]) => moveMutate(...args),
     isPending: false,
   }),
 }));
 
-vi.mock("@/lib/notify", () => ({
+jest.mock("@/lib/notify", () => ({
   notifyApiError: (...args: unknown[]) => notifyApiError(...args),
   notifyConflict: (...args: unknown[]) => notifyConflict(...args),
 }));

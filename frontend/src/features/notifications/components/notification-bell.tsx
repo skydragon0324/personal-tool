@@ -1,5 +1,3 @@
-"use client";
-
 import {
   ActionIcon,
   Button,
@@ -18,17 +16,18 @@ import {
 } from "../hooks/use-notifications";
 import { useOpenNotification } from "../hooks/use-open-notification";
 import type { AppNotification, NotificationKind } from "../types";
-import { formatNotificationTime } from "../utils/notification-utils";
+import { formatNotificationTime, notificationBody, notificationTitle } from "../utils/notification-utils";
 import { NotificationSettingsModal } from "./notification-settings-modal";
 import { TaskAlertActions, isTaskAlert } from "./task-alert-actions";
+import { t } from "@/i18n";
 
-const KIND_LABEL: Record<NotificationKind, string> = {
-  daily_digest: "Daily digest",
-  schedule_start: "Schedule",
-  task_reminder: "Reminder",
-  board_shared: "Shared board",
-  task_assigned: "Assigned to you",
-  task_overdue: "Overdue",
+const KIND_LABEL: Record<NotificationKind, () => string> = {
+  daily_digest: () => t("notifications.kindDigest"),
+  schedule_start: () => t("notifications.kindSchedule"),
+  task_reminder: () => t("notifications.kindReminder"),
+  board_shared: () => t("notifications.kindShared"),
+  task_assigned: () => t("notifications.kindAssigned"),
+  task_overdue: () => t("notifications.kindOverdue"),
 };
 
 const KIND_DOT: Record<NotificationKind, string> = {
@@ -72,7 +71,7 @@ export function NotificationBell() {
               color="gray"
               size="lg"
               aria-label={
-                unread ? `Notifications (${unread} unread)` : "Notifications"
+                unread ? t("notifications.bellLabelUnread", { count: unread }) : t("notifications.bellLabel")
               }
               onClick={() => setOpened((value) => !value)}
             >
@@ -88,7 +87,7 @@ export function NotificationBell() {
             className="border-b border-[var(--app-border)]"
           >
             <Text fw={600} size="sm">
-              Notifications
+              {t("notifications.title")}
             </Text>
             <Group gap={4}>
               <Button
@@ -97,7 +96,7 @@ export function NotificationBell() {
                 disabled={unread === 0}
                 onClick={() => markAllRead.mutate()}
               >
-                Mark all read
+                {t("notifications.markAllRead")}
               </Button>
               <Button
                 size="compact-xs"
@@ -108,7 +107,7 @@ export function NotificationBell() {
                   setSettingsOpen(true);
                 }}
               >
-                Settings
+                {t("notifications.settings")}
               </Button>
             </Group>
           </Group>
@@ -116,12 +115,12 @@ export function NotificationBell() {
             {items.length === 0 ? (
               <Text size="sm" c="dimmed" ta="center" py="lg" px="sm">
                 {feed.isError
-                  ? "Could not load notifications."
-                  : "You're all caught up."}
+                  ? t("notifications.couldNotLoad")
+                  : t("notifications.allCaughtUp")}
               </Text>
             ) : (
               <ul
-                aria-label="Notification list"
+                aria-label={t("notifications.listLabel")}
                 className="divide-y divide-[var(--app-border)]"
               >
                 {items.map((item) => (
@@ -151,7 +150,7 @@ export function NotificationBell() {
                 color="gray"
                 onClick={() => dismissAll.mutate()}
               >
-                Clear all
+                {t("notifications.clearAll")}
               </Button>
             </Group>
           ) : null}
@@ -186,14 +185,14 @@ function NotificationRow({
       <div className="min-w-0 flex-1">
         <UnstyledButton onClick={onOpen} className="w-full text-left">
           <Text size="xs" c="dimmed">
-            {KIND_LABEL[item.kind]} · {formatNotificationTime(item.fire_at)}
+            {KIND_LABEL[item.kind]()} · {formatNotificationTime(item.fire_at)}
           </Text>
           <Text size="sm" fw={unread ? 600 : 400} lineClamp={2}>
-            {item.title}
+            {notificationTitle(item)}
           </Text>
-          {item.body ? (
+          {notificationBody(item) ? (
             <Text size="xs" c="dimmed" lineClamp={2}>
-              {item.body}
+              {notificationBody(item)}
             </Text>
           ) : null}
         </UnstyledButton>
@@ -203,7 +202,7 @@ function NotificationRow({
         variant="subtle"
         color="gray"
         size="sm"
-        aria-label={`Dismiss ${item.title}`}
+        aria-label={t("notifications.dismiss", { title: notificationTitle(item) })}
         onClick={onDismiss}
       >
         <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>

@@ -1,6 +1,5 @@
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
-import "@testing-library/jest-dom/vitest";
+import "@testing-library/jest-dom";
 
 afterEach(() => {
   cleanup();
@@ -31,4 +30,3 @@ window.ResizeObserver = ResizeObserverStub;
 Element.prototype.scrollIntoView = function scrollIntoView() {
   return undefined;
 };
-

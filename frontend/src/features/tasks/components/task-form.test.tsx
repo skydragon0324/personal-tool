@@ -3,25 +3,24 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactElement } from "react";
-import { describe, expect, it, vi } from "vitest";
 
 import type { TaskDetail } from "@/features/board/types";
 
 import { TaskForm } from "./task-form";
 
-vi.mock("@/lib/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-client")>();
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
       ...actual.apiClient,
-      listCategories: vi
+      listCategories: jest
         .fn()
         .mockResolvedValue([
           { id: "cat-1", name: "Work", color: "blue", board_id: "board-1", position: 0, created_at: "" },
         ]),
-      createCategory: vi.fn(),
-      getBoardMembers: vi.fn().mockResolvedValue({
+      createCategory: jest.fn(),
+      getBoardMembers: jest.fn().mockResolvedValue({
         can_manage: true,
         people: [{ user_id: "user-1", display_name: "Me", email: "me@example.com", role: "owner" }],
         invitations: [],
@@ -30,7 +29,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("@/features/tasks/components/task-rich-text-editor", () => ({
+jest.mock("@/features/tasks/components/task-rich-text-editor", () => ({
   TaskRichTextEditor: () => createElement("div", { "data-testid": "rich-text" }, "editor"),
 }));
 
@@ -72,7 +71,7 @@ describe("TaskForm", () => {
             boardId: "board-1",
             columnId: initial.column_id,
             dueDate: initial.due_date,
-            onSubmit: vi.fn(),
+            onSubmit: jest.fn(),
           }),
         ),
       );
@@ -91,7 +90,7 @@ describe("TaskForm", () => {
 
   it("leaves an existing reminder alone and sends the assignees", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const onSubmit = vi.fn().mockResolvedValue(TASK);
+    const onSubmit = jest.fn().mockResolvedValue(TASK);
     render(
       createElement(
         QueryClientProvider,
@@ -121,5 +120,35 @@ describe("TaskForm", () => {
     // Reminders are set from notifications ("Remind me"), so saving the form must not clear them.
     expect(payload).not.toHaveProperty("remind_at");
     expect(payload.assignee_ids).toEqual(["user-1"]);
+  });
+
+  it("reports unsaved edits only after the user changes something", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onDirtyChange = jest.fn();
+    render(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(
+          MantineProvider,
+          null,
+          createElement(TaskForm, {
+            initial: TASK,
+            boardId: "board-1",
+            columnId: TASK.column_id,
+            dueDate: TASK.due_date,
+            onSubmit: jest.fn(),
+            onDirtyChange,
+          }),
+        ),
+      ),
+    );
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+
+    await userEvent.type(screen.getByLabelText(/^Title/), "!");
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    await userEvent.type(screen.getByLabelText(/^Title/), "{Backspace}");
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 });

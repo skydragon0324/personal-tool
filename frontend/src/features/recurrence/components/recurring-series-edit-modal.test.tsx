@@ -3,23 +3,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
 
 import type { RecurrenceSeriesRead } from "../types";
 import { RecurringSeriesEditModal } from "./recurring-series-edit-modal";
 
-const getRecurrenceSeries = vi.fn();
-const updateRecurrenceSeries = vi.fn();
-const listCategories = vi.fn();
-const listColumns = vi.fn();
-const createCategory = vi.fn();
-const notifySuccess = vi.fn();
-const notifyApiError = vi.fn();
+const getRecurrenceSeries = jest.fn();
+const updateRecurrenceSeries = jest.fn();
+const listCategories = jest.fn();
+const listColumns = jest.fn();
+const createCategory = jest.fn();
+const notifySuccess = jest.fn();
+const notifyApiError = jest.fn();
 
-vi.mock("@/lib/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-client")>();
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -33,12 +32,12 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/notify", () => ({
+jest.mock("@/lib/notify", () => ({
   notifySuccess: (...args: unknown[]) => notifySuccess(...args),
   notifyApiError: (...args: unknown[]) => notifyApiError(...args),
 }));
 
-vi.mock("@/features/tasks/components/task-rich-text-editor", () => ({
+jest.mock("@/features/tasks/components/task-rich-text-editor", () => ({
   TaskRichTextEditor: () => createElement("div", { "data-testid": "rich-text" }, "editor"),
 }));
 
@@ -72,7 +71,7 @@ const DETAIL: RecurrenceSeriesRead = {
 
 function wrap(seriesId: string | null = "series-1") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const onClose = vi.fn();
+  const onClose = jest.fn();
   render(
     createElement(
       QueryClientProvider,
@@ -240,8 +239,8 @@ describe("RecurringSeriesEditModal", () => {
     await user.clear(title);
     await user.type(title, "Renamed");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByRole("button", { name: "Saving..." })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Saving..." }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Saving…" }));
     expect(updateRecurrenceSeries).toHaveBeenCalledTimes(1);
     resolveUpdate?.({ ...DETAIL, title: "Renamed", version: 5 });
   });

@@ -1,5 +1,3 @@
-"use client";
-
 import { Select, Table } from "@mantine/core";
 import { useMemo, useState } from "react";
 
@@ -9,6 +7,7 @@ import { formatTaskPeriod } from "@/lib/dates";
 import type { BoardColumn, TaskSummary, TasksByColumn } from "../types";
 import { flattenVisibleTasks } from "../utils/progress-stats";
 import { BOARD_CONTENT_GUTTER } from "../utils/board-layout";
+import { t } from "@/i18n";
 
 interface TaskTableProps {
   columns: BoardColumn[];
@@ -50,20 +49,20 @@ export function TaskTable({ columns, tasksByColumn, onOpenDetail, onMoveStatus }
       <Table highlightOnHover striped>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Task</Table.Th>
-            <Table.Th>Status</Table.Th>
-            <Table.Th>Category</Table.Th>
+            <Table.Th>{t("task.task")}</Table.Th>
+            <Table.Th>{t("task.status")}</Table.Th>
+            <Table.Th>{t("task.category")}</Table.Th>
             <Table.Th>
               <button type="button" className="font-semibold" onClick={() => toggleSort("priority")}>
-                Priority {sortKey === "priority" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                {t("task.priority")} {sortKey === "priority" ? (sortDir === "asc" ? "↑" : "↓") : ""}
               </button>
             </Table.Th>
             <Table.Th>
               <button type="button" className="font-semibold" onClick={() => toggleSort("due_date")}>
-                Dates {sortKey === "due_date" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                {t("task.dates")} {sortKey === "due_date" ? (sortDir === "asc" ? "↑" : "↓") : ""}
               </button>
             </Table.Th>
-            <Table.Th>Subtasks</Table.Th>
+            <Table.Th>{t("task.subtasks")}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -104,7 +103,7 @@ export function TaskTable({ columns, tasksByColumn, onOpenDetail, onMoveStatus }
         </Table.Tbody>
       </Table>
       {!rows.length ? (
-        <p className="mt-6 text-center text-sm text-[var(--app-text-muted)]">No tasks match the current filters.</p>
+        <p className="mt-6 text-center text-sm text-[var(--app-text-muted)]">{t("progress.noMatches")}</p>
       ) : null}
     </div>
   );

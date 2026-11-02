@@ -1,6 +1,5 @@
 import { render } from "@testing-library/react";
 import { DragDropProvider } from "@dnd-kit/react";
-import { describe, expect, it } from "vitest";
 
 import type { TaskSummary } from "../types";
 import { overlayTaskFromSource, TaskDragOverlay } from "./task-drag-overlay";

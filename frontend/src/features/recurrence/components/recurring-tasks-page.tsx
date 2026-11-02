@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Loader, Skeleton, Text } from "@mantine/core";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useState } from "react";
@@ -19,6 +17,7 @@ import type {
 import { formatRecurrenceRule } from "../utils/format-recurrence";
 import { PauseRecurrenceDialog } from "./pause-recurrence-dialog";
 import { RecurringSeriesEditModal } from "./recurring-series-edit-modal";
+import { t } from "@/i18n";
 
 const PAGE_SIZES: RecurrenceSeriesPageSize[] = [25, 50, 100];
 
@@ -126,9 +125,9 @@ export function RecurringTasksPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title="Recurring tasks" description="Manage repeating work across your boards.">
+      <PageHeader title={t("recurring.pageTitle")} description={t("recurring.pageDescription")}>
         <Button variant="light" component={Link} href="/boards">
-          Back to boards
+          {t("recurring.backToBoards")}
         </Button>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
@@ -152,7 +151,7 @@ export function RecurringTasksPage() {
           {loading ? <LoadingState /> : null}
           {failed && !loading ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Text>Could not load recurring tasks.</Text>
+              <Text>{t("recurring.couldNotLoad")}</Text>
               <Button
                 variant="light"
                 onClick={() => {
@@ -160,7 +159,7 @@ export function RecurringTasksPage() {
                   summary.refetch();
                 }}
               >
-                Retry
+                {t("common.retry")}
               </Button>
             </div>
           ) : null}
@@ -210,10 +209,10 @@ function SummaryCards({
   loading: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Recurring task summary">
-      <MetricCard label="Active" value={active} loading={loading} />
-      <MetricCard label="Stopped" value={stopped} loading={loading} />
-      <MetricCard label="No future occurrence" value={noFuture} loading={loading} />
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label={t("recurring.summaryLabel")}>
+      <MetricCard label={t("recurring.active")} value={active} loading={loading} />
+      <MetricCard label={t("recurring.stopped")} value={stopped} loading={loading} />
+      <MetricCard label={t("recurring.noFutureOccurrence")} value={noFuture} loading={loading} />
     </div>
   );
 }
@@ -252,23 +251,23 @@ function FilterBar({
 }) {
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
-      <div role="tablist" aria-label="Recurrence status" className="flex rounded-lg border border-[var(--app-border)] p-1">
+      <div role="tablist" aria-label={t("recurring.statusTabs")} className="flex rounded-lg border border-[var(--app-border)] p-1">
         <TabButton selected={status === "active"} onClick={() => onStatusChange("active")}>
-          Active
+          {t("recurring.active")}
         </TabButton>
         <TabButton selected={status === "stopped"} onClick={() => onStatusChange("stopped")}>
-          Stopped
+          {t("recurring.stopped")}
         </TabButton>
       </div>
       <label className="block w-full sm:max-w-xs">
-        <span className="mb-1 block text-sm text-[var(--app-text-muted)]">Board</span>
+        <span className="mb-1 block text-sm text-[var(--app-text-muted)]">{t("recurring.board")}</span>
         <select
-          aria-label="Board"
+          aria-label={t("recurring.board")}
           value={boardId}
           onChange={(event) => onBoardChange(event.target.value)}
           className="w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)]"
         >
-          <option value="">All boards</option>
+          <option value="">{t("recurring.allBoards")}</option>
           {boards.map((board) => (
             <option key={board.value} value={board.value}>
               {board.label}
@@ -277,9 +276,9 @@ function FilterBar({
         </select>
       </label>
       <label className="block w-full sm:w-36">
-        <span className="mb-1 block text-sm text-[var(--app-text-muted)]">Rows per page</span>
+        <span className="mb-1 block text-sm text-[var(--app-text-muted)]">{t("recurring.rowsPerPage")}</span>
         <select
-          aria-label="Rows per page"
+          aria-label={t("recurring.rowsPerPage")}
           value={limit}
           onChange={(event) => onLimitChange(Number(event.target.value) as RecurrenceSeriesPageSize)}
           className="w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)]"
@@ -292,7 +291,7 @@ function FilterBar({
         </select>
       </label>
       <Button variant="subtle" onClick={onReset}>
-        Reset filters
+        {t("recurring.resetFilters")}
       </Button>
     </div>
   );
@@ -326,7 +325,7 @@ function TabButton({
 
 function LoadingState() {
   return (
-    <div role="status" aria-label="Loading recurring tasks" className="space-y-3 py-6">
+    <div role="status" aria-label={t("recurring.loading")} className="space-y-3 py-6">
       <div className="flex justify-center">
         <Loader />
       </div>
@@ -403,14 +402,14 @@ function Results({
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Text size="sm" c="dimmed">
-          Showing {from}–{to} of {data.total}
+          {t("recurring.showing", { from, to, total: data.total })}
         </Text>
         <div className="flex gap-2">
           <Button variant="default" disabled={!hasPrevious} onClick={onPrevious}>
-            Previous
+            {t("recurring.previous")}
           </Button>
           <Button variant="default" disabled={!hasNext} onClick={onNext}>
-            Next
+            {t("recurring.next")}
           </Button>
         </div>
       </div>
@@ -434,11 +433,14 @@ function EmptyState({
   if (boardId) {
     return (
       <EmptyCopy
-        title="No recurring tasks on this board"
+        title={t("recurring.emptyBoardTitle")}
         body={
           boardName
-            ? `Nothing matches ${boardName} for the ${status} tab.`
-            : "Nothing matches the selected board for this tab."
+            ? t("recurring.emptyBoardNamed", {
+                board: boardName,
+                tab: status === "active" ? t("recurring.active") : t("recurring.stopped"),
+              })
+            : t("recurring.emptyBoardUnnamed")
         }
       />
     );
@@ -446,23 +448,23 @@ function EmptyState({
   if (summaryActive === 0 && summaryStopped === 0) {
     return (
       <EmptyCopy
-        title="No recurring tasks yet"
-        body="Repeating work you create on boards will appear here."
+        title={t("recurring.emptyTitle")}
+        body={t("recurring.emptyBody")}
       />
     );
   }
   if (status === "active") {
     return (
       <EmptyCopy
-        title="No active recurring tasks"
-        body="Stopped series are on the Stopped tab."
+        title={t("recurring.emptyActiveTitle")}
+        body={t("recurring.emptyActiveBody")}
       />
     );
   }
   return (
     <EmptyCopy
-      title="No stopped recurring tasks"
-      body="Active series are on the Active tab."
+      title={t("recurring.emptyStoppedTitle")}
+      body={t("recurring.emptyStoppedBody")}
     />
   );
 }
@@ -498,13 +500,13 @@ function SeriesTable({
       <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-[var(--app-border)] text-xs text-[var(--app-text-muted)]">
-            <th className="py-2 pr-3 font-medium">Task</th>
-            <th className="py-2 pr-3 font-medium">Board</th>
-            <th className="py-2 pr-3 font-medium">Repeat</th>
-            <th className="py-2 pr-3 font-medium">Next occurrence</th>
-            <th className="py-2 pr-3 font-medium">Progress</th>
-            <th className="py-2 pr-3 font-medium">Status</th>
-            <th className="py-2 font-medium">Actions</th>
+            <th className="py-2 pr-3 font-medium">{t("recurring.task")}</th>
+            <th className="py-2 pr-3 font-medium">{t("recurring.board")}</th>
+            <th className="py-2 pr-3 font-medium">{t("recurring.repeat")}</th>
+            <th className="py-2 pr-3 font-medium">{t("recurring.nextOccurrence")}</th>
+            <th className="py-2 pr-3 font-medium">{t("recurring.progress")}</th>
+            <th className="py-2 pr-3 font-medium">{t("recurring.status")}</th>
+            <th className="py-2 font-medium">{t("recurring.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -610,11 +612,11 @@ function SeriesActions({
       variant="light"
       disabled={blockedByArchive}
       onClick={() => onEdit(item)}
-      aria-label={`Edit ${item.title}`}
+      aria-label={t("recurring.editItem", { title: item.title })}
       aria-describedby={blockedByArchive ? editHintId : undefined}
-      title={blockedByArchive ? "Restore the board before editing this recurring task." : undefined}
+      title={blockedByArchive ? t("recurring.restoreToEdit") : undefined}
     >
-      Edit
+      {t("common.edit")}
     </Button>
   );
 
@@ -629,14 +631,14 @@ function SeriesActions({
             disabled={pending}
             loading={pending && pendingKind === "pause"}
             onClick={() => onPause(item)}
-            aria-label={`Pause ${item.title}`}
+            aria-label={t("recurring.pauseItem", { title: item.title })}
           >
-            {pending && pendingKind === "pause" ? "Pausing..." : "Pause"}
+            {pending && pendingKind === "pause" ? t("recurring.pausing") : t("recurring.pause")}
           </Button>
         </div>
         {blockedByArchive ? (
           <p id={editHintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
-            Restore the board before editing this recurring task.
+            {t("recurring.restoreToEdit")}
           </p>
         ) : null}
       </div>
@@ -655,20 +657,20 @@ function SeriesActions({
           disabled={pending || blockedByArchive}
           loading={pending && pendingKind === "resume"}
           onClick={() => onResume(item)}
-          aria-label={`Resume ${item.title}`}
+          aria-label={t("recurring.resumeItem", { title: item.title })}
           aria-describedby={blockedByArchive ? resumeHintId : undefined}
-          title={blockedByArchive ? "Restore the board before resuming this recurring task." : undefined}
+          title={blockedByArchive ? t("recurring.restoreToResume") : undefined}
         >
-          {pending && pendingKind === "resume" ? "Resuming..." : "Resume"}
+          {pending && pendingKind === "resume" ? t("recurring.resuming") : t("recurring.resume")}
         </Button>
       </div>
       {blockedByArchive ? (
         <>
           <p id={editHintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
-            Restore the board before editing this recurring task.
+            {t("recurring.restoreToEdit")}
           </p>
           <p id={resumeHintId} className="max-w-[14rem] text-xs text-[var(--app-text-muted)]">
-            Restore the board before resuming this recurring task.
+            {t("recurring.restoreToResume")}
           </p>
         </>
       ) : null}
@@ -697,7 +699,7 @@ function BoardCell({ item }: { item: RecurrenceSeriesListItem }) {
       >
         {item.board_name}
       </Link>
-      {item.board_archived ? <StatusBadge label="Archived board" tone="archived" /> : null}
+      {item.board_archived ? <StatusBadge label={t("recurring.archivedBoard")} tone="archived" /> : null}
       <p className="mt-1 text-xs text-[var(--app-text-muted)]">
         {item.default_column_name || "—"}
       </p>
@@ -707,18 +709,18 @@ function BoardCell({ item }: { item: RecurrenceSeriesListItem }) {
 
 function nextOccurrenceLabel(item: RecurrenceSeriesListItem): string {
   if (item.status !== "active") return "—";
-  if (!item.next_occurrence_date) return "No future occurrence";
+  if (!item.next_occurrence_date) return t("recurring.noFutureOccurrence");
   return formatLongDate(item.next_occurrence_date);
 }
 
 function ProgressCounts({ item }: { item: RecurrenceSeriesListItem }) {
   return (
     <p className="text-xs text-[var(--app-text-muted)]">
-      Open {item.open_occurrence_count}
-      {" · "}
-      Completed {item.completed_occurrence_count}
-      {" · "}
-      Customized {item.detached_occurrence_count}
+      {t("recurring.progressCounts", {
+        open: item.open_occurrence_count,
+        completed: item.completed_occurrence_count,
+        customized: item.detached_occurrence_count,
+      })}
     </p>
   );
 }
@@ -726,12 +728,12 @@ function ProgressCounts({ item }: { item: RecurrenceSeriesListItem }) {
 function StatusBadges({ item }: { item: RecurrenceSeriesListItem }) {
   return (
     <div className="flex flex-wrap gap-1">
-      {item.status === "active" ? <StatusBadge label="Active" tone="active" /> : null}
-      {item.status === "stopped" ? <StatusBadge label="Stopped" tone="stopped" /> : null}
-      {item.status === "archived" ? <StatusBadge label="Archived" tone="archived" /> : null}
-      {item.board_archived ? <StatusBadge label="Archived board" tone="archived" /> : null}
+      {item.status === "active" ? <StatusBadge label={t("recurring.active")} tone="active" /> : null}
+      {item.status === "stopped" ? <StatusBadge label={t("recurring.stopped")} tone="stopped" /> : null}
+      {item.status === "archived" ? <StatusBadge label={t("recurring.archived")} tone="archived" /> : null}
+      {item.board_archived ? <StatusBadge label={t("recurring.archivedBoard")} tone="archived" /> : null}
       {item.status === "active" && !item.next_occurrence_date ? (
-        <StatusBadge label="No future occurrence" tone="warning" />
+        <StatusBadge label={t("recurring.noFutureOccurrence")} tone="warning" />
       ) : null}
     </div>
   );

@@ -3,30 +3,30 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
 
 import type { RecurrenceSeriesListItem, RecurrenceSeriesListResponse } from "../types";
 import { RecurringTasksPage } from "./recurring-tasks-page";
 
-const listRecurrenceSeries = vi.fn();
-const stopRecurrence = vi.fn();
-const resumeRecurrence = vi.fn();
-const getRecurrenceSeries = vi.fn();
-const updateRecurrenceSeries = vi.fn();
-const listCategories = vi.fn();
-const listColumns = vi.fn();
-const notifyApiError = vi.fn();
-const notifySuccess = vi.fn();
+const listRecurrenceSeries = jest.fn();
+const stopRecurrence = jest.fn();
+const resumeRecurrence = jest.fn();
+const getRecurrenceSeries = jest.fn();
+const updateRecurrenceSeries = jest.fn();
+const listCategories = jest.fn();
+const listColumns = jest.fn();
+const notifyApiError = jest.fn();
+const notifySuccess = jest.fn();
 
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
+  __esModule: true,
   default: ({ href, children }: { href: string; children: ReactNode }) =>
     createElement("a", { href }, children),
 }));
 
-vi.mock("@/lib/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api-client")>();
+jest.mock("@/lib/api-client", () => {
+  const actual = jest.requireActual<typeof import("@/lib/api-client")>("@/lib/api-client");
   return {
     ...actual,
     apiClient: {
@@ -42,16 +42,16 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/notify", () => ({
+jest.mock("@/lib/notify", () => ({
   notifyApiError: (...args: unknown[]) => notifyApiError(...args),
   notifySuccess: (...args: unknown[]) => notifySuccess(...args),
 }));
 
-vi.mock("@/features/tasks/components/task-rich-text-editor", () => ({
+jest.mock("@/features/tasks/components/task-rich-text-editor", () => ({
   TaskRichTextEditor: () => createElement("div", { "data-testid": "rich-text" }, "editor"),
 }));
 
-vi.mock("@/features/board/hooks/use-boards", () => ({
+jest.mock("@/features/board/hooks/use-boards", () => ({
   useBoards: () => ({
     data: [
       {
@@ -621,7 +621,7 @@ describe("Recurring tasks page", () => {
     await user.click((await screen.findAllByRole("button", { name: "Pause Weekly standup" }))[0]);
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Pause" }));
     await waitFor(() => {
-      expect(screen.getAllByText("Pausing...").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Pausing…").length).toBeGreaterThan(0);
     });
     const pendingButtons = screen.getAllByRole("button", { name: "Pause Weekly standup" });
     for (const button of pendingButtons) {

@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { clearUserLocalState } from "./clear-user-state";
 import {
   browserTimezone,

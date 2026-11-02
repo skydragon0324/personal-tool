@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import { formatRecurrenceRule } from "./format-recurrence";
 
 describe("formatRecurrenceRule", () => {

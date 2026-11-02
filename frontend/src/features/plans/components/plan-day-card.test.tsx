@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
 
 import type { PlanDay } from "../types";
 import { PlanDayCard } from "./plan-day-card";
@@ -41,12 +40,12 @@ const DAY: PlanDay = {
 function renderCard(overrides: Partial<Parameters<typeof PlanDayCard>[0]> = {}) {
   const props = {
     day: DAY,
-    onToggleItem: vi.fn(),
-    onRenameItem: vi.fn(),
-    onDeleteItem: vi.fn(),
-    onAddItem: vi.fn(async () => undefined),
-    onEditDay: vi.fn(),
-    onDeleteDay: vi.fn(),
+    onToggleItem: jest.fn(),
+    onRenameItem: jest.fn(),
+    onDeleteItem: jest.fn(),
+    onAddItem: jest.fn(async () => undefined),
+    onEditDay: jest.fn(),
+    onDeleteDay: jest.fn(),
     ...overrides,
   };
   render(createElement(MantineProvider, { env: "test" }, createElement(PlanDayCard, props)));

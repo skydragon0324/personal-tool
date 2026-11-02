@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import type { ScheduleEntry } from "../types";
 import { assignLanes, entriesForDay, entriesForIsoDate } from "./schedule-layout";
 import { mondayOf, minutesToTime, parseTimeToMinutes, shiftIso, weekdayIndex } from "./schedule-time";

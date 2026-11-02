@@ -2,6 +2,7 @@ import { Progress } from "@mantine/core";
 
 import type { TodayProgress } from "../types";
 import { progressLabel, progressPercent } from "../utils/progress";
+import { t } from "@/i18n";
 
 export function TodaySummaryStrip({
   greeting,
@@ -16,7 +17,7 @@ export function TodaySummaryStrip({
 }) {
   return (
     <section
-      aria-label="Today summary"
+      aria-label={t("today.summaryLabel")}
       className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -25,8 +26,8 @@ export function TodaySummaryStrip({
           <p className="mt-1 text-sm text-[var(--app-text-muted)]">{dateLabel}</p>
         </div>
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2">
-          <MiniProgress label="Tasks" progress={tasks} />
-          <MiniProgress label="Schedule" progress={schedule} />
+          <MiniProgress label={t("today.tasks")} progress={tasks} />
+          <MiniProgress label={t("today.schedule")} progress={schedule} />
         </div>
       </div>
     </section>

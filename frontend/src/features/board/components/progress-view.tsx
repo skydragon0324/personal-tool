@@ -1,5 +1,3 @@
-"use client";
-
 import { Alert, Group, Progress, RingProgress, SimpleGrid, Text } from "@mantine/core";
 import { useMemo } from "react";
 
@@ -7,6 +5,7 @@ import type { BoardColumn, TasksByColumn } from "../types";
 import { computeProgressStats } from "../utils/progress-stats";
 import { BOARD_CONTENT_GUTTER } from "../utils/board-layout";
 import { statusHeaderClass } from "../utils/status-colors";
+import { t } from "@/i18n";
 
 interface ProgressViewProps {
   columns: BoardColumn[];
@@ -21,10 +20,10 @@ export function ProgressView({ columns, tasksByColumn }: ProgressViewProps) {
 
   return (
     <div className={`${BOARD_CONTENT_GUTTER} space-y-6 pb-8`}>
-      <p className="text-sm text-[var(--app-text-muted)]">Based on current filters</p>
+      <p className="text-sm text-[var(--app-text-muted)]">{t("progress.basedOnFilters")}</p>
       {!stats.hasCompletedStatus ? (
-        <Alert color="yellow" title="No completed status is configured.">
-          Mark a status as “Counts as completed” to track completion.
+        <Alert color="yellow" title={t("progress.noCompletedStatusTitle")}>
+          {t("progress.noCompletedStatusBody")}
         </Alert>
       ) : null}
 
@@ -41,16 +40,16 @@ export function ProgressView({ columns, tasksByColumn }: ProgressViewProps) {
           sections={[{ value: stats.percent, color: "teal" }]}
         />
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="lg" className="min-w-[16rem] flex-1">
-          <Stat label="Total" value={stats.total} />
-          <Stat label="Completed" value={stats.completed} />
-          <Stat label="Remaining" value={stats.remaining} />
-          <Stat label="Overdue" value={stats.overdue} />
+          <Stat label={t("board.total")} value={stats.total} />
+          <Stat label={t("board.completed")} value={stats.completed} />
+          <Stat label={t("board.remaining")} value={stats.remaining} />
+          <Stat label={t("task.overdue")} value={stats.overdue} />
         </SimpleGrid>
       </div>
 
       <section className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
         <Text fw={600} mb="md">
-          By status
+          {t("progress.byStatus")}
         </Text>
         <div className="space-y-3">
           {stats.byStatus.map((item) => (
@@ -72,7 +71,7 @@ export function ProgressView({ columns, tasksByColumn }: ProgressViewProps) {
 
       <section className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
         <Text fw={600} mb="md">
-          By category
+          {t("progress.byCategory")}
         </Text>
         {stats.byCategory.length ? (
           <div className="space-y-3">
@@ -90,7 +89,7 @@ export function ProgressView({ columns, tasksByColumn }: ProgressViewProps) {
           </div>
         ) : (
           <Text size="sm" c="dimmed">
-            No tasks match the current filters.
+            {t("progress.noMatches")}
           </Text>
         )}
       </section>

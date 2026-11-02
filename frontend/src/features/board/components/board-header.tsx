@@ -1,10 +1,9 @@
-"use client";
-
 import { Button, Menu, Tooltip } from "@mantine/core";
 
 import type { ViewMode } from "../utils/view-mode";
 import { BoardGlyph, boardColorClass } from "../utils/board-icons";
 import { MobileSidebarButton } from "./board-workspace";
+import { t } from "@/i18n";
 
 interface BoardHeaderProps {
   boardName: string;
@@ -22,10 +21,10 @@ interface BoardHeaderProps {
   quickAddDisabled?: boolean;
 }
 
-const VIEW_MODE_ITEMS: Array<{ value: ViewMode; label: string }> = [
-  { value: "board", label: "Board" },
-  { value: "table", label: "Table" },
-  { value: "progress", label: "Progress" },
+const VIEW_MODE_ITEMS: Array<{ value: ViewMode; label: () => string }> = [
+  { value: "board", label: () => t("board.viewBoard") },
+  { value: "table", label: () => t("board.viewTable") },
+  { value: "progress", label: () => t("board.viewProgress") },
 ];
 
 export function BoardHeader({
@@ -54,7 +53,7 @@ export function BoardHeader({
           </span>
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-[var(--app-text-muted)]">
-              {isOwner ? "Current board" : "Shared board"}
+              {isOwner ? t("board.currentBoard") : t("board.sharedBoard")}
             </p>
             <h1 className="truncate font-display text-2xl text-[var(--app-text)] sm:text-3xl">
               {boardName}
@@ -62,39 +61,39 @@ export function BoardHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Tooltip label="Create a status first" disabled={!quickAddDisabled}>
+          <Tooltip label={t("board.createStatusFirst")} disabled={!quickAddDisabled}>
             <span>
               <Button onClick={onQuickAdd} disabled={quickAddDisabled}>
-                Quick add
+                {t("board.quickAdd")}
               </Button>
             </span>
           </Tooltip>
           {isOwner ? (
             <Button variant="light" onClick={onManageStatuses}>
-              Manage statuses
+              {t("board.manageStatuses")}
             </Button>
           ) : null}
           <Button variant="default" onClick={onShare}>
-            {memberCount > 0 ? `Share · ${memberCount + 1}` : "Share"}
+            {memberCount > 0 ? t("board.shareWithCount", { count: memberCount + 1 }) : t("board.share")}
           </Button>
           <Menu shadow="md" width={220} position="bottom-end">
             <Menu.Target>
-              <Button variant="default">Settings</Button>
+              <Button variant="default">{t("board.settings")}</Button>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Label>View mode</Menu.Label>
+              <Menu.Label>{t("board.viewMode")}</Menu.Label>
               {VIEW_MODE_ITEMS.map((item) => (
                 <Menu.Item
                   key={item.value}
                   onClick={() => onViewModeChange(item.value)}
                   rightSection={viewMode === item.value ? "✓" : null}
                 >
-                  {item.label}
+                  {item.label()}
                 </Menu.Item>
               ))}
               <Menu.Divider />
-              <Menu.Label>Board</Menu.Label>
-              <Menu.Item disabled>Timezone: {timezone ?? "Asia/Seoul"}</Menu.Item>
+              <Menu.Label>{t("board.board")}</Menu.Label>
+              <Menu.Item disabled>{t("board.timezone", { zone: timezone ?? "Asia/Seoul" })}</Menu.Item>
             </Menu.Dropdown>
           </Menu>
         </div>

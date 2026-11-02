@@ -27,6 +27,7 @@ export const columnKeys = {
 };
 
 export const taskKeys = {
+  all: ["task"] as const,
   detail: (taskId: string) => ["task", taskId] as const,
 };
 
@@ -39,6 +40,8 @@ export function tasksByColumnFromView(view: BoardView): TasksByColumn {
 }
 
 export function applyDetailToView(view: BoardView, task: TaskDetail): BoardView {
+  // Sub-tasks are reached through their parent and never shown as board cards.
+  if (task.parent) return view;
   const summary: TaskSummary = {
     id: task.id,
     column_id: task.column_id,

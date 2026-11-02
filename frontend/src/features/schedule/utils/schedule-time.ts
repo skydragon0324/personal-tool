@@ -1,10 +1,15 @@
+import { dateLocale, weekdayName } from "@/i18n";
+
 import { toISODate, parseISODate, weekRange } from "@/features/board/utils/date-presets";
 import { todayISO } from "@/lib/dates";
 
 export const SLOT_MINUTES = 30;
 export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES;
 
-export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+/** Short weekday names, Monday first, in the current language. */
+export function weekdayLabels(): string[] {
+  return [0, 1, 2, 3, 4, 5, 6].map((index) => weekdayName(index));
+}
 
 export function mondayOf(iso: string): string {
   return weekRange(iso)[0] as string;
@@ -40,7 +45,7 @@ export function formatTimeLabel(value: string): string {
   const minutes = parseTimeToMinutes(value);
   const date = new Date();
   date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return date.toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit" });
 }
 
 export function slotStartMinutes(slot: number): number {

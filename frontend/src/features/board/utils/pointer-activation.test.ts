@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import {
   POINTER_ACTIVATION_DISTANCE,
   isNoDragTarget,

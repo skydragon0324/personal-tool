@@ -1,0 +1,53 @@
+import type { RichTextEditorLabels } from "@mantine/tiptap";
+
+import { t } from "./index";
+
+/** Toolbar and link/color-picker texts for Mantine's rich text editor, in the current language. */
+export function editorLabels(): Partial<RichTextEditorLabels> {
+  return {
+    linkControlLabel: t("editor.link"),
+    colorPickerControlLabel: t("editor.textColor"),
+    highlightControlLabel: t("editor.highlight"),
+    colorControlLabel: (color: string) => t("editor.setTextColor", { color }),
+    boldControlLabel: t("editor.bold"),
+    italicControlLabel: t("editor.italic"),
+    underlineControlLabel: t("editor.underline"),
+    strikeControlLabel: t("editor.strike"),
+    clearFormattingControlLabel: t("editor.clearFormatting"),
+    unlinkControlLabel: t("editor.unlink"),
+    bulletListControlLabel: t("editor.bulletList"),
+    orderedListControlLabel: t("editor.orderedList"),
+    h1ControlLabel: t("editor.heading", { level: 1 }),
+    h2ControlLabel: t("editor.heading", { level: 2 }),
+    h3ControlLabel: t("editor.heading", { level: 3 }),
+    h4ControlLabel: t("editor.heading", { level: 4 }),
+    h5ControlLabel: t("editor.heading", { level: 5 }),
+    h6ControlLabel: t("editor.heading", { level: 6 }),
+    blockquoteControlLabel: t("editor.blockquote"),
+    alignLeftControlLabel: t("editor.alignLeft"),
+    alignCenterControlLabel: t("editor.alignCenter"),
+    alignRightControlLabel: t("editor.alignRight"),
+    alignJustifyControlLabel: t("editor.alignJustify"),
+    codeControlLabel: t("editor.code"),
+    codeBlockControlLabel: t("editor.codeBlock"),
+    subscriptControlLabel: t("editor.subscript"),
+    superscriptControlLabel: t("editor.superscript"),
+    unsetColorControlLabel: t("editor.unsetColor"),
+    hrControlLabel: t("editor.horizontalLine"),
+    undoControlLabel: t("editor.undo"),
+    redoControlLabel: t("editor.redo"),
+    tasksControlLabel: t("editor.taskList"),
+    tasksSinkLabel: t("editor.decreaseTaskLevel"),
+    tasksLiftLabel: t("editor.increaseTaskLevel"),
+    linkEditorInputLabel: t("editor.enterUrl"),
+    linkEditorExternalLink: t("editor.openInNewTab"),
+    linkEditorInternalLink: t("editor.openInSameTab"),
+    linkEditorSave: t("common.save"),
+    colorPickerCancel: t("common.cancel"),
+    colorPickerClear: t("editor.clearColor"),
+    colorPickerColorPicker: t("editor.colorPicker"),
+    colorPickerPalette: t("editor.colorPalette"),
+    colorPickerSave: t("common.save"),
+    colorPickerColorLabel: (color: string) => t("editor.setTextColor", { color }),
+  };
+}

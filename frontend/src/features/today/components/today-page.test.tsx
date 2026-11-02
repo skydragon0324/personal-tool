@@ -2,46 +2,44 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TodayResponse } from "../types";
 import { TodayPage } from "./today-page";
 
-const { todayQuery, occurrenceMutate, loadNote } = vi.hoisted(() => ({
-  todayQuery: {
-    isLoading: false,
-    isError: false,
-    data: null as TodayResponse | null,
-    refetch: vi.fn(),
-  },
-  occurrenceMutate: vi.fn(),
-  loadNote: vi.fn(),
-}));
+const todayQuery = {
+  isLoading: false,
+  isError: false,
+  data: null as TodayResponse | null,
+  refetch: jest.fn(),
+};
+const occurrenceMutate = jest.fn();
+const loadNote = jest.fn();
 
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
+  __esModule: true,
   default: ({ href, children }: { href: string; children: ReactNode }) =>
     createElement("a", { href }, children),
 }));
 
-vi.mock("@/lib/dates", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/dates")>();
+jest.mock("@/lib/dates", () => {
+  const actual = jest.requireActual<typeof import("@/lib/dates")>("@/lib/dates");
   return {
     ...actual,
     todayISO: () => "2026-08-20",
   };
 });
 
-vi.mock("@/features/auth/components/auth-provider", () => ({
+jest.mock("@/features/auth/components/auth-provider", () => ({
   useAuth: () => ({
     user: { display_name: "Ada", email: "ada@example.com" },
     isLoading: false,
-    login: vi.fn(),
-    register: vi.fn(),
-    logout: vi.fn(),
+    login: jest.fn(),
+    register: jest.fn(),
+    logout: jest.fn(),
   }),
 }));
 
-vi.mock("@/features/schedule/hooks/use-schedule-occurrence", () => ({
+jest.mock("@/features/schedule/hooks/use-schedule-occurrence", () => ({
   useScheduleOccurrence: () => ({
     mutate: occurrenceMutate,
     isPending: false,
@@ -50,16 +48,16 @@ vi.mock("@/features/schedule/hooks/use-schedule-occurrence", () => ({
   }),
 }));
 
-vi.mock("../hooks/use-today", () => ({
+jest.mock("../hooks/use-today", () => ({
   useToday: () => todayQuery,
 }));
 
-vi.mock("./today-editors", () => ({
+jest.mock("./today-editors", () => ({
   loadNote: (...args: unknown[]) => loadNote(...args),
-  TodayTaskDrawer: ({ taskId }: { taskId: string | null }) =>
-    taskId ? createElement("div", null, `Task drawer ${taskId}`) : null,
-  TodayNoteDrawer: ({ note }: { note: { title: string } | null }) =>
-    note ? createElement("div", null, `Note drawer ${note.title}`) : null,
+  TodayTaskModal: ({ taskId }: { taskId: string | null }) =>
+    taskId ? createElement("div", null, `Task modal ${taskId}`) : null,
+  TodayNoteModal: ({ note }: { note: { title: string } | null }) =>
+    note ? createElement("div", null, `Note modal ${note.title}`) : null,
   TodayScheduleEditor: ({ entry }: { entry: { title: string } | null }) =>
     entry ? createElement("div", null, `Schedule editor ${entry.title}`) : null,
 }));
@@ -251,18 +249,18 @@ describe("Today page", () => {
     });
   });
 
-  it("opens the task detail drawer", async () => {
+  it("opens the task detail modal", async () => {
     const user = userEvent.setup();
     wrap(createElement(TodayPage));
     await user.click(screen.getByRole("button", { name: /Write brief/ }));
-    expect(screen.getByText("Task drawer task-open")).toBeInTheDocument();
+    expect(screen.getByText("Task modal task-open")).toBeInTheDocument();
   });
 
-  it("opens the note drawer", async () => {
+  it("opens the note modal", async () => {
     const user = userEvent.setup();
     wrap(createElement(TodayPage));
     await user.click(screen.getByRole("button", { name: /Grocery list/ }));
-    expect(await screen.findByText("Note drawer Grocery list")).toBeInTheDocument();
+    expect(await screen.findByText("Note modal Grocery list")).toBeInTheDocument();
     expect(loadNote).toHaveBeenCalledWith("note-1");
   });
 

@@ -1,5 +1,5 @@
 /**
- * Asks an already-mounted board page to open a task drawer. Used when navigating to
+ * Asks an already-mounted board page to open a task. Used when navigating to
  * `/boards/{id}?task=…` would not remount the page because that board is already open.
  */
 export const OPEN_TASK_EVENT = "life-management:open-task";

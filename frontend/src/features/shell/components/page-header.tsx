@@ -1,5 +1,3 @@
-"use client";
-
 import { MobileSidebarButton } from "@/features/shell/components/workspace-chrome";
 
 export function PageHeader({

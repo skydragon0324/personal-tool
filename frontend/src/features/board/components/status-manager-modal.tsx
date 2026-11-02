@@ -1,5 +1,3 @@
-"use client";
-
 import { move } from "@dnd-kit/helpers";
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { DragDropProvider } from "@dnd-kit/react";
@@ -25,6 +23,8 @@ import { formatDateTime } from "@/lib/dates";
 import type { ColumnDetail } from "../types";
 import { STATUS_COLORS, statusHeaderClass } from "../utils/status-colors";
 import { useColumnMutations, useColumns } from "../hooks/use-columns";
+import { colorName, t } from "@/i18n";
+import { tRich } from "@/i18n/rich";
 
 interface StatusManagerModalProps {
   opened: boolean;
@@ -71,14 +71,14 @@ function SortableStatusRow({
           type="button"
           ref={handleRef}
           className="mt-1 cursor-grab rounded-md border border-[var(--app-border)] px-2 py-1 text-[var(--app-text-muted)]"
-          aria-label={`Reorder ${column.name}`}
+          aria-label={t("boards.reorder", { name: column.name })}
         >
           ⋮⋮
         </button>
         <div className={`mt-1 h-8 w-1.5 rounded-full ${statusHeaderClass(column.color)}`} />
         <div className="min-w-0 flex-1 space-y-2">
           <TextInput
-            label="Name"
+            label={t("boards.name")}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             onBlur={() => {
@@ -94,19 +94,19 @@ function SortableStatusRow({
                   column.color === color ? "ring-2 ring-[var(--app-primary)] ring-offset-2" : ""
                 }`}
                 onClick={() => onColor(color)}
-                aria-label={color}
+                aria-label={colorName(color)}
               />
             ))}
           </Group>
           <Group justify="space-between" gap="xs">
             <Switch
               size="sm"
-              label="Counts as completed"
+              label={t("status.countsAsCompleted")}
               checked={column.is_done}
               onChange={(event) => onDone(event.currentTarget.checked)}
             />
             <Button size="xs" color="red" variant="subtle" onClick={onRequestArchive}>
-              Remove…
+              {t("statuses.removeEllipsis")}
             </Button>
           </Group>
         </div>
@@ -189,12 +189,18 @@ export function StatusManagerModal({
       });
       setNewName("");
       setNewDone(false);
-      notifySuccess("Status created");
+      notifySuccess(t("statuses.created"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not create status";
+      const message = err instanceof Error ? err.message : t("statuses.couldNotCreate");
       setError(message);
-      notifyApiError(err, "Could not create status");
+      notifyApiError(err, t("statuses.couldNotCreate"));
     }
+  }
+
+  function saveColumn(columnId: string, payload: { name?: string; color?: string; is_done?: boolean }) {
+    void update.mutateAsync({ columnId, payload }).catch((error) => {
+      notifyApiError(error, t("status.couldNotUpdate"));
+    });
   }
 
   function openArchiveDialog(column: ColumnDetail) {
@@ -212,12 +218,12 @@ export function StatusManagerModal({
         columnId: pendingArchive.id,
         moveToColumnId: pendingArchive.task_count > 0 ? archiveMoveTo : null,
       });
-      notifySuccess(`Archived ${pendingArchive.name}`);
+      notifySuccess(t("statuses.archived", { name: pendingArchive.name }));
       setPendingArchive(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not archive status";
+      const message = err instanceof Error ? err.message : t("statuses.couldNotArchive");
       setError(message);
-      notifyApiError(err, "Could not archive status");
+      notifyApiError(err, t("statuses.couldNotArchive"));
     }
   }
 
@@ -229,11 +235,11 @@ export function StatusManagerModal({
         columnId: pendingArchive.id,
         moveToColumnId: pendingArchive.task_count > 0 ? archiveMoveTo : null,
       });
-      notifySuccess(`Deleted ${pendingArchive.name}`);
+      notifySuccess(t("status.deleted", { name: pendingArchive.name }));
       setPendingArchive(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete status");
-      notifyApiError(err, "Could not delete status");
+      setError(err instanceof Error ? err.message : t("statuses.couldNotDelete"));
+      notifyApiError(err, t("statuses.couldNotDelete"));
     }
   }
 
@@ -241,11 +247,11 @@ export function StatusManagerModal({
     setError(null);
     try {
       await restore.mutateAsync(column.id);
-      notifySuccess(`Restored ${column.name}`);
+      notifySuccess(t("statuses.restored", { name: column.name }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not restore status";
+      const message = err instanceof Error ? err.message : t("statuses.couldNotRestore");
       setError(message);
-      notifyApiError(err, "Could not restore status");
+      notifyApiError(err, t("statuses.couldNotRestore"));
     }
   }
 
@@ -254,12 +260,12 @@ export function StatusManagerModal({
     setError(null);
     try {
       await remove.mutateAsync(pendingDelete.id);
-      notifySuccess(`Deleted ${pendingDelete.name}`);
+      notifySuccess(t("status.deleted", { name: pendingDelete.name }));
       setPendingDelete(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not delete status";
+      const message = err instanceof Error ? err.message : t("statuses.couldNotDelete");
       setError(message);
-      notifyApiError(err, "Could not delete status");
+      notifyApiError(err, t("statuses.couldNotDelete"));
     }
   }
 
@@ -270,7 +276,7 @@ export function StatusManagerModal({
       <Modal
         opened={opened}
         onClose={onClose}
-        title="Manage statuses"
+        title={t("board.manageStatuses")}
         size="xl"
         radius="lg"
         styles={{ body: { maxHeight: "min(75vh, 720px)", overflowY: "auto" } }}
@@ -283,25 +289,25 @@ export function StatusManagerModal({
           ) : null}
           <Tabs value={tab} onChange={(value) => value && setTab(value as "active" | "archived")}>
             <Tabs.List>
-              <Tabs.Tab value="active">Active ({active.length})</Tabs.Tab>
-              <Tabs.Tab value="archived">Archived ({archived.length})</Tabs.Tab>
+              <Tabs.Tab value="active">{t("boards.activeTab", { count: active.length })}</Tabs.Tab>
+              <Tabs.Tab value="archived">{t("boards.archivedTab", { count: archived.length })}</Tabs.Tab>
             </Tabs.List>
 
             <Tabs.Panel value="active" pt="md">
               <div className="rounded-xl border border-dashed border-[var(--app-border)] p-3">
                 <Text fw={600} mb="xs">
-                  Add a status
+                  {t("statuses.addTitle")}
                 </Text>
                 <Group align="end" grow>
                   <TextInput
-                    label="Name"
+                    label={t("boards.name")}
                     value={newName}
                     onChange={(event) => setNewName(event.currentTarget.value)}
-                    placeholder="e.g. Review"
+                    placeholder={t("statuses.namePlaceholder")}
                   />
                   <Select
-                    label="Color"
-                    data={STATUS_COLORS.map((color) => ({ value: color, label: color }))}
+                    label={t("status.color")}
+                    data={STATUS_COLORS.map((color) => ({ value: color, label: colorName(color) }))}
                     value={newColor}
                     onChange={(value) => setNewColor(value ?? "slate")}
                     allowDeselect={false}
@@ -309,18 +315,18 @@ export function StatusManagerModal({
                 </Group>
                 <Checkbox
                   className="mt-3"
-                  label="Counts as completed"
-                  description="Tasks in this status are counted as completed."
+                  label={t("status.countsAsCompleted")}
+                  description={t("statuses.countsAsCompletedHint")}
                   checked={newDone}
                   onChange={(event) => setNewDone(event.currentTarget.checked)}
                 />
                 <Button className="mt-3" onClick={() => void handleCreate()} loading={create.isPending}>
-                  Add
+                  {t("common.add")}
                 </Button>
               </div>
 
               <Text fw={600} mt="lg" mb="sm">
-                Active statuses
+                {t("statuses.activeStatuses")}
               </Text>
               <DragDropProvider
                 onDragOver={(event) => {
@@ -340,8 +346,8 @@ export function StatusManagerModal({
                   try {
                     await reorder.mutateAsync({ columnId: sourceId, targetPosition: target });
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : "Could not reorder statuses");
-                    notifyApiError(err, "Could not reorder statuses");
+                    setError(err instanceof Error ? err.message : t("statuses.couldNotReorder"));
+                    notifyApiError(err, t("statuses.couldNotReorder"));
                     setOrderedIds(active.map((column) => column.id));
                   }
                 }}
@@ -352,15 +358,9 @@ export function StatusManagerModal({
                       key={column.id}
                       column={column}
                       index={index}
-                      onRename={(name) =>
-                        void update.mutateAsync({ columnId: column.id, payload: { name } })
-                      }
-                      onColor={(color) =>
-                        void update.mutateAsync({ columnId: column.id, payload: { color } })
-                      }
-                      onDone={(is_done) =>
-                        void update.mutateAsync({ columnId: column.id, payload: { is_done } })
-                      }
+                      onRename={(name) => saveColumn(column.id, { name })}
+                      onColor={(color) => saveColumn(column.id, { color })}
+                      onDone={(is_done) => saveColumn(column.id, { is_done })}
                       onRequestArchive={() => openArchiveDialog(column)}
                     />
                   ))}
@@ -370,7 +370,7 @@ export function StatusManagerModal({
 
             <Tabs.Panel value="archived" pt="md">
               <Text size="sm" c="dimmed" mb="md">
-                Archive is reversible. Delete permanently cannot be undone.
+                {t("boards.archiveHint")}
               </Text>
               {archived.length ? (
                 <div className="space-y-3">
@@ -388,10 +388,10 @@ export function StatusManagerModal({
                             <Text fw={600}>{column.name}</Text>
                           </Group>
                           <Text size="sm" c="dimmed">
-                            Archived {column.archived_at ? formatDateTime(column.archived_at) : ""}
+                            {t("boards.archivedAt", { date: column.archived_at ? formatDateTime(column.archived_at) : "" })}
                           </Text>
                           <Badge className="mt-2" variant="light" color={column.is_done ? "teal" : "gray"}>
-                            {column.is_done ? "Counts as completed" : "Not a completed status"}
+                            {column.is_done ? t("status.countsAsCompleted") : t("statuses.notCompleted")}
                           </Badge>
                         </div>
                         <Group gap="xs">
@@ -401,7 +401,7 @@ export function StatusManagerModal({
                             loading={restore.isPending && restore.variables === column.id}
                             disabled={restore.isPending || remove.isPending}
                           >
-                            Restore
+                            {t("boards.restore")}
                           </Button>
                           <Button
                             color="red"
@@ -411,13 +411,13 @@ export function StatusManagerModal({
                             }}
                             disabled={column.task_count > 0 || remove.isPending}
                           >
-                            Delete permanently
+                            {t("boards.deletePermanently")}
                           </Button>
                         </Group>
                       </Group>
                       {column.task_count > 0 ? (
                         <Text size="xs" c="dimmed" mt="xs">
-                          Move or delete its tasks before permanent deletion.
+                          {t("statuses.moveTasksFirst")}
                         </Text>
                       ) : null}
                     </div>
@@ -425,7 +425,7 @@ export function StatusManagerModal({
                 </div>
               ) : (
                 <Text size="sm" c="dimmed">
-                  No archived statuses.
+                  {t("statuses.noArchived")}
                 </Text>
               )}
             </Tabs.Panel>
@@ -436,41 +436,43 @@ export function StatusManagerModal({
       <Modal
         opened={pendingArchive !== null}
         onClose={() => setPendingArchive(null)}
-        title={pendingArchive ? `Remove “${pendingArchive.name}”` : "Remove status"}
+        title={pendingArchive ? t("statuses.removeTitle", { name: pendingArchive.name }) : t("statuses.removeStatus")}
         radius="lg"
       >
         {pendingArchive ? (
           <Stack>
             <Text size="sm">
-              <strong>Archive</strong> hides the status and lets you restore it later.{" "}
-              <strong>Delete</strong> removes it for good. Either way its tasks are kept.
+              {tRich("statuses.removeExplainer", {
+                archive: <strong>{t("boards.archive")}</strong>,
+                delete: <strong>{t("common.delete")}</strong>,
+              })}
             </Text>
             {pendingArchive.task_count > 0 ? (
               <>
                 <Text size="sm">
-                  {pendingArchive.task_count}{" "}
-                  {pendingArchive.task_count === 1 ? "task" : "tasks"} will move to the selected
-                  status
-                  {archiveTargetName ? ` (${archiveTargetName})` : ""}.
+                  {t("statuses.tasksWillMove", {
+                    count: pendingArchive.task_count,
+                    target: archiveTargetName ? t("statuses.targetSuffix", { name: archiveTargetName }) : "",
+                  })}
                 </Text>
                 <Select
-                  label="Move tasks to"
+                  label={t("statuses.moveTasksTo")}
                   data={active
                     .filter((item) => item.id !== pendingArchive.id)
                     .map((item) => ({ value: item.id, label: item.name }))}
                   value={archiveMoveTo}
                   onChange={setArchiveMoveTo}
-                  placeholder="Target status"
+                  placeholder={t("statuses.targetStatus")}
                 />
               </>
             ) : (
               <Text size="sm" c="dimmed">
-                This status has no tasks.
+                {t("statuses.noTasks")}
               </Text>
             )}
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setPendingArchive(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="light"
@@ -478,7 +480,7 @@ export function StatusManagerModal({
                 loading={archive.isPending}
                 disabled={pendingArchive.task_count > 0 && !archiveMoveTo}
               >
-                Archive
+                {t("boards.archive")}
               </Button>
               <Button
                 color="red"
@@ -486,7 +488,7 @@ export function StatusManagerModal({
                 loading={removeMovingTasks.isPending}
                 disabled={pendingArchive.task_count > 0 && !archiveMoveTo}
               >
-                Delete
+                {t("common.delete")}
               </Button>
             </Group>
           </Stack>
@@ -496,24 +498,24 @@ export function StatusManagerModal({
       <Modal
         opened={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        title="Delete status permanently"
+        title={t("statuses.deleteTitle")}
         radius="lg"
       >
         {pendingDelete ? (
           <Stack>
             <Text>
-              Permanently delete <strong>{pendingDelete.name}</strong>? This action cannot be undone.
+              {tRich("statuses.deleteConfirm", { name: <strong>{pendingDelete.name}</strong> })}
             </Text>
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setPendingDelete(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 color="red"
                 onClick={() => void confirmDelete()}
                 loading={remove.isPending}
               >
-                Delete permanently
+                {t("boards.deletePermanently")}
               </Button>
             </Group>
           </Stack>

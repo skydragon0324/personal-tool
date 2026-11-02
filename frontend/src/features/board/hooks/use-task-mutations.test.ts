@@ -1,18 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { recurrenceKeys } from "@/features/recurrence/api/recurrence-queries";
 import type { BoardQueryParams, TaskDetail } from "../types";
 import { useTaskMutations } from "./use-task-mutations";
 
-const create = vi.fn();
-const update = vi.fn();
-const remove = vi.fn();
-const stopRecurrence = vi.fn();
+const create = jest.fn();
+const update = jest.fn();
+const remove = jest.fn();
+const stopRecurrence = jest.fn();
 
-vi.mock("../api/task-mutations", () => ({
+jest.mock("../api/task-mutations", () => ({
   taskMutations: {
     create: (...args: unknown[]) => create(...args),
     update: (...args: unknown[]) => update(...args),
@@ -21,10 +20,10 @@ vi.mock("../api/task-mutations", () => ({
   },
 }));
 
-vi.mock("@/lib/api-client", () => ({
+jest.mock("@/lib/api-client", () => ({
   apiClient: {
-    uploadAttachment: vi.fn(),
-    deleteAttachment: vi.fn(),
+    uploadAttachment: jest.fn(),
+    deleteAttachment: jest.fn(),
   },
 }));
 
@@ -54,7 +53,7 @@ describe("useTaskMutations recurrence invalidation", () => {
 
   it("invalidates recurrence queries after create, edit, delete, and stop", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const invalidate = jest.spyOn(client, "invalidateQueries");
     create.mockResolvedValue(task);
     update.mockResolvedValue(task);
     remove.mockResolvedValue(undefined);

@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Task
@@ -40,6 +40,30 @@ def resolve_insert_index(
     if fallback_index is not None:
         return min(max(fallback_index, 0), len(sibling_ids))
     return len(sibling_ids)
+
+
+def renumber_columns(db: Session, column_ids: set[uuid.UUID]) -> None:
+    """Make task positions 0..n-1 again in these columns (after rows left them)."""
+    if not column_ids:
+        return
+    db.flush()
+    ranked = (
+        select(
+            Task.id.label("id"),
+            (func.row_number().over(partition_by=Task.column_id, order_by=(Task.position, Task.id)) - 1).label(
+                "rank"
+            ),
+        )
+        .where(Task.column_id.in_(column_ids))
+        .subquery()
+    )
+    db.execute(
+        update(Task)
+        .where(Task.id == ranked.c.id, Task.position != ranked.c.rank)
+        .values(position=ranked.c.rank)
+        .execution_options(synchronize_session=False)
+    )
+    db.expire_all()
 
 
 def move_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailRead:

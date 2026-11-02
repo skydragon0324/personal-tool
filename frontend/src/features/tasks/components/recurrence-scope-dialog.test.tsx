@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
 
 import { RecurrenceScopeDialog } from "./recurrence-scope-dialog";
 
@@ -17,8 +16,8 @@ describe("RecurrenceScopeDialog delete", () => {
         open: true,
         mode: "delete",
         taskTitle: "Weekly standup",
-        onClose: vi.fn(),
-        onConfirm: vi.fn(),
+        onClose: jest.fn(),
+        onConfirm: jest.fn(),
       }),
     );
     expect(screen.getByRole("alertdialog", { name: "Delete repeating task" })).toBeInTheDocument();
@@ -35,8 +34,8 @@ describe("RecurrenceScopeDialog delete", () => {
         mode: "delete",
         taskTitle: "Weekly standup",
         completed: true,
-        onClose: vi.fn(),
-        onConfirm: vi.fn(),
+        onClose: jest.fn(),
+        onConfirm: jest.fn(),
       }),
     );
     expect(screen.getByRole("radio", { name: "This task only" })).toBeInTheDocument();
@@ -51,13 +50,13 @@ describe("RecurrenceScopeDialog delete", () => {
 
   it("passes the selected scope on confirm", async () => {
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
+    const onConfirm = jest.fn();
     wrap(
       createElement(RecurrenceScopeDialog, {
         open: true,
         mode: "delete",
         taskTitle: "Weekly standup",
-        onClose: vi.fn(),
+        onClose: jest.fn(),
         onConfirm,
       }),
     );
@@ -68,14 +67,14 @@ describe("RecurrenceScopeDialog delete", () => {
 
   it("passes completed confirmation for a completed occurrence", async () => {
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
+    const onConfirm = jest.fn();
     wrap(
       createElement(RecurrenceScopeDialog, {
         open: true,
         mode: "delete",
         taskTitle: "Weekly standup",
         completed: true,
-        onClose: vi.fn(),
+        onClose: jest.fn(),
         onConfirm,
       }),
     );
@@ -85,8 +84,8 @@ describe("RecurrenceScopeDialog delete", () => {
 
   it("does not delete when cancelled", async () => {
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
-    const onClose = vi.fn();
+    const onConfirm = jest.fn();
+    const onClose = jest.fn();
     wrap(
       createElement(RecurrenceScopeDialog, {
         open: true,
@@ -107,8 +106,8 @@ describe("RecurrenceScopeDialog delete", () => {
         open: true,
         mode: "delete",
         taskTitle: "Weekly standup",
-        onClose: vi.fn(),
-        onConfirm: vi.fn(),
+        onClose: jest.fn(),
+        onConfirm: jest.fn(),
       }),
     );
     expect(screen.getByRole("alertdialog", { name: "Delete repeating task" })).toBeInTheDocument();

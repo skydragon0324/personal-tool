@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
 
 import type { ScheduleEntry, ScheduleOccurrence } from "../types";
 import { ScheduleGrid } from "./schedule-grid";
@@ -36,9 +35,9 @@ function renderGrid({
   view = "week",
   dates = weekDates,
   occurrences = [],
-  onToggleComplete = vi.fn(),
-  onEntryClick = vi.fn(),
-  onSlotClick = vi.fn(),
+  onToggleComplete = jest.fn(),
+  onEntryClick = jest.fn(),
+  onSlotClick = jest.fn(),
   pendingKey = null,
 }: {
   view?: "day" | "week";
@@ -126,9 +125,9 @@ describe("ScheduleGrid occurrence completion", () => {
               completed_at: "2026-08-17T08:05:00Z",
             },
           ],
-          onSlotClick: vi.fn(),
-          onEntryClick: vi.fn(),
-          onToggleComplete: vi.fn(),
+          onSlotClick: jest.fn(),
+          onEntryClick: jest.fn(),
+          onToggleComplete: jest.fn(),
         }),
       ),
     );

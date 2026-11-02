@@ -1,5 +1,3 @@
-"use client";
-
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { useDroppable } from "@dnd-kit/react";
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, time
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -17,7 +18,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -42,6 +43,10 @@ class Notification(Base):
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    # Lets clients show the body in the user's language: a message key and the values it needs
+    # (dates as YYYY-MM-DD, times as HH:MM). ``body`` keeps the English text.
+    body_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    body_params: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     board_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("boards.id", ondelete="CASCADE"), nullable=True
     )

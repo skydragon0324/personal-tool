@@ -1,3 +1,5 @@
+import { t } from "@/i18n";
+
 export type DateRangeValue = [string | null, string | null];
 
 export function applyRangeChange(
@@ -31,10 +33,10 @@ export function commitCustomRange(
   const start = pickerRange[0];
   const end = pickerRange[1];
   if (!start || !end) {
-    return { ok: false, error: "Choose a start date and an end date" };
+    return { ok: false, error: t("filters.chooseStartAndEnd") };
   }
   if (start > end) {
-    return { ok: false, error: "Start date must be on or before the end date" };
+    return { ok: false, error: t("filters.startAfterEnd") };
   }
   return { ok: true, range: [start, end] };
 }

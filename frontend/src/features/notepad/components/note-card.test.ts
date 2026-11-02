@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactElement } from "react";
-import { describe, expect, it, vi } from "vitest";
 
 import type { Note } from "../types";
 import { NoteCard } from "./note-card";
@@ -23,16 +22,16 @@ function renderWithMantine(ui: ReactElement) {
 }
 
 describe("note pin actions", () => {
-  it("pins from a card without opening the drawer", async () => {
+  it("pins from a card without opening the editor", async () => {
     const user = userEvent.setup();
-    const onOpen = vi.fn();
-    const onTogglePin = vi.fn();
+    const onOpen = jest.fn();
+    const onTogglePin = jest.fn();
     renderWithMantine(
       createElement(NoteCard, {
         note,
         onOpen,
         onTogglePin,
-        onDelete: vi.fn(),
+        onDelete: jest.fn(),
       }),
     );
     await user.click(screen.getByLabelText("Note actions"));
@@ -44,14 +43,14 @@ describe("note pin actions", () => {
 
   it("pins from a table row without opening the row", async () => {
     const user = userEvent.setup();
-    const onOpen = vi.fn();
-    const onTogglePin = vi.fn();
+    const onOpen = jest.fn();
+    const onTogglePin = jest.fn();
     renderWithMantine(
       createElement(NoteTable, {
         notes: [note],
         onOpen,
         onTogglePin,
-        onDelete: vi.fn(),
+        onDelete: jest.fn(),
       }),
     );
     await user.click(screen.getByLabelText("Note actions"));

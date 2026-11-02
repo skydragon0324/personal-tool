@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import type { TaskSummary } from "../types";
 import { moveAnchors, shouldShowDateHeadings } from "./move-anchors";
 

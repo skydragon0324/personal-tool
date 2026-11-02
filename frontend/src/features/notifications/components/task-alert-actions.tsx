@@ -1,15 +1,15 @@
-"use client";
-
 import { Button, Group } from "@mantine/core";
-import { DatePicker, TimeInput } from "@mantine/dates";
+import { TimeInput } from "@mantine/dates";
 import dayjs from "dayjs";
 import { useState } from "react";
 
+import { DatePicker } from "@/lib/date-pickers";
 import { notifyApiError, notifySuccess } from "@/lib/notify";
 
 import { useNotificationMutations } from "../hooks/use-notifications";
 import type { AppNotification } from "../types";
 import { snoozeOptions } from "../utils/snooze-options";
+import { t } from "@/i18n";
 
 /** Kinds about a task the user can act on: remind again later, mark done, or close. */
 export function isTaskAlert(item: AppNotification): boolean {
@@ -32,8 +32,9 @@ export function TaskAlertActions({ item }: { item: AppNotification }) {
     snooze.mutate(
       { id: item.id, remindAt: dayjs(at).format() },
       {
-        onSuccess: () => notifySuccess(`We'll remind you ${dayjs(at).format("MMM D [at] HH:mm")}`),
-        onError: (error) => notifyApiError(error, "Could not set the reminder"),
+        onSuccess: () =>
+          notifySuccess(t("notifications.remindedAt", { when: dayjs(at).format(t("notifications.remindWhenFormat")) })),
+        onError: (error) => notifyApiError(error, t("notifications.couldNotRemind")),
       },
     );
   }
@@ -49,7 +50,7 @@ export function TaskAlertActions({ item }: { item: AppNotification }) {
           onClick={() => setMode(mode === "closed" ? "choices" : "closed")}
           aria-expanded={mode !== "closed"}
         >
-          Remind me
+          {t("notifications.remindMe")}
         </Button>
         <Button
           size="compact-xs"
@@ -57,26 +58,26 @@ export function TaskAlertActions({ item }: { item: AppNotification }) {
           color="teal"
           onClick={() =>
             completeTask.mutate(item.id, {
-              onSuccess: () => notifySuccess(`Marked “${item.title}” as completed`),
-              onError: (error) => notifyApiError(error, "Could not complete the task"),
+              onSuccess: () => notifySuccess(t("notifications.markedCompleted", { title: item.title })),
+              onError: (error) => notifyApiError(error, t("notifications.couldNotComplete")),
             })
           }
         >
-          Complete
+          {t("notifications.complete")}
         </Button>
         <Button
           size="compact-xs"
           variant="subtle"
           color="gray"
-          title="Stop notifying me about this task"
+          title={t("notifications.stopNotifying")}
           onClick={() => dismiss.mutate(item.id)}
         >
-          Close
+          {t("common.close")}
         </Button>
       </Group>
 
       {mode === "choices" ? (
-        <div className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="Remind me when">
+        <div className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={t("notifications.remindMeWhen")}>
           {snoozeOptions().map((option) => (
             <Button key={option.label} size="compact-xs" variant="default" onClick={() => remindAt(option.at)}>
               {option.label}
@@ -90,7 +91,7 @@ export function TaskAlertActions({ item }: { item: AppNotification }) {
               setMode("custom");
             }}
           >
-            Pick a time…
+            {t("notifications.pickTime")}
           </Button>
         </div>
       ) : null}
@@ -101,20 +102,20 @@ export function TaskAlertActions({ item }: { item: AppNotification }) {
           <Group gap={4} align="flex-end">
             <TimeInput
               size="xs"
-              label="Time"
+              label={t("notifications.time")}
               value={time}
               onChange={(event) => setTime(event.currentTarget.value)}
               w={100}
             />
             <Button size="compact-sm" variant="default" onClick={() => setMode("choices")}>
-              Back
+              {t("common.back")}
             </Button>
             <Button
               size="compact-sm"
               disabled={!custom || !custom.isAfter(dayjs())}
               onClick={() => custom && remindAt(custom.toDate())}
             >
-              Set reminder
+              {t("notifications.setReminder")}
             </Button>
           </Group>
         </div>

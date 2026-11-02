@@ -1,3 +1,5 @@
+import { dateLocale } from "@/i18n";
+
 import { todayISO } from "@/lib/dates";
 
 function parse(isoDate: string): Date {
@@ -14,7 +16,7 @@ function toISO(date: Date): string {
 /** "Monday, September 23" — the year is added only when it is not the current one. */
 export function formatPlanDay(isoDate: string, today: string = todayISO()): string {
   const date = parse(isoDate);
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale(), {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -26,7 +28,7 @@ export function formatPlanDay(isoDate: string, today: string = todayISO()): stri
 export function formatPlanRange(first: string | null, last: string | null): string | null {
   if (!first || !last) return null;
   const short = (value: string) =>
-    parse(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    parse(value).toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
   return first === last ? short(first) : `${short(first)} – ${short(last)}`;
 }
 

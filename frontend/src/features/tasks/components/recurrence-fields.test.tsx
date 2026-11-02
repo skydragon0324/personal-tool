@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   RecurrenceFields,

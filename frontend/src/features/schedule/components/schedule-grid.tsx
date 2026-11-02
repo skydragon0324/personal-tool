@@ -1,5 +1,3 @@
-"use client";
-
 import { Checkbox } from "@mantine/core";
 
 import { statusHeaderClass } from "@/features/board/utils/status-colors";
@@ -10,7 +8,7 @@ import { isOccurrenceCompleted, occurrenceKey } from "../utils/occurrence-state"
 import {
   SLOT_MINUTES,
   SLOTS_PER_DAY,
-  WEEKDAY_LABELS,
+  weekdayLabels,
   formatTimeLabel,
   minutesToTime,
   slotCount,
@@ -18,6 +16,7 @@ import {
   timeToSlot,
   weekdayIndex,
 } from "../utils/schedule-time";
+import { t } from "@/i18n";
 
 interface ScheduleGridProps {
   view: "day" | "week";
@@ -57,7 +56,7 @@ export function ScheduleGrid({
             key={iso}
             className="sticky top-0 z-10 border-b border-l border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-2 text-center text-sm font-medium text-[var(--app-text)]"
           >
-            {WEEKDAY_LABELS[view === "day" ? weekdayIndex(iso) : index]}
+            {weekdayLabels()[view === "day" ? weekdayIndex(iso) : index]}
             <div className="text-xs font-normal text-[var(--app-text-muted)]">{iso.slice(5)}</div>
           </div>
         ))}
@@ -118,7 +117,7 @@ function SlotRow({
           >
             <button
               type="button"
-              aria-label={`Add schedule at ${formatTimeLabel(start)} on ${WEEKDAY_LABELS[weekday]}`}
+              aria-label={t("schedule.addAt", { time: formatTimeLabel(start), day: weekdayLabels()[weekday] })}
               onClick={() => onSlotClick(weekday, start, end)}
               className="absolute inset-0 hover:bg-[var(--app-surface-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
             />
@@ -143,8 +142,8 @@ function SlotRow({
                     disabled={pendingKey === key}
                     aria-label={
                       completed
-                        ? `Mark ${item.entry.title} incomplete on ${iso}`
-                        : `Mark ${item.entry.title} complete on ${iso}`
+                        ? t("schedule.markIncomplete", { title: item.entry.title, date: iso })
+                        : t("schedule.markComplete", { title: item.entry.title, date: iso })
                     }
                     onChange={(event) =>
                       onToggleComplete(item.entry, iso, event.currentTarget.checked)
@@ -158,7 +157,7 @@ function SlotRow({
                     className="min-w-0 flex-1 truncate text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
                   >
                     <span className={completed ? "line-through" : undefined}>{item.entry.title}</span>
-                    {completed ? <span className="sr-only">Completed</span> : null}
+                    {completed ? <span className="sr-only">{t("schedule.completed")}</span> : null}
                   </button>
                 </div>
               );

@@ -10,7 +10,11 @@ export interface AppNotification {
   id: string;
   kind: NotificationKind;
   title: string;
+  /** The English text; show `notificationBody(item)` instead. */
   body: string;
+  /** A message key and its values for showing the body in the user's language (newer notifications). */
+  body_key?: string | null;
+  body_params?: Record<string, string | number> | null;
   board_id: string | null;
   task_id: string | null;
   schedule_entry_id: string | null;

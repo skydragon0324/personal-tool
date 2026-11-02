@@ -1,8 +1,6 @@
-"use client";
-
 import { Button, Input, Select, Text, TextInput } from "@mantine/core";
-import { DatePickerInput, MonthPickerInput, YearPickerInput } from "@mantine/dates";
 
+import { DatePickerInput, DateRangePickerInput, MonthPickerInput, YearPickerInput } from "@/lib/date-pickers";
 import { formatLongDate } from "@/lib/dates";
 import { UNASSIGNED } from "../utils/filter-tasks";
 import type { BoardFilters, BoardPerson, Category, Priority } from "../types";
@@ -21,6 +19,7 @@ import {
   type DateRangeMode,
   type DateRangeValue,
 } from "../utils/date-presets";
+import { t } from "@/i18n";
 
 interface BoardToolbarProps {
   range: DateRangeValue;
@@ -41,25 +40,29 @@ interface BoardToolbarProps {
   onApplyCustom: (range: [string, string]) => void;
 }
 
-const RANGE_OPTIONS: { value: DateRangeMode; label: string }[] = [
-  { value: "year", label: "Year" },
-  { value: "month", label: "Month" },
-  { value: "week", label: "Week" },
-  { value: "day", label: "Day" },
-  { value: "custom", label: "Custom" },
-  { value: "all", label: "All" },
-];
+function rangeOptions(): { value: DateRangeMode; label: string }[] {
+  return [
+    { value: "year", label: t("filters.rangeYear") },
+    { value: "month", label: t("filters.rangeMonth") },
+    { value: "week", label: t("filters.rangeWeek") },
+    { value: "day", label: t("filters.rangeDay") },
+    { value: "custom", label: t("filters.rangeCustom") },
+    { value: "all", label: t("filters.rangeAll") },
+  ];
+}
 
 function rangeSummary(mode: DateRangeMode, range: DateRangeValue, dateField: DateField): string {
-  if (mode === "all") return "No date filter";
+  if (mode === "all") return t("filters.noDateFilter");
   if (!range[0] || !range[1]) {
-    return mode === "custom" ? "Choose a start date and an end date" : "Pick a date";
+    return mode === "custom" ? t("filters.chooseStartAndEnd") : t("filters.pickDate");
   }
   if (mode === "year") return formatYearLabel(range[0]);
   if (mode === "month") return formatMonthLabel(range[0]);
   if (mode === "week") return formatWeekRangeLabel(range[0], range[1]);
-  const fieldLabel = dateField === "created_at" ? "Created" : "Due";
-  if (range[0] === range[1]) return `${fieldLabel}: ${formatLongDate(range[0])}`;
+  if (range[0] === range[1]) {
+    const date = formatLongDate(range[0]);
+    return dateField === "created_at" ? t("filters.createdOn", { date }) : t("filters.dueOn", { date });
+  }
   return `${formatLongDate(range[0])} – ${formatLongDate(range[1])}`;
 }
 
@@ -80,14 +83,14 @@ function DateRangeControl({
   onCustomError: (message: string | null) => void;
   onApplyCustom: (range: [string, string]) => void;
 }) {
-  const label = dateField === "created_at" ? "Created date" : "Due date";
+  const label = dateField === "created_at" ? t("filters.createdDate") : t("filters.dueDate");
 
   if (mode === "all") {
     return (
       <div className="min-w-0">
         <Input.Label>{label}</Input.Label>
         <Text size="sm" mt={8}>
-          No date filter
+          {t("filters.noDateFilter")}
         </Text>
       </div>
     );
@@ -96,8 +99,8 @@ function DateRangeControl({
   if (mode === "year") {
     return (
       <YearPickerInput
-        label="Year"
-        placeholder="Select year"
+        label={t("filters.rangeYear")}
+        placeholder={t("filters.selectYear")}
         value={range[0]}
         valueFormat="YYYY"
         onChange={(value) => {
@@ -112,8 +115,8 @@ function DateRangeControl({
   if (mode === "month") {
     return (
       <MonthPickerInput
-        label="Month"
-        placeholder="Select month"
+        label={t("filters.rangeMonth")}
+        placeholder={t("filters.selectMonth")}
         value={range[0]}
         valueFormat="MMMM YYYY"
         monthsListFormat="MMMM"
@@ -129,9 +132,8 @@ function DateRangeControl({
   if (mode === "week") {
     return (
       <DatePickerInput
-        type="default"
-        label="Week"
-        placeholder="Select week"
+        label={t("filters.rangeWeek")}
+        placeholder={t("filters.selectWeek")}
         value={range[0]}
         valueFormat="MMM D, YYYY"
         firstDayOfWeek={1}
@@ -160,9 +162,8 @@ function DateRangeControl({
   if (mode === "day") {
     return (
       <DatePickerInput
-        type="default"
-        label="Day"
-        placeholder="Select date"
+        label={t("filters.rangeDay")}
+        placeholder={t("filters.selectDate")}
         value={range[0]}
         valueFormat="MMM D, YYYY"
         onChange={(value) => {
@@ -177,10 +178,9 @@ function DateRangeControl({
   const canApply = Boolean(range[0] && range[1]);
   return (
     <div className="min-w-0">
-      <DatePickerInput
-        type="range"
-        label={dateField === "created_at" ? "Created date range" : "Due date range"}
-        placeholder="Pick a range"
+      <DateRangePickerInput
+        label={dateField === "created_at" ? t("filters.createdRange") : t("filters.dueRange")}
+        placeholder={t("filters.pickRange")}
         value={range}
         onChange={(value: DateRangeValue) => {
           const start = pickerToISO(value?.[0] ?? null);
@@ -206,7 +206,7 @@ function DateRangeControl({
           onApplyCustom(result.range);
         }}
       >
-        Apply
+        {t("filters.apply")}
       </Button>
       {customError ? (
         <Text size="xs" c="red" mt={6}>
@@ -238,10 +238,10 @@ export function BoardToolbar({
     <section className="border-b border-[var(--app-border)] bg-[var(--app-surface)]">
       <div className="mx-auto grid max-w-[1400px] items-start gap-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(8rem,10rem)_minmax(9rem,12rem)_minmax(16rem,1.4fr)_minmax(9rem,12rem)_minmax(8rem,10rem)_minmax(9rem,12rem)_1fr_auto]">
         <Select
-          label="Date field"
+          label={t("filters.dateField")}
           data={[
-            { value: "due_date", label: "Due date" },
-            { value: "created_at", label: "Created date" },
+            { value: "due_date", label: t("filters.dueDate") },
+            { value: "created_at", label: t("filters.createdDate") },
           ]}
           value={dateField}
           onChange={(value) => {
@@ -250,8 +250,8 @@ export function BoardToolbar({
           allowDeselect={false}
         />
         <Select
-          label="Range"
-          data={RANGE_OPTIONS}
+          label={t("filters.range")}
+          data={rangeOptions()}
           value={rangeMode}
           onChange={(value) => {
             if (value) onRangeModeChange(value as DateRangeMode);
@@ -273,10 +273,10 @@ export function BoardToolbar({
           </Text>
         </div>
         <Select
-          label="Category"
-          placeholder="All"
+          label={t("task.category")}
+          placeholder={t("filters.all")}
           data={[
-            { value: "", label: "All" },
+            { value: "", label: t("filters.all") },
             ...categories.map((category) => ({
               value: category.id,
               label: category.name,
@@ -293,13 +293,13 @@ export function BoardToolbar({
           searchable
         />
         <Select
-          label="Priority"
-          placeholder="All"
+          label={t("task.priority")}
+          placeholder={t("filters.all")}
           data={[
-            { value: "", label: "All" },
-            { value: "high", label: "High" },
-            { value: "medium", label: "Medium" },
-            { value: "low", label: "Low" },
+            { value: "", label: t("filters.all") },
+            { value: "high", label: t("task.priorityHigh") },
+            { value: "medium", label: t("task.priorityMedium") },
+            { value: "low", label: t("task.priorityLow") },
           ]}
           value={filters.priority}
           onChange={(value) =>
@@ -311,12 +311,12 @@ export function BoardToolbar({
           clearable
         />
         <Select
-          label="Assignee"
-          placeholder="Anyone"
+          label={t("filters.assignee")}
+          placeholder={t("filters.anyone")}
           data={[
-            { value: "", label: "Anyone" },
-            ...(currentUserId ? [{ value: currentUserId, label: "Assigned to me" }] : []),
-            { value: UNASSIGNED, label: "Unassigned" },
+            { value: "", label: t("filters.anyone") },
+            ...(currentUserId ? [{ value: currentUserId, label: t("filters.assignedToMe") }] : []),
+            { value: UNASSIGNED, label: t("filters.unassigned") },
             ...people
               .filter((person) => person.user_id !== currentUserId)
               .map((person) => ({ value: person.user_id, label: person.display_name })),
@@ -327,8 +327,8 @@ export function BoardToolbar({
           searchable
         />
         <TextInput
-          label="Search"
-          placeholder="Title or details"
+          label={t("filters.search")}
+          placeholder={t("filters.searchPlaceholder")}
           value={filters.query}
           onChange={(event) =>
             onFiltersChange({
@@ -338,9 +338,9 @@ export function BoardToolbar({
           }
         />
         <div>
-          <Input.Label className="invisible">Reset</Input.Label>
+          <Input.Label className="invisible">{t("filters.reset")}</Input.Label>
           <Button variant="default" fullWidth onClick={onReset}>
-            Reset
+            {t("filters.reset")}
           </Button>
         </div>
       </div>

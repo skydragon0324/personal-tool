@@ -1,3 +1,6 @@
+import { dateLocale, getLanguage, t, translateServerText } from "@/i18n";
+import { formatDisplayDate } from "@/lib/dates";
+
 import type { AppNotification } from "../types";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
@@ -84,17 +87,44 @@ export function formatNotificationTime(iso: string, now: Date = new Date()): str
   if (Number.isNaN(at.getTime())) return "";
   const diffMs = now.getTime() - at.getTime();
   const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t("notifications.justNow");
+  if (minutes < 60) return t("notifications.minutesAgo", { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24 && at.getDate() === now.getDate()) return `${hours} h ago`;
-  return at.toLocaleString("en-US", {
+  if (hours < 24 && at.getDate() === now.getDate()) return t("notifications.hoursAgo", { count: hours });
+  return at.toLocaleString(dateLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
+}
+
+/** The notification title in the current language (the digest has a fixed title). */
+export function notificationTitle(item: Pick<AppNotification, "kind" | "title">): string {
+  return item.kind === "daily_digest" ? t("notificationBodies.digestTitle") : item.title;
+}
+
+/**
+ * The notification body in the current language. The server stores English text plus a key and
+ * values; older notifications have only the English text, which is shown as it is.
+ */
+export function notificationBody(item: Pick<AppNotification, "body" | "body_key" | "body_params">): string {
+  const key = item.body_key;
+  if (!key || getLanguage() === "en") return item.body;
+  const params: Record<string, string | number> = { ...(item.body_params ?? {}) };
+  if (typeof params.due === "string") params.due = formatDisplayDate(params.due);
+  if (key === "daily_digest") {
+    const count = (name: string) => Number(params[name] ?? 0);
+    const parts = [
+      count("due_today") ? t("notificationBodies.digestDueToday", { count: count("due_today") }) : "",
+      count("overdue") ? t("notificationBodies.digestOverdue", { count: count("overdue") }) : "",
+      count("scheduled") ? t("notificationBodies.digestScheduled", { count: count("scheduled") }) : "",
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : item.body;
+  }
+  const resolved = key === "task_overdue" && Number(params.days) <= 1 ? "task_overdue_yesterday" : key;
+  return translateServerText("notificationBodies", resolved, params, item.body);
 }
 
 export function desktopNotificationsSupported(): boolean {

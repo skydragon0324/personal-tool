@@ -1,5 +1,3 @@
-"use client";
-
 import { Combobox, InputBase, Loader, Text, useCombobox } from "@mantine/core";
 import { useMemo, useState } from "react";
 
@@ -10,6 +8,7 @@ import {
   matchingCategory,
   nextCategoryColor,
 } from "@/features/tasks/utils/category-options";
+import { t } from "@/i18n";
 
 interface CategoryComboboxProps {
   categories: Category[];
@@ -33,8 +32,8 @@ export function CategoryCombobox({
   error,
   disabled,
   required,
-  label = "Category",
-  placeholder = "Search or create a category",
+  label = t("tasks.categoryLabel"),
+  placeholder = t("tasks.categoryPlaceholder"),
 }: CategoryComboboxProps) {
   const combobox = useCombobox({
     onDropdownClose: () => combobox.resetSelectedOption(),
@@ -134,7 +133,7 @@ export function CategoryCombobox({
             </Combobox.Option>
           ) : null}
           {options.items.length === 0 && !options.showCreate ? (
-            <Combobox.Empty>No categories</Combobox.Empty>
+            <Combobox.Empty>{t("tasks.noCategories")}</Combobox.Empty>
           ) : null}
         </Combobox.Options>
       </Combobox.Dropdown>

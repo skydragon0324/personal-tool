@@ -1,5 +1,3 @@
-"use client";
-
 import { ActionIcon, Checkbox, Menu, TextInput } from "@mantine/core";
 import { useState } from "react";
 
@@ -8,6 +6,7 @@ import { todayISO } from "@/lib/dates";
 import type { PlanDay, PlanItem } from "../types";
 import { dayProgress } from "../utils/plan-cache";
 import { formatPlanDay } from "../utils/plan-dates";
+import { t } from "@/i18n";
 
 interface PlanDayCardProps {
   day: PlanDay;
@@ -58,7 +57,7 @@ export function PlanDayCard({
           <h2 className="truncate text-sm font-semibold text-[var(--app-text)]">
             {heading}
             {isToday ? (
-              <span className="ml-2 text-xs font-medium text-[var(--app-primary)]">Today</span>
+              <span className="ml-2 text-xs font-medium text-[var(--app-primary)]">{t("plans.today")}</span>
             ) : null}
           </h2>
           {day.title ? (
@@ -70,20 +69,20 @@ export function PlanDayCard({
             className={`text-xs tabular-nums ${
               total > 0 && done === total ? "text-[var(--app-primary)]" : "text-[var(--app-text-muted)]"
             }`}
-            aria-label={`${done} of ${total} done`}
+            aria-label={t("plans.dayDoneOfTotal", { done, total })}
           >
             {done}/{total}
           </span>
           <Menu shadow="md" position="bottom-end" withinPortal>
             <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" size="sm" aria-label={`Day menu for ${heading}`}>
+              <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t("plans.dayMenuFor", { day: heading })}>
                 ⋯
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item onClick={() => onEditDay(day)}>Edit day</Menu.Item>
+              <Menu.Item onClick={() => onEditDay(day)}>{t("plans.editDay")}</Menu.Item>
               <Menu.Item color="red" onClick={() => onDeleteDay(day)}>
-                Delete day
+                {t("plans.deleteDay")}
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -101,7 +100,7 @@ export function PlanDayCard({
           />
         ))}
         {!day.items.length ? (
-          <li className="px-3 py-1.5 text-xs text-[var(--app-text-muted)]">No items yet.</li>
+          <li className="px-3 py-1.5 text-xs text-[var(--app-text-muted)]">{t("plans.noItems")}</li>
         ) : null}
       </ul>
 
@@ -116,8 +115,8 @@ export function PlanDayCard({
           size="xs"
           variant="unstyled"
           px={4}
-          placeholder="+ Add an item"
-          aria-label={`Add an item to ${heading}`}
+          placeholder={t("plans.addItem")}
+          aria-label={t("plans.addItemTo", { day: heading })}
           value={draft}
           onChange={(event) => setDraft(event.currentTarget.value)}
           disabled={adding}
@@ -164,7 +163,7 @@ function PlanItemRow({
           value={value}
           autoFocus
           maxLength={500}
-          aria-label="Item text"
+          aria-label={t("plans.itemText")}
           onChange={(event) => setValue(event.currentTarget.value)}
           onBlur={commit}
           onKeyDown={(event) => {
@@ -196,7 +195,7 @@ function PlanItemRow({
             variant="subtle"
             color="gray"
             size="xs"
-            aria-label={`Edit ${item.title}`}
+            aria-label={t("plans.editItem", { title: item.title })}
             onClick={() => {
               setValue(item.title);
               setEditing(true);
@@ -212,7 +211,7 @@ function PlanItemRow({
               />
             </svg>
           </ActionIcon>
-          <ActionIcon variant="subtle" color="gray" size="xs" aria-label={`Delete ${item.title}`} onClick={onDelete}>
+          <ActionIcon variant="subtle" color="gray" size="xs" aria-label={t("plans.deleteItem", { title: item.title })} onClick={onDelete}>
             <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden>
               <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>

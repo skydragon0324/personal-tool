@@ -1,5 +1,3 @@
-"use client";
-
 import { RichTextEditor } from "@mantine/tiptap";
 import { Group, Select } from "@mantine/core";
 import { useEditor } from "@tiptap/react";
@@ -20,10 +18,12 @@ import { type ReactNode, useEffect, useMemo } from "react";
 import type { Editor } from "@tiptap/react";
 
 import type { TiptapJSON } from "@/features/board/types";
+import { t } from "@/i18n";
+import { editorLabels } from "@/i18n/editor-labels";
 
 const FONT_SIZES = ["12", "14", "16", "18", "24", "32"];
-const FONTS = [
-  { value: "inherit", label: "Default" },
+const FONTS = () => [
+  { value: "inherit", label: t("editor.defaultFont") },
   { value: "Georgia, serif", label: "Georgia" },
   { value: "Courier New, monospace", label: "Courier" },
   { value: "Trebuchet MS, sans-serif", label: "Trebuchet" },
@@ -98,7 +98,7 @@ interface TaskRichTextEditorProps {
 export function TaskRichTextEditor({
   value,
   onChange,
-  placeholder = "Write task details…",
+  placeholder = t("editor.placeholder"),
   onEditorReady,
   extraToolbar,
 }: TaskRichTextEditorProps) {
@@ -157,7 +157,7 @@ export function TaskRichTextEditor({
   const currentFont = editor.getAttributes("textStyle").fontFamily || "inherit";
 
   return (
-    <RichTextEditor editor={editor}>
+    <RichTextEditor editor={editor} labels={editorLabels()}>
       <RichTextEditor.Toolbar sticky stickyOffset={0} className="flex flex-wrap gap-y-1">
         <RichTextEditor.ControlsGroup>
           <RichTextEditor.Undo />
@@ -182,7 +182,7 @@ export function TaskRichTextEditor({
           <Select
             size="xs"
             w={90}
-            placeholder="Size"
+            placeholder={t("editor.size")}
             data={FONT_SIZES.map((s) => ({ value: s, label: `${s}px` }))}
             value={currentSize || null}
             onChange={(size) => {
@@ -199,8 +199,8 @@ export function TaskRichTextEditor({
           <Select
             size="xs"
             w={130}
-            placeholder="Font"
-            data={FONTS}
+            placeholder={t("editor.font")}
+            data={FONTS()}
             value={currentFont}
             onChange={(font) => {
               if (!editor || editor.isDestroyed) return;

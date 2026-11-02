@@ -1,11 +1,9 @@
-"use client";
-
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
 import { RecurrenceScopeDialog } from "@/features/tasks/components/recurrence-scope-dialog";
-import { TaskDetailDrawer } from "@/features/tasks/components/task-detail-drawer";
+import { TaskDetailModal } from "@/features/tasks/components/task-detail-modal";
 import { TaskDialog } from "@/features/tasks/components/task-dialog";
 import { ApiError } from "@/lib/api-client";
 import { formatRangeLabel, todayISO } from "@/lib/dates";
@@ -53,6 +51,7 @@ import { ProgressView } from "./progress-view";
 import { SaveNotice } from "./save-notice";
 import { StatusManagerModal } from "./status-manager-modal";
 import { TaskTable } from "./task-table";
+import { t } from "@/i18n";
 
 interface BoardPageProps {
   boardId: string;
@@ -102,7 +101,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     unbounded,
   };
   const dateLabel = unbounded
-    ? "All"
+    ? t("filters.all")
     : rangeMode === "year" && appliedRange[0]
       ? formatYearLabel(appliedRange[0])
       : rangeMode === "month" && appliedRange[0]
@@ -145,6 +144,8 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     title: string;
     repeating?: boolean;
     completed?: boolean;
+    // Set when deleting a sub-task: the modal goes back to its parent.
+    parentId?: string | null;
   } | null>(null);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -230,7 +231,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         await uploadAttachment.mutateAsync({ taskId, file });
       } catch (err) {
         failures.push(
-          `${file.name}: ${err instanceof Error ? err.message : "upload failed"}`,
+          `${file.name}: ${err instanceof Error ? err.message : t("boardPage.uploadFailed")}`,
         );
       }
     }
@@ -291,29 +292,28 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
 
   async function handleUpdate(payload: TaskCreate, pendingFiles: File[]) {
     if (!viewingId) {
-      throw new Error("Task is not loaded");
+      throw new Error(t("boardPage.taskNotLoaded"));
     }
-    const updated = await update.mutateAsync({
-      taskId: viewingId,
-      payload: {
-        title: payload.title,
-        description: payload.description,
-        content: payload.content,
-        start_date: payload.start_date,
-        due_date: payload.due_date,
-        priority: payload.priority,
-        category_id: payload.category_id,
-        links: payload.links,
-        edit_scope: payload.edit_scope,
-        recurrence: payload.recurrence,
-        remind_at: payload.remind_at,
-        assignee_ids: payload.assignee_ids,
-      } satisfies TaskUpdate,
-    });
+    const changes: TaskUpdate = {
+      title: payload.title,
+      description: payload.description,
+      content: payload.content,
+      start_date: payload.start_date,
+      due_date: payload.due_date,
+      priority: payload.priority,
+      category_id: payload.category_id,
+      links: payload.links,
+      edit_scope: payload.edit_scope,
+      recurrence: payload.recurrence,
+      remind_at: payload.remind_at,
+      assignee_ids: payload.assignee_ids,
+    };
+    const updated = await update.mutateAsync({ taskId: viewingId, payload: changes });
     if (pendingFiles.length) {
       await uploadPending(viewingId, pendingFiles);
     }
-    showSaveNotice(updated);
+    // Sub-tasks never show on the board, so there is no card to point at.
+    if (!updated.parent) showSaveNotice(updated);
     return updated;
   }
 
@@ -329,19 +329,19 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         confirmCompleted,
       });
     } catch (err) {
-      notifyApiError(err, "Could not delete the task");
+      notifyApiError(err, t("boardPage.couldNotDelete"));
       return;
     }
-    if (viewingId === deleting.id) setViewingId(null);
+    if (viewingId === deleting.id) setViewingId(deleting.parentId ?? null);
     setDeleting(null);
   }
 
   async function handleDuplicate(taskId: string) {
     try {
       const copy = await duplicate.mutateAsync(taskId);
-      notifySuccess(`Created “${copy.title}”`);
+      notifySuccess(t("boardPage.created", { title: copy.title }));
     } catch (err) {
-      notifyApiError(err, "Could not duplicate the task");
+      notifyApiError(err, t("boardPage.couldNotDuplicate"));
     }
   }
 
@@ -369,11 +369,14 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       const dropped = (moving.assignees ?? []).filter((person) => !kept.has(person.id));
       notifySuccess(
         dropped.length
-          ? `Moved “${moved.title}”. Unassigned ${dropped.map((person) => person.display_name).join(", ")} (not on that board).`
-          : `Moved “${moved.title}”`,
+          ? t("boardPage.movedAndUnassigned", {
+              title: moved.title,
+              names: dropped.map((person) => person.display_name).join(", "),
+            })
+          : t("boardPage.moved", { title: moved.title }),
       );
     } catch (err) {
-      notifyApiError(err, "Could not move the task");
+      notifyApiError(err, t("boardPage.couldNotMove"));
     }
   }
 
@@ -381,7 +384,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     try {
       await update.mutateAsync({ taskId: task.id, payload: { assignee_ids: userIds } });
     } catch (err) {
-      notifyApiError(err, "Could not update the assignees");
+      notifyApiError(err, t("boardPage.couldNotUpdateAssignees"));
     }
   }
 
@@ -400,7 +403,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         notifyConflict();
         return;
       }
-      notifyApiError(err, "Could not change status");
+      notifyApiError(err, t("task.couldNotChangeStatus"));
     }
   }
 
@@ -423,16 +426,16 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
 
   useEffect(() => {
     const name = data?.name;
-    document.title = name ? `${name} · Life Management` : "Life Management";
+    document.title = name ? t("boardPage.documentTitle", { name }) : t("common.appName");
     return () => {
-      document.title = "Life Management";
+      document.title = t("common.appName");
     };
   }, [data?.name]);
 
   return (
     <div className="min-h-full bg-[var(--app-bg)] text-[var(--app-text)]">
       <BoardHeader
-        boardName={data?.name ?? "Board"}
+        boardName={data?.name ?? t("board.board")}
         boardColor={data?.color}
         boardIcon={data?.icon_name}
         timezone={data?.timezone}
@@ -514,7 +517,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       {uploadErrors.length ? (
         <div className="mx-auto mb-4 max-w-[1400px] px-4 text-sm sm:px-6">
           <div className="rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
-            Some attachments failed to upload:
+            {t("boardPage.uploadFailures")}
             <ul className="mt-1 list-disc pl-5">
               {uploadErrors.map((msg) => (
                 <li key={msg}>{msg}</li>
@@ -530,13 +533,13 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           role="alert"
         >
           <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
-            {error instanceof Error ? error.message : "Failed to load board"}
+            {error instanceof Error ? error.message : t("boardPage.failedToLoad")}
             <button
               type="button"
               className="ml-2 font-medium underline"
               onClick={() => void refetch()}
             >
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         </div>
@@ -544,13 +547,13 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
 
       {isLoading && !data ? (
         <div className="mx-auto max-w-[1400px] px-4 py-16 text-center text-[var(--app-text-muted)] sm:px-6">
-          Loading board…
+          {t("boardPage.loading")}
         </div>
       ) : null}
 
       {showEmptyStatuses && !isOwner ? (
         <div className="mx-auto max-w-[1400px] px-4 py-16 text-center text-[var(--app-text-muted)] sm:px-6">
-          The board owner has not set up any statuses yet.
+          {t("boardPage.noStatusesForMember")}
         </div>
       ) : null}
 
@@ -607,7 +610,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
 
       <TaskDialog
         open={createColumnId !== null}
-        title="Add task"
+        title={t("boardPage.addTask")}
         boardId={boardId}
         columnId={createColumnId ?? data?.columns[0]?.id ?? ""}
         dueDate={todayISO()}
@@ -622,7 +625,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         }}
       />
 
-      <TaskDetailDrawer
+      <TaskDetailModal
         taskId={viewingId}
         mode={detailMode}
         boardId={boardId}
@@ -631,6 +634,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         submitting={update.isPending || uploadAttachment.isPending}
         onModeChange={setDetailMode}
         onClose={() => setViewingId(null)}
+        onOpenTask={setViewingId}
         onSubmit={handleUpdate}
         onUploadFile={async (taskId, file) =>
           uploadAttachment.mutateAsync({ taskId, file })
@@ -648,6 +652,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
             title,
             repeating: Boolean(meta?.repeating),
             completed: Boolean(meta?.completed),
+            parentId: meta?.parentId ?? null,
           });
         }}
         onStopRepeat={
@@ -701,7 +706,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       ) : null}
       <BoardMembersModal
         boardId={boardId}
-        boardName={data?.name ?? "Board"}
+        boardName={data?.name ?? t("board.board")}
         opened={shareOpen}
         onClose={() => setShareOpen(false)}
       />

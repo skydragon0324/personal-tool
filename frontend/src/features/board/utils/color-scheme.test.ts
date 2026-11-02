@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import {
   NORMALIZE_COLOR_SCHEME_SCRIPT,
   normalizeStoredColorScheme,

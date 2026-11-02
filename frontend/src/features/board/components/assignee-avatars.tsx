@@ -1,5 +1,3 @@
-"use client";
-
 import { Avatar, Tooltip } from "@mantine/core";
 
 import { initials } from "../utils/person";

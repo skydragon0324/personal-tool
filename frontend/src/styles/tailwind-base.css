@@ -1,0 +1,6 @@
+/*
+ * Tailwind's preflight reset, loaded before Mantine's styles (see _app.tsx).
+ * Tailwind 3.3 (the newest that runs on Node 12) resets `[type='button']` with the same specificity
+ * as Mantine's component classes, so if it loaded later it would wipe out Button backgrounds.
+ */
+@tailwind base;

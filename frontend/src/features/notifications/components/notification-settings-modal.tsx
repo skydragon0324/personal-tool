@@ -1,5 +1,3 @@
-"use client";
-
 import { Alert, Button, Divider, Group, Loader, Modal, NumberInput, Stack, Switch, Text } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
 import { useEffect, useState } from "react";
@@ -15,6 +13,7 @@ import {
   showDesktopNotification,
   writeDesktopEnabled,
 } from "../utils/notification-utils";
+import { t } from "@/i18n";
 
 const hhmm = (value: string) => value.slice(0, 5);
 
@@ -63,46 +62,45 @@ export function NotificationSettingsModal({ opened, onClose }: { opened: boolean
         quiet_start: hhmm(draft.quiet_start),
         quiet_end: hhmm(draft.quiet_end),
       });
-      notifySuccess("Notification settings saved");
+      notifySuccess(t("notifications.settingsSaved"));
       onClose();
     } catch (error) {
-      notifyApiError(error, "Could not save notification settings");
+      notifyApiError(error, t("notifications.couldNotSaveSettings"));
     }
   }
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Notification settings" size="md" radius="lg">
+    <Modal opened={opened} onClose={onClose} title={t("notifications.settingsTitle")} size="md" radius="lg">
       {!draft ? (
         <Group justify="center" py="lg">
-          {prefsQuery.isError ? <Text c="red">Could not load settings.</Text> : <Loader size="sm" />}
+          {prefsQuery.isError ? <Text c="red">{t("notifications.couldNotLoadSettings")}</Text> : <Loader size="sm" />}
         </Group>
       ) : (
         <Stack gap="md">
           <section>
             <Text fw={600} size="sm" mb={6}>
-              Desktop notifications
+              {t("notifications.desktop")}
             </Text>
             {permission === "unsupported" ? (
               <Text size="sm" c="dimmed">
-                This browser does not support desktop notifications.
+                {t("notifications.desktopUnsupported")}
               </Text>
             ) : (
               <Stack gap="xs">
                 <Switch
-                  label="Show notifications from the operating system while the app is open"
+                  label={t("notifications.desktopSwitch")}
                   checked={desktopOn && permission === "granted"}
                   disabled={permission === "denied"}
                   onChange={(event) => toggleDesktop(event.currentTarget.checked)}
                 />
                 {permission === "default" ? (
                   <Button size="xs" variant="light" w="fit-content" onClick={() => void enableDesktop()}>
-                    Allow desktop notifications
+                    {t("notifications.allowDesktop")}
                   </Button>
                 ) : null}
                 {permission === "denied" ? (
                   <Alert color="yellow" p="xs">
-                    Desktop notifications are blocked for this site. Allow them in your browser&apos;s site
-                    settings, then reopen this dialog.
+                    {t("notifications.desktopBlocked")}
                   </Alert>
                 ) : null}
                 {permission === "granted" && desktopOn ? (
@@ -113,12 +111,12 @@ export function NotificationSettingsModal({ opened, onClose }: { opened: boolean
                     px={0}
                     onClick={() =>
                       showDesktopNotification(
-                        { id: "test", title: "Life Management", body: "Desktop notifications are on." },
+                        { id: "test", title: t("common.appName"), body: t("notifications.testBody") },
                         () => undefined,
                       )
                     }
                   >
-                    Send a test notification
+                    {t("notifications.sendTest")}
                   </Button>
                 ) : null}
               </Stack>
@@ -129,13 +127,13 @@ export function NotificationSettingsModal({ opened, onClose }: { opened: boolean
 
           <section className="space-y-3">
             <Switch
-              label="Daily digest"
-              description="A summary of tasks due today, overdue tasks and today's schedule."
+              label={t("notifications.digest")}
+              description={t("notifications.digestHint")}
               checked={draft.digest_enabled}
               onChange={(event) => set("digest_enabled", event.currentTarget.checked)}
             />
             <TimeInput
-              label="Digest time"
+              label={t("notifications.digestTime")}
               value={hhmm(draft.digest_time)}
               disabled={!draft.digest_enabled}
               onChange={(event) => set("digest_time", event.currentTarget.value || draft.digest_time)}
@@ -145,13 +143,13 @@ export function NotificationSettingsModal({ opened, onClose }: { opened: boolean
 
           <section className="space-y-3">
             <Switch
-              label="Schedule starting soon"
-              description="Alert before a schedule entry starts, unless it is already marked done."
+              label={t("notifications.scheduleSoon")}
+              description={t("notifications.scheduleSoonHint")}
               checked={draft.schedule_enabled}
               onChange={(event) => set("schedule_enabled", event.currentTarget.checked)}
             />
             <NumberInput
-              label="Minutes before start"
+              label={t("notifications.minutesBefore")}
               min={0}
               max={240}
               value={draft.schedule_lead_minutes}
@@ -162,35 +160,35 @@ export function NotificationSettingsModal({ opened, onClose }: { opened: boolean
           </section>
 
           <Switch
-            label="Overdue tasks"
-            description="When a task is past its due date and not finished. From the notice you can get reminded later, mark it completed, or close it."
+            label={t("notifications.overdueTasks")}
+            description={t("notifications.overdueHint")}
             checked={draft.overdue_enabled}
             onChange={(event) => set("overdue_enabled", event.currentTarget.checked)}
           />
 
           <Switch
-            label="Reminders"
-            description="Alerts at the time you picked with “Remind me”."
+            label={t("notifications.reminders")}
+            description={t("notifications.remindersHint")}
             checked={draft.task_reminders_enabled}
             onChange={(event) => set("task_reminders_enabled", event.currentTarget.checked)}
           />
 
           <section className="space-y-3">
             <Switch
-              label="Quiet hours"
-              description="Task reminders and the digest are held until quiet hours end; schedule alerts during these hours are skipped."
+              label={t("notifications.quietHours")}
+              description={t("notifications.quietHoursHint")}
               checked={draft.quiet_hours_enabled}
               onChange={(event) => set("quiet_hours_enabled", event.currentTarget.checked)}
             />
             <Group grow maw={340}>
               <TimeInput
-                label="From"
+                label={t("notifications.from")}
                 value={hhmm(draft.quiet_start)}
                 disabled={!draft.quiet_hours_enabled}
                 onChange={(event) => set("quiet_start", event.currentTarget.value || draft.quiet_start)}
               />
               <TimeInput
-                label="Until"
+                label={t("notifications.until")}
                 value={hhmm(draft.quiet_end)}
                 disabled={!draft.quiet_hours_enabled}
                 onChange={(event) => set("quiet_end", event.currentTarget.value || draft.quiet_end)}
@@ -200,10 +198,10 @@ export function NotificationSettingsModal({ opened, onClose }: { opened: boolean
 
           <Group justify="flex-end" mt="xs">
             <Button variant="default" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={() => void save()} loading={update.isPending}>
-              Save
+              {t("common.save")}
             </Button>
           </Group>
         </Stack>

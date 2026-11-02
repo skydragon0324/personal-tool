@@ -1,5 +1,3 @@
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { notificationKeys } from "@/features/notifications/api/notification-queries";
@@ -11,6 +9,7 @@ import type { ScheduleOccurrence } from "../types";
 import { patchScheduleOccurrenceCaches } from "../utils/occurrence-cache";
 import { occurrenceKey } from "../utils/occurrence-state";
 import { scheduleKeys } from "./use-schedule";
+import { t } from "@/i18n";
 
 export interface ToggleScheduleOccurrence {
   entryId: string;
@@ -42,7 +41,7 @@ export function useScheduleOccurrence() {
       for (const [key, data] of context?.previousToday ?? []) {
         queryClient.setQueryData(key, data);
       }
-      notifyApiError(error, "Could not update schedule");
+      notifyApiError(error, t("schedule.couldNotUpdate"));
     },
     onSuccess: (saved: ScheduleOccurrence) => {
       patchScheduleOccurrenceCaches(

@@ -109,12 +109,23 @@ export interface TaskSummary {
   assignees?: TaskAssignee[];
 }
 
+/**
+ * A sub-task as listed under its parent. Sub-tasks are full tasks (open one with its id for
+ * everything); they are left out of task lists and reached through the parent.
+ */
 export interface TaskSubtask {
   id: string;
+  /** The parent task. */
   task_id: string;
   title: string;
   is_completed: boolean;
   position: number;
+  column_id: string;
+  start_date: string;
+  due_date: string;
+  priority: Priority;
+  completed_at: string | null;
+  assignees?: TaskAssignee[];
   created_at: string;
   updated_at: string;
 }
@@ -139,6 +150,8 @@ export interface TaskDetail {
   links: TaskLink[];
   attachments: TaskAttachment[];
   subtasks: TaskSubtask[];
+  /** Set when this task is a sub-task. */
+  parent?: { id: string; title: string } | null;
   category: Category;
   recurrence?: RecurrenceRead | null;
   /** Everyone the task is assigned to (can be several). */

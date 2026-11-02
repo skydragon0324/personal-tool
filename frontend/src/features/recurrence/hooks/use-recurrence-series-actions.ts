@@ -1,5 +1,3 @@
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -10,6 +8,7 @@ import { apiClient } from "@/lib/api-client";
 import { notifyApiError, notifySuccess } from "@/lib/notify";
 
 import { recurrenceKeys } from "../api/recurrence-queries";
+import { t } from "@/i18n";
 
 export interface RecurrenceSeriesActionVars {
   seriesId: string;
@@ -31,22 +30,22 @@ export function useRecurrenceSeriesActions() {
   const pause = useMutation({
     mutationFn: ({ seriesId }: RecurrenceSeriesActionVars) => apiClient.stopRecurrence(seriesId),
     onSuccess: async (_data, vars) => {
-      notifySuccess("Recurring task paused");
+      notifySuccess(t("recurring.paused"));
       await invalidateRecurrenceAction(queryClient, vars.boardId);
     },
     onError: (error) => {
-      notifyApiError(error, "Could not pause recurring task");
+      notifyApiError(error, t("recurring.couldNotPause"));
     },
   });
 
   const resume = useMutation({
     mutationFn: ({ seriesId }: RecurrenceSeriesActionVars) => apiClient.resumeRecurrence(seriesId),
     onSuccess: async (_data, vars) => {
-      notifySuccess("Recurring task resumed");
+      notifySuccess(t("recurring.resumed"));
       await invalidateRecurrenceAction(queryClient, vars.boardId);
     },
     onError: (error) => {
-      notifyApiError(error, "Could not resume recurring task");
+      notifyApiError(error, t("recurring.couldNotResume"));
     },
   });
 

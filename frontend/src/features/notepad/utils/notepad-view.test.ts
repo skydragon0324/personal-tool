@@ -1,5 +1,3 @@
-import { describe, expect, it } from "vitest";
-
 import {
   NOTEPAD_VIEW_STORAGE_KEY,
   isNotepadView,

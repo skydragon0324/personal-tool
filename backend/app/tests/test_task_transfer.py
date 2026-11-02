@@ -131,8 +131,13 @@ def test_move_to_board_brings_everything_along(client: TestClient, db: Session) 
     assert len(moved["attachments"]) == 1 and len(moved["links"]) == 1
     assert moved["content"] == original["content"]
 
+    # Sub-tasks come along onto the new board's statuses, still hidden from its lists.
+    assert {item["column_id"] for item in moved["subtasks"]} <= {column["id"] for column in target_columns}
+
     view = client.get(f"/api/v1/boards/{target}/view", params={"date": DAY}).json()
-    assert any(task["id"] == original["id"] for column in view["columns"] for task in column["tasks"])
+    view_ids = {task["id"] for column in view["columns"] for task in column["tasks"]}
+    assert original["id"] in view_ids
+    assert view_ids.isdisjoint({item["id"] for item in moved["subtasks"]})
 
 
 def test_move_to_done_status_on_other_board_completes_it(client: TestClient, db: Session) -> None:
