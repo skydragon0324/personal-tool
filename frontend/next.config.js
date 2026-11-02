@@ -1,5 +1,7 @@
 const path = require("path");
 
+require("./node12-compat");
+
 const { resolveNextDistDir } = require("./resolve-next-dist-dir");
 
 const distDir = resolveNextDistDir(process.env.NODE_ENV, process.env.NEXT_DIST_DIR);
@@ -51,7 +53,7 @@ const nextConfig = {
           configFile: false,
           cacheDirectory: true,
           sourceType: "unambiguous",
-          presets: [["@babel/preset-env", { targets: { node: "12.22" }, modules: false }]],
+          presets: [["@babel/preset-env", { targets: { node: "12.16" }, modules: false }]],
         },
       },
     });

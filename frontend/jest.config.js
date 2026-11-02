@@ -24,7 +24,7 @@ module.exports = async () => {
     // Node 12 cannot parse; Babel's preset-env lowers them.
     "[\\\\/]node_modules[\\\\/]@tanstack[\\\\/].+\\.(c|m)?js$": [
       "babel-jest",
-      { presets: [["@babel/preset-env", { targets: { node: "12.22" } }]] },
+      { presets: [["@babel/preset-env", { targets: { node: "12.16" } }]] },
     ],
     // next/jest only registers SWC for js/jsx/ts/tsx/mjs; packages also ship .cjs builds.
     ...Object.fromEntries(
