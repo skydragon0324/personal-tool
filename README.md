@@ -51,6 +51,12 @@ npm run dev
 
 App: http://localhost:3000
 
+**Node 12.16 notes**
+
+- Always use the npm scripts (`npm run dev`, `build`, `start`, `lint`, `test`). They pass `--experimental-modules`, which Next.js 12 needs on Node < 12.17. Running `npx next ...` directly fails on 12.16.
+- Some dev dependencies are pinned to the newest versions that support Node 12.16. Don't upgrade them without checking their `engines.node`: `eslint` 7.32.0, `eslint-config-next` 12.0.4, `browserslist` 4.28.1, `core-js-compat` 3.49.0, `node-releases` 2.0.44, `sucrase` 3.34.0.
+- `next` (declares >=12.22), `typescript` 5.0.4 (declares >=12.20) and `type-fest` (types only, from Mantine) declare newer Node versions but are tested to work on 12.16.
+
 ## API (`/api/v1`)
 
 | Method | Path | Description |
