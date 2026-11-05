@@ -1,26 +1,26 @@
 /**
- * App translations (English, Simplified Chinese and Korean).
+ * App translations (English, Simplified Chinese and Russian).
  *
  * `t("section.key", { name })` returns the text in the current language. It is a plain function so
  * it also works outside React (validation, date helpers, notifications). Switching language
  * re-renders the whole app (see I18nProvider), so every `t` call picks up the new language.
  *
- * English (`en.ts`) is the source of truth; `zh.ts` and `ko.ts` must have exactly the same keys.
+ * English (`en.ts`) is the source of truth; `zh.ts` and `ru.ts` must have exactly the same keys.
  */
-import { en, type Messages } from "./en";
-import { ko } from "./ko";
+import { en, type Messages, type Plural } from "./en";
+import { ru } from "./ru";
 import { zh } from "./zh";
 
-export type Language = "en" | "zh" | "ko";
+export type Language = "en" | "zh" | "ru";
 
 export const LANGUAGES: { value: Language; label: string }[] = [
   { value: "en", label: "English" },
   { value: "zh", label: "简体中文" },
-  { value: "ko", label: "한국어" },
+  { value: "ru", label: "Русский" },
 ];
 
 export function isLanguage(value: unknown): value is Language {
-  return value === "en" || value === "zh" || value === "ko";
+  return value === "en" || value === "zh" || value === "ru";
 }
 
 interface LocaleInfo {
@@ -35,7 +35,7 @@ interface LocaleInfo {
 
 export const LOCALES: Record<Language, LocaleInfo> = {
   en: { bcp47: "en-US", dayjs: "en", shortLabel: "EN", dateFormats: {} },
-  // Chinese and Korean readers expect year-first dates, not a translated "Oct 22, 2026".
+  // Chinese readers expect year-first dates and Russian readers day-first ones, not a translated "Oct 22, 2026".
   zh: {
     bcp47: "zh-CN",
     dayjs: "zh-cn",
@@ -47,28 +47,22 @@ export const LOCALES: Record<Language, LocaleInfo> = {
       "dddd, MMMM D, YYYY": "YYYY年M月D日 dddd",
     },
   },
-  ko: {
-    bcp47: "ko-KR",
-    dayjs: "ko",
-    shortLabel: "한",
+  ru: {
+    bcp47: "ru-RU",
+    dayjs: "ru",
+    shortLabel: "RU",
     dateFormats: {
-      "MMM D, YYYY": "YYYY년 M월 D일",
-      "MMMM YYYY": "YYYY년 M월",
-      "YYYY": "YYYY년",
-      "dddd, MMMM D, YYYY": "YYYY년 M월 D일 dddd",
+      "MMM D, YYYY": "D MMM YYYY",
+      "dddd, MMMM D, YYYY": "dddd, D MMMM YYYY",
     },
   },
 };
 
 export const LANGUAGE_STORAGE_KEY = "app-language";
 
-const DICTIONARIES: Record<Language, Messages> = { en, zh, ko };
+const DICTIONARIES: Record<Language, Messages> = { en, zh, ru };
 
-/** A text with English singular/plural forms; picked by the `count` parameter. */
-export interface Plural {
-  one: string;
-  other: string;
-}
+export type { Plural };
 
 type Leaf = string | Plural;
 
@@ -115,8 +109,16 @@ function fill(template: string, params?: MessageParams): string {
 }
 
 function resolve(leaf: Leaf, params?: MessageParams): string {
-  const template = typeof leaf === "string" ? leaf : params?.count === 1 ? leaf.one : leaf.other;
-  return fill(template, params);
+  return fill(typeof leaf === "string" ? leaf : pluralForm(leaf, params?.count), params);
+}
+
+/** English-style one/other, or the language's plural rules when the text has `few`/`many` forms. */
+function pluralForm(leaf: Plural, count: string | number | undefined): string {
+  if (leaf.few === undefined && leaf.many === undefined) return count === 1 ? leaf.one : leaf.other;
+  if (typeof count !== "number") return leaf.other;
+  const category = new Intl.PluralRules(LOCALES[current].bcp47).select(count);
+  if (category === "one" || category === "few" || category === "many") return leaf[category] ?? leaf.other;
+  return leaf.other;
 }
 
 export function t(key: MessageKey, params?: MessageParams): string {

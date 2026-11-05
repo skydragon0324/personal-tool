@@ -3,7 +3,7 @@ import { join } from "path";
 
 import { en } from "@/i18n/en";
 
-const HANGUL = /[가-힣]/;
+const CYRILLIC = /[А-Яа-яЁё]/;
 const SRC_ROOT = join(__dirname, "..");
 const I18N_ROOT = join(SRC_ROOT, "i18n");
 
@@ -37,11 +37,11 @@ function walk(dir: string): string[] {
 }
 
 describe("English UI copy", () => {
-  it("does not contain Korean user-facing strings", () => {
+  it("does not contain Russian user-facing strings", () => {
     const hits = walk(SRC_ROOT).flatMap((file) => {
       const lines = readFileSync(file, "utf8").split(/\r?\n/);
       return lines
-        .map((line, index) => (HANGUL.test(line) ? `${file}:${index + 1}:${line.trim()}` : null))
+        .map((line, index) => (CYRILLIC.test(line) ? `${file}:${index + 1}:${line.trim()}` : null))
         .filter((item): item is string => Boolean(item));
     });
     expect(hits).toEqual([]);

@@ -125,7 +125,7 @@ export function TaskDetailModal({
         transitionProps={{ duration: 120 }}
         classNames={{
           // A large, fixed-size frame: the header and action bar stay put and only the middle scrolls.
-          content: "w-[min(96vw,72rem)] h-[min(90dvh,60rem)] !max-h-[90dvh] !flex flex-col !overflow-hidden",
+          content: "task-detail-modal-content w-[min(96vw,72rem)] h-[min(90dvh,60rem)] !max-h-[90dvh] !flex flex-col !overflow-hidden",
           body: "flex min-h-0 flex-1 flex-col gap-3",
         }}
       >

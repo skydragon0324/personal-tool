@@ -1,5 +1,5 @@
 /**
- * English texts: the source of truth for every key. `zh.ts` must mirror this shape exactly.
+ * English texts: the source of truth for every key. `zh.ts` and `ru.ts` must mirror this shape exactly.
  * `{name}` marks a value filled in at runtime; `{ one, other }` picks a form by `count`.
  */
 export const en = {
@@ -1134,4 +1134,17 @@ export const en = {
   },
 };
 
-export type Messages = typeof en;
+/**
+ * A text picked by `count`. English uses `one` and `other`; languages with more forms (Russian)
+ * also give `few` and `many`, chosen by the language's plural rules.
+ */
+export interface Plural {
+  one: string;
+  few?: string;
+  many?: string;
+  other: string;
+}
+
+type Shape<T> = { [K in keyof T]: T[K] extends string ? string : T[K] extends { other: string } ? Plural : Shape<T[K]> };
+
+export type Messages = Shape<typeof en>;

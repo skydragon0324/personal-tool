@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import "dayjs/locale/ko";
+import "dayjs/locale/ru";
 import "dayjs/locale/zh-cn";
 import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -15,7 +15,7 @@ const LanguageContext = createContext<LanguageContextValue>({
   setLanguage: () => undefined,
 });
 
-/** The saved choice, else the browser's language (Chinese for "zh…", Korean for "ko…"), else English. */
+/** The saved choice, else the browser's language (Chinese for "zh…", Russian for "ru…"), else English. */
 function preferredLanguage(): Language {
   try {
     const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -25,7 +25,7 @@ function preferredLanguage(): Language {
   }
   const browser = window.navigator.language?.toLowerCase() ?? "";
   if (browser.startsWith("zh")) return "zh";
-  if (browser.startsWith("ko")) return "ko";
+  if (browser.startsWith("ru")) return "ru";
   return "en";
 }
 
@@ -37,7 +37,7 @@ function applyLanguage(language: Language) {
 
 /**
  * Picks the language on the client and re-renders the app when it changes. Nothing renders until
- * the language is known, so a Chinese or Korean user never sees an English first paint.
+ * the language is known, so a Chinese or Russian user never sees an English first paint.
  */
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language | null>(null);
