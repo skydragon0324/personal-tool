@@ -174,6 +174,9 @@ export const apiClient = {
   getTask: (taskId: string) =>
     request<import("@/features/board/types").TaskDetail>(`/api/v1/tasks/${taskId}`),
 
+  getTaskHistory: (taskId: string) =>
+    request<import("@/features/tasks/types").TaskHistoryEntry[]>(`/api/v1/tasks/${taskId}/history`),
+
   createTask: (payload: import("@/features/board/types").TaskCreate) =>
     request<import("@/features/board/types").TaskDetail>(`/api/v1/tasks`, {
       method: "POST",

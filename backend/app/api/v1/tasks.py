@@ -2,10 +2,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser
 from app.db.session import get_db
+from app.models import Task
 from app.schemas.task import (
     TaskAttachmentRead,
     TaskCreate,
@@ -18,25 +20,41 @@ from app.schemas.task import (
     SubtaskReorder,
     SubtaskUpdate,
 )
+from app.schemas.task_history import TaskHistoryRead
 from app.services import (
     attachment_service,
     subtask_service,
     task_ordering_service,
     task_service,
+    task_history_service,
     task_transfer_service,
 )
+from app.services.task_history_service import record_created, track_changes
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
+def _with_parent(db: Session, task_id: UUID) -> tuple[UUID, UUID | None]:
+    """The task and its parent: a sub-task's change can also change the parent's sub-task list."""
+    return task_id, db.scalar(select(Task.parent_task_id).where(Task.id == task_id))
+
+
 @router.post("", response_model=TaskDetailRead, status_code=status.HTTP_201_CREATED)
 def create_task(payload: TaskCreate, user: CurrentUser, db: Session = Depends(get_db)) -> TaskDetailRead:
-    return task_service.create_task(db, user.id, payload)
+    task = task_service.create_task(db, user.id, payload)
+    record_created(db, task.id, user)
+    return task
 
 
 @router.get("/{task_id}", response_model=TaskDetailRead)
 def get_task(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> TaskDetailRead:
     return task_service.get_task(db, user.id, task_id)
+
+
+@router.get("/{task_id}/history", response_model=list[TaskHistoryRead])
+def get_task_history(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> list[TaskHistoryRead]:
+    """Who changed what on the task and when, newest first."""
+    return task_history_service.list_history(db, user.id, task_id)
 
 
 @router.patch("/{task_id}", response_model=TaskDetailRead)
@@ -46,7 +64,9 @@ def update_task(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> TaskDetailRead:
-    return task_service.update_task(db, user.id, task_id, payload)
+    with track_changes(db, user, *_with_parent(db, task_id)):
+        task = task_service.update_task(db, user.id, task_id, payload)
+    return task
 
 
 @router.patch("/{task_id}/move", response_model=TaskDetailRead)
@@ -56,13 +76,17 @@ def move_task(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> TaskDetailRead:
-    return task_ordering_service.move_task(db, user.id, task_id, payload)
+    with track_changes(db, user, *_with_parent(db, task_id)):
+        task = task_ordering_service.move_task(db, user.id, task_id, payload)
+    return task
 
 
 @router.post("/{task_id}/duplicate", response_model=TaskDetailRead, status_code=status.HTTP_201_CREATED)
 def duplicate_task(task_id: UUID, user: CurrentUser, db: Session = Depends(get_db)) -> TaskDetailRead:
     """Copy the task (content, links, sub-tasks, files) right below the original, unassigned."""
-    return task_transfer_service.duplicate_task(db, user.id, task_id)
+    copy = task_transfer_service.duplicate_task(db, user.id, task_id)
+    record_created(db, copy.id, user)
+    return copy
 
 
 @router.post("/{task_id}/move-to-board", response_model=TaskDetailRead)
@@ -73,7 +97,9 @@ def move_task_to_board(
     db: Session = Depends(get_db),
 ) -> TaskDetailRead:
     """Move the task to another board; assignees stay only if they are on that board too."""
-    return task_transfer_service.move_to_board(db, user.id, task_id, payload)
+    with track_changes(db, user, task_id):
+        task = task_transfer_service.move_to_board(db, user.id, task_id, payload)
+    return task
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -105,7 +131,9 @@ async def upload_attachment(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> TaskAttachmentRead:
-    return await attachment_service.upload_attachment(db, user.id, task_id, file)
+    with track_changes(db, user, task_id):
+        attachment = await attachment_service.upload_attachment(db, user.id, task_id, file)
+    return attachment
 
 
 @router.get("/{task_id}/attachments/{attachment_id}/download")
@@ -128,7 +156,8 @@ def delete_attachment(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> Response:
-    attachment_service.delete_attachment(db, user.id, task_id, attachment_id)
+    with track_changes(db, user, task_id):
+        attachment_service.delete_attachment(db, user.id, task_id, attachment_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -143,7 +172,10 @@ def create_subtask(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> SubtaskRead:
-    return subtask_service.create_subtask(db, user.id, task_id, payload)
+    with track_changes(db, user, task_id):
+        subtask = subtask_service.create_subtask(db, user.id, task_id, payload)
+    record_created(db, subtask.id, user)
+    return subtask
 
 
 @router.patch("/{task_id}/subtasks/reorder", response_model=list[SubtaskRead])
@@ -164,7 +196,9 @@ def update_subtask(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> SubtaskRead:
-    return subtask_service.update_subtask(db, user.id, task_id, subtask_id, payload)
+    with track_changes(db, user, task_id, subtask_id):
+        subtask = subtask_service.update_subtask(db, user.id, task_id, subtask_id, payload)
+    return subtask
 
 
 @router.delete(
@@ -177,5 +211,6 @@ def delete_subtask(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> Response:
-    subtask_service.delete_subtask(db, user.id, task_id, subtask_id)
+    with track_changes(db, user, task_id):
+        subtask_service.delete_subtask(db, user.id, task_id, subtask_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

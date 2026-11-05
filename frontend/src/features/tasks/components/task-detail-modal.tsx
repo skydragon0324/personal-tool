@@ -1,4 +1,5 @@
 import { Alert, Button, Group, Loader, Menu, Modal, Text } from "@mantine/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { DiscardChangesModal } from "@/components/discard-changes-modal";
@@ -9,6 +10,7 @@ import type {
   TaskDetail,
   TiptapJSON,
 } from "@/features/board/types";
+import { taskKeys } from "@/features/board/api/board-queries";
 import { AssigneeAvatars } from "@/features/board/components/assignee-avatars";
 import { useTaskDetail } from "@/features/board/hooks/use-task-detail";
 import { statusHeaderClass } from "@/features/board/utils/status-colors";
@@ -21,6 +23,7 @@ import { PriorityBadge } from "./priority-badge";
 import { SubtaskList } from "./subtask-list";
 import { TaskContentViewer } from "./task-content-viewer";
 import { TaskForm } from "./task-form";
+import { TaskHistory } from "./task-history";
 import { recurrenceLabel } from "./recurrence-fields";
 
 interface TaskDetailModalProps {
@@ -67,8 +70,16 @@ export function TaskDetailModal({
   onDuplicate,
   onMoveToBoard,
 }: TaskDetailModalProps) {
+  const queryClient = useQueryClient();
   const detailQuery = useTaskDetail(taskId);
   const task = detailQuery.data ?? null;
+
+  // Some changes update the cached task directly instead of refetching it; refresh the history
+  // whenever the task data changes so it always lists the latest change.
+  const detailUpdatedAt = detailQuery.dataUpdatedAt;
+  useEffect(() => {
+    if (taskId && detailUpdatedAt) void queryClient.invalidateQueries({ queryKey: taskKeys.history(taskId) });
+  }, [detailUpdatedAt, queryClient, taskId]);
   const [localMode, setLocalMode] = useState(mode);
   const [editDirty, setEditDirty] = useState(false);
   // Where to go once the user confirms throwing away unsaved edits.
@@ -126,7 +137,8 @@ export function TaskDetailModal({
         transitionProps={{ duration: 120 }}
         classNames={{
           // A large, fixed-size frame: the header and action bar stay put and only the middle scrolls.
-          content: "w-[min(96vw,72rem)] !flex flex-col !overflow-hidden",
+          // Wider when viewing, to fit the change history next to the details.
+          content: `${localMode === "view" ? "w-[min(96vw,90rem)]" : "w-[min(96vw,72rem)]"} !flex flex-col !overflow-hidden`,
           body: "flex min-h-0 flex-1 flex-col gap-3",
         }}
         styles={{ content: { height: `min(${screenHeight(90)}, 60rem)` } }}
@@ -183,7 +195,9 @@ export function TaskDetailModal({
         ) : null}
         {task && localMode === "view" ? (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            {/* On wide screens the details and the history scroll separately, side by side. */}
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:overflow-hidden">
+            <div className="min-w-0 pr-1 lg:flex-1 lg:overflow-y-auto">
               <h2 className="mb-4 break-words font-display text-2xl text-[var(--app-text)] sm:text-3xl">
                 {task.title}
               </h2>
@@ -339,6 +353,19 @@ export function TaskDetailModal({
                 </div>
               </div>
             </div>
+            <aside
+              aria-label={t("history.title")}
+              className="min-w-0 border-t border-[var(--app-border)] pt-4 lg:w-[19rem] lg:shrink-0 lg:overflow-y-auto lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"
+            >
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--app-text)]">
+                <span className="text-[var(--app-primary)]">
+                  <HistoryIcon />
+                </span>
+                {t("history.title")}
+              </h3>
+              <TaskHistory taskId={task.id} />
+            </aside>
+            </div>
 
             <Group className="shrink-0 border-t border-[var(--app-border)] pt-3">
               <Button onClick={() => setLocalMode("edit")}>{t("common.edit")}</Button>
@@ -491,6 +518,15 @@ function LinkIcon() {
     <Icon>
       <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
       <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </Icon>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <Icon>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5M12 7v5l3 2" />
     </Icon>
   );
 }

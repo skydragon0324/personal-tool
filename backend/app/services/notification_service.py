@@ -528,8 +528,13 @@ def complete_task(db: Session, user_id: uuid.UUID, notification_id: uuid.UUID) -
             detail="This board has no completed status to move the task to",
         )
     if task.column_id != done.id:
+        from app.services.task_history_service import track_changes
+
+        actor = db.get(User, user_id)
+        assert actor is not None
         # move_task commits and hides the task's reminder and overdue notices.
-        move_task(db, user_id, task.id, TaskMove(target_column_id=done.id, expected_version=task.version))
+        with track_changes(db, actor, task.id):
+            move_task(db, user_id, task.id, TaskMove(target_column_id=done.id, expected_version=task.version))
     item = _get_notification_any(db, user_id, notification_id)
     if item is not None and item.dismissed_at is None:
         item.dismissed_at = datetime.now(UTC)

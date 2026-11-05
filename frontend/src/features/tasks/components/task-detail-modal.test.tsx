@@ -1,9 +1,11 @@
 import { MantineProvider } from "@mantine/core";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 
 import type { TaskDetail } from "@/features/board/types";
+import type { TaskHistoryEntry } from "@/features/tasks/types";
 
 import { TaskDetailModal } from "./task-detail-modal";
 
@@ -31,6 +33,11 @@ const TASK: TaskDetail = {
 };
 
 let current: TaskDetail = TASK;
+let history: TaskHistoryEntry[] = [];
+
+jest.mock("@/lib/api-client", () => ({
+  apiClient: { getTaskHistory: () => Promise.resolve(history) },
+}));
 
 jest.mock("@/features/board/hooks/use-task-detail", () => ({
   useTaskDetail: () => ({ data: current, isLoading: false, isError: false, refetch: jest.fn() }),
@@ -50,8 +57,12 @@ jest.mock("./task-form", () => ({
 
 function renderModal(props: Partial<Parameters<typeof TaskDetailModal>[0]> = {}) {
   const onModeChange = jest.fn();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
       MantineProvider,
       { env: "test" },
       createElement(TaskDetailModal, {
@@ -67,6 +78,7 @@ function renderModal(props: Partial<Parameters<typeof TaskDetailModal>[0]> = {})
         onDelete: jest.fn(),
         ...props,
       }),
+      ),
     ),
   );
   return { onModeChange };
@@ -75,6 +87,34 @@ function renderModal(props: Partial<Parameters<typeof TaskDetailModal>[0]> = {})
 describe("TaskDetailModal", () => {
   beforeEach(() => {
     current = TASK;
+    history = [];
+  });
+
+  it("shows who changed what in the history next to the details", async () => {
+    history = [
+      {
+        id: "h2",
+        created_at: "2026-10-25T09:30:00Z",
+        actor_id: "u2",
+        actor_name: "Mate",
+        action: "updated",
+        changes: [
+          { field: "status", from: "To Do", to: "Done" },
+          { field: "priority", from: "medium", to: "high" },
+          { field: "assignees", added: ["Mate"], removed: ["Ada"] },
+          { field: "details" },
+        ],
+      },
+      { id: "h1", created_at: "2026-10-24T08:00:00Z", actor_id: "u1", actor_name: "Ada", action: "created", changes: [] },
+    ];
+    renderModal({ mode: "view" });
+    expect(await screen.findByText("Mate made changes")).toBeInTheDocument();
+    expect(screen.getByText("Ada created this task")).toBeInTheDocument();
+    const history_ = screen.getByRole("complementary", { name: "History" });
+    expect(history_).toHaveTextContent("Status: To Do → Done");
+    expect(history_).toHaveTextContent("Priority: Medium → High");
+    expect(history_).toHaveTextContent("Assignees: Added Mate; Removed Ada");
+    expect(history_).toHaveTextContent("Edited the details");
   });
 
   it("goes back to the details after saving, without asking to discard changes", async () => {

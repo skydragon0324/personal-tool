@@ -11,6 +11,7 @@ from app.models.schedule_occurrence_state import ScheduleOccurrenceState
 from app.models.task import Task
 from app.models.task_assignee import TaskAssignee
 from app.models.task_attachment import TaskAttachment
+from app.models.task_history import TaskHistoryEntry
 from app.models.task_link import TaskLink
 from app.models.task_recurrence import (
     TaskRecurrenceAttachmentRef,
@@ -41,6 +42,7 @@ __all__ = [
     "TaskAssignee",
     "TaskLink",
     "TaskAttachment",
+    "TaskHistoryEntry",
     "TaskRecurrenceAttachmentRef",
     "TaskRecurrenceException",
     "TaskRecurrenceLinkTemplate",

@@ -29,6 +29,8 @@ export const columnKeys = {
 export const taskKeys = {
   all: ["task"] as const,
   detail: (taskId: string) => ["task", taskId] as const,
+  // Under the task's key, so refreshing the task also refreshes its history.
+  history: (taskId: string) => ["task", taskId, "history"] as const,
 };
 
 export function tasksByColumnFromView(view: BoardView): TasksByColumn {
