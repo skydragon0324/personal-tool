@@ -1,5 +1,7 @@
 import { AppShell } from "@mantine/core";
 
+import { screenHeight } from "@/lib/viewport";
+
 import { NotificationBridge } from "@/features/notifications/components/notification-bridge";
 
 import { AppSidebar } from "./app-sidebar";
@@ -19,13 +21,12 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       padding={0}
-      className="h-dvh"
       styles={{
-        root: { height: "100dvh", minHeight: "100dvh", background: "var(--app-bg)" },
+        root: { height: screenHeight(100), minHeight: screenHeight(100), background: "var(--app-bg)" },
         main: {
           minHeight: 0,
           minWidth: 0,
-          height: "100dvh",
+          height: screenHeight(100),
           overflow: "auto",
           background: "var(--app-bg)",
         },

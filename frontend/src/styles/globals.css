@@ -120,23 +120,3 @@ body {
   flex: 1 1 auto;
   min-width: 0;
 }
-
-/*
- * Older browsers do not understand the `dvh` unit, so Mantine's modal height limit
- * (calc(100dvh - ...)) is ignored there and tall modals run off the screen with their buttons
- * out of reach. Fall back to `vh` in those browsers only.
- */
-@supports not (height: 100dvh) {
-  .mantine-Modal-inner {
-    padding-top: 5vh;
-    padding-bottom: 5vh;
-  }
-
-  .mantine-Modal-content {
-    max-height: 90vh !important;
-  }
-
-  .task-detail-modal-content {
-    height: min(90vh, 60rem);
-  }
-}

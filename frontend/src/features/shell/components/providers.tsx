@@ -1,4 +1,4 @@
-import { MantineProvider, createTheme, useMantineColorScheme } from "@mantine/core";
+import { MantineProvider, Modal, createTheme, useMantineColorScheme } from "@mantine/core";
 import { DatesProvider } from "@mantine/dates";
 import { Notifications } from "@mantine/notifications";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { AuthProvider } from "@/features/auth/components/auth-provider";
 import { LOCALES } from "@/i18n";
 import { I18nProvider, useLanguage } from "@/i18n/provider";
 import { makeQueryClient } from "@/lib/query-client";
+import { screenHeight } from "@/lib/viewport";
 
 const theme = createTheme({
   primaryColor: "teal",
@@ -31,6 +32,16 @@ const theme = createTheme({
       "#115E59",
       "#134E4A",
     ],
+  },
+  components: {
+    // Mantine limits modal height with `100dvh`, which older browsers (Chrome < 108) ignore, so
+    // tall modals ran off the screen. Set the same limit with a unit the browser understands.
+    Modal: Modal.extend({
+      styles: () => ({
+        inner: { paddingTop: screenHeight(5), paddingBottom: screenHeight(5) },
+        content: { maxHeight: screenHeight(90) },
+      }),
+    }),
   },
 });
 

@@ -14,6 +14,7 @@ import { useTaskDetail } from "@/features/board/hooks/use-task-detail";
 import { statusHeaderClass } from "@/features/board/utils/status-colors";
 import { t } from "@/i18n";
 import { formatDateTime, formatTaskPeriod } from "@/lib/dates";
+import { screenHeight } from "@/lib/viewport";
 import { subtaskProgressLabel } from "../hooks/use-subtasks";
 import { CategoryBadge } from "./category-badge";
 import { PriorityBadge } from "./priority-badge";
@@ -125,9 +126,10 @@ export function TaskDetailModal({
         transitionProps={{ duration: 120 }}
         classNames={{
           // A large, fixed-size frame: the header and action bar stay put and only the middle scrolls.
-          content: "task-detail-modal-content w-[min(96vw,72rem)] h-[min(90dvh,60rem)] !max-h-[90dvh] !flex flex-col !overflow-hidden",
+          content: "w-[min(96vw,72rem)] !flex flex-col !overflow-hidden",
           body: "flex min-h-0 flex-1 flex-col gap-3",
         }}
+        styles={{ content: { height: `min(${screenHeight(90)}, 60rem)` } }}
       >
         {task?.parent ? (
           // shrink-0: inside the flex column this must never be squeezed by the content below.
