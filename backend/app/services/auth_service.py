@@ -8,8 +8,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
-from app.models import Board, User
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserRead
+from app.models import Board, User, UserSession
+from app.schemas.auth import (
+    AuthResponse,
+    LoginRequest,
+    PasswordChangeRequest,
+    ProfileUpdateRequest,
+    RegisterRequest,
+    UserRead,
+)
 from app.services.board_service import seed_personal_board
 from app.services.session_service import (
     LOGIN_ERROR,
@@ -111,6 +118,57 @@ def logout(db: Session, request: Request, response: Response) -> None:
 
 def read_me(user: User) -> UserRead:
     return UserRead.model_validate(user)
+
+
+CURRENT_PASSWORD_REQUIRED = "Enter your current password to change your email"
+CURRENT_PASSWORD_WRONG = "Current password is incorrect"
+
+
+def _check_current_password(user: User, password: str | None) -> None:
+    if not password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=CURRENT_PASSWORD_REQUIRED)
+    if not verify_password(password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=CURRENT_PASSWORD_WRONG)
+
+
+def update_profile(db: Session, user: User, payload: ProfileUpdateRequest) -> UserRead:
+    if payload.display_name is not None:
+        user.display_name = payload.display_name
+    if payload.email is not None and payload.email != user.email.strip().lower():
+        _check_current_password(user, payload.current_password)
+        taken = db.scalar(
+            select(User.id).where(func.lower(User.email) == payload.email, User.id != user.id)
+        )
+        if taken is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        user.email = payload.email
+        from app.services.board_member_service import accept_pending_invitations
+
+        # Invitations sent to the new address become memberships, as they do on sign-up.
+        accept_pending_invitations(db, user)
+    user.updated_at = datetime.now(UTC)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered") from None
+    db.refresh(user)
+    return UserRead.model_validate(user)
+
+
+def change_password(db: Session, request: Request, user: User, payload: PasswordChangeRequest) -> None:
+    """Sets a new password and signs out every other session of the user; this one stays."""
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=CURRENT_PASSWORD_WRONG)
+    user.password_hash = hash_password(payload.new_password)
+    user.updated_at = datetime.now(UTC)
+    loaded = load_session(db, request)
+    others = select(UserSession).where(UserSession.user_id == user.id)
+    if loaded is not None:
+        others = others.where(UserSession.id != loaded[1].id)
+    for session in db.scalars(others).all():
+        db.delete(session)
+    db.commit()
 
 
 def issue_csrf(db: Session, request: Request, response: Response) -> str:

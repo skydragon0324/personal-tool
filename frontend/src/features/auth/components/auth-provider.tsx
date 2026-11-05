@@ -2,7 +2,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
 
 import { authKeys } from "@/features/auth/api/auth-queries";
-import type { AuthUser, LoginPayload, RegisterPayload } from "@/features/auth/types";
+import type {
+  AuthUser,
+  LoginPayload,
+  PasswordChangePayload,
+  ProfileUpdatePayload,
+  RegisterPayload,
+} from "@/features/auth/types";
 import { clearUserLocalState } from "@/features/auth/utils/clear-user-state";
 import { ApiError, apiClient, setCsrfToken, setUnauthorizedHandler } from "@/lib/api-client";
 
@@ -15,6 +21,8 @@ interface AuthContextValue {
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (payload: ProfileUpdatePayload) => Promise<AuthUser>;
+  changePassword: (payload: PasswordChangePayload) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -92,6 +100,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [queryClient, resetWorkspace]);
 
+  const updateProfile = useCallback(
+    async (payload: ProfileUpdatePayload) => {
+      const user = await apiClient.updateProfile(payload);
+      queryClient.setQueryData(authKeys.me, user);
+      // Names and emails also show up in board members and assignees.
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== authKeys.me[0] });
+      return user;
+    },
+    [queryClient],
+  );
+
+  const changePassword = useCallback(async (payload: PasswordChangePayload) => {
+    await apiClient.changePassword(payload);
+  }, []);
+
   const value = useMemo(
     () => ({
       user: meQuery.data ?? null,
@@ -101,8 +124,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      updateProfile,
+      changePassword,
     }),
-    [login, logout, meQuery.data, meQuery.isError, meQuery.isLoading, refetchMe, register],
+    [changePassword, login, logout, meQuery.data, meQuery.isError, meQuery.isLoading, refetchMe, register, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

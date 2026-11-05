@@ -67,6 +67,34 @@ class LoginRequest(BaseModel):
         return normalize_email(value)
 
 
+class ProfileUpdateRequest(BaseModel):
+    """Fields left out are not changed. Changing the email needs the current password."""
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    email: EmailStr | None = None
+    current_password: str | None = Field(default=None, max_length=1024)
+
+    @field_validator("display_name")
+    @classmethod
+    def _name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Name is required")
+        return cleaned
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: EmailStr | None) -> str | None:
+        return None if value is None else normalize_email(str(value))
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=1024)
+
+
 class AuthResponse(BaseModel):
     user: UserRead
     csrf_token: str

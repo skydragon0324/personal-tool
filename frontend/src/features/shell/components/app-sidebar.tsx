@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AccountSettingsModal } from "@/features/auth/components/account-settings-modal";
 import { useAuth } from "@/features/auth/components/auth-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/features/board/components/theme-toggle";
@@ -22,6 +23,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const chrome = useWorkspaceChrome();
   const { user, logout } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
   const boardsQuery = useBoards(true);
   const boards = activeBoards(boardsQuery.data);
   const currentBoardId = boardIdFromPath(pathname);
@@ -118,11 +120,18 @@ export function AppSidebar() {
       </nav>
       <div className="border-t border-[var(--app-border)] px-3 py-3">
         {user ? (
-          <div className="mb-3 px-1">
+          <button
+            type="button"
+            onClick={() => setAccountOpen(true)}
+            aria-label={t("account.open", { name: user.display_name })}
+            title={t("account.title")}
+            className="mb-3 block w-full rounded-md px-1 py-1 text-left transition-colors hover:bg-[var(--app-surface-muted)]"
+          >
             <p className="truncate text-sm font-medium text-[var(--app-text)]">{user.display_name}</p>
             <p className="truncate text-xs text-[var(--app-text-muted)]">{user.email}</p>
-          </div>
+          </button>
         ) : null}
+        <AccountSettingsModal opened={accountOpen} onClose={() => setAccountOpen(false)} />
         <div className="flex items-center justify-between gap-2">
           <Button variant="subtle" color="gray" onClick={() => void logout()}>
             {t("shell.logout")}

@@ -530,6 +530,15 @@ export const apiClient = {
       return body;
     }),
 
+  updateProfile: (payload: import("@/features/auth/types").ProfileUpdatePayload) =>
+    request<import("@/features/auth/types").AuthUser>("/api/v1/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  changePassword: (payload: import("@/features/auth/types").PasswordChangePayload) =>
+    request<void>("/api/v1/auth/password", { method: "POST", body: JSON.stringify(payload) }),
+
   logout: () =>
     request<void>("/api/v1/auth/logout", { method: "POST" }).finally(() => {
       setCsrfToken(null);

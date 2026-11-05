@@ -18,6 +18,8 @@ ERROR_MESSAGES: dict[str, str] = {
     "csrf_failed": "CSRF check failed",
     "invalid_origin": "Invalid origin",
     "owner_only": "Only the board owner can do this",
+    "current_password_required": "Enter your current password to change your email",
+    "current_password_wrong": "Current password is incorrect",
     # Not found
     "board_not_found": "Board not found",
     "task_not_found": "Task not found",
