@@ -17,7 +17,7 @@ import {
 } from "@mantine/dates";
 import dayjs from "dayjs";
 
-import { getLanguage } from "@/i18n";
+import { getLanguage, LOCALES } from "@/i18n";
 
 type DayPropsResult = ReturnType<NonNullable<DatePickerProps["getDayProps"]>>;
 
@@ -37,18 +37,10 @@ interface SingleStringDate extends StringDateOptions {
 
 export type DateRangeStrings = [string | null, string | null];
 
-// Chinese readers expect year-first dates ("2026年10月22日"), not a translated "Oct 22, 2026".
-const CHINESE_FORMATS: Record<string, string> = {
-  "MMM D, YYYY": "YYYY年M月D日",
-  "MMMM YYYY": "YYYY年M月",
-  "YYYY": "YYYY年",
-  "dddd, MMMM D, YYYY": "YYYY年M月D日 dddd",
-};
-
 /** The display format for the current language. */
 function localFormat(format: string | undefined): string | undefined {
-  if (!format || getLanguage() !== "zh") return format;
-  return CHINESE_FORMATS[format] ?? format;
+  if (!format) return format;
+  return LOCALES[getLanguage()].dateFormats[format] ?? format;
 }
 
 function toDate(value: string | null | undefined): Date | null {

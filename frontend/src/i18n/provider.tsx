@@ -1,8 +1,9 @@
 import dayjs from "dayjs";
+import "dayjs/locale/ko";
 import "dayjs/locale/zh-cn";
 import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { LANGUAGE_STORAGE_KEY, setActiveLanguage, type Language } from "./index";
+import { isLanguage, LANGUAGE_STORAGE_KEY, LOCALES, setActiveLanguage, type Language } from "./index";
 
 interface LanguageContextValue {
   language: Language;
@@ -14,26 +15,29 @@ const LanguageContext = createContext<LanguageContextValue>({
   setLanguage: () => undefined,
 });
 
-/** The saved choice, else the browser's language (Chinese if it starts with "zh"), else English. */
+/** The saved choice, else the browser's language (Chinese for "zh…", Korean for "ko…"), else English. */
 function preferredLanguage(): Language {
   try {
     const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (saved === "en" || saved === "zh") return saved;
+    if (isLanguage(saved)) return saved;
   } catch {
     // Storage can be blocked; fall back to the browser language.
   }
-  return window.navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+  const browser = window.navigator.language?.toLowerCase() ?? "";
+  if (browser.startsWith("zh")) return "zh";
+  if (browser.startsWith("ko")) return "ko";
+  return "en";
 }
 
 function applyLanguage(language: Language) {
   setActiveLanguage(language);
-  dayjs.locale(language === "zh" ? "zh-cn" : "en");
-  document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+  dayjs.locale(LOCALES[language].dayjs);
+  document.documentElement.lang = language === "en" ? "en" : LOCALES[language].bcp47;
 }
 
 /**
  * Picks the language on the client and re-renders the app when it changes. Nothing renders until
- * the language is known, so a Chinese user never sees an English first paint.
+ * the language is known, so a Chinese or Korean user never sees an English first paint.
  */
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language | null>(null);

@@ -3,6 +3,7 @@ import { join } from "path";
 
 import { en } from "./en";
 import { colorName, formatList, setActiveLanguage, t, translateServerText, weekdayName } from "./index";
+import { ko } from "./ko";
 import { zh } from "./zh";
 
 const BACKEND = join(__dirname, "../../../backend/app");
@@ -27,26 +28,32 @@ const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((mat
 
 afterEach(() => setActiveLanguage("en"));
 
-describe("dictionaries", () => {
+describe.each([
+  ["zh", zh],
+  ["ko", ko],
+])("%s dictionary", (_language, dictionary) => {
   const english = leaves(en);
-  const chinese = leaves(zh);
+  const translated = leaves(dictionary);
 
-  it("have the same keys", () => {
-    expect([...chinese.keys()].sort()).toEqual([...english.keys()].sort());
+  it("has the same keys as English", () => {
+    expect([...translated.keys()].sort()).toEqual([...english.keys()].sort());
   });
 
-  it("use the same {placeholders} in both languages", () => {
+  it("uses the same {placeholders} as English", () => {
     const mismatched = [...english].filter(
-      ([key, text]) => placeholders(text).join() !== placeholders(chinese.get(key) ?? "").join(),
+      ([key, text]) => placeholders(text).join() !== placeholders(translated.get(key) ?? "").join(),
     );
     expect(mismatched.map(([key]) => key)).toEqual([]);
   });
+});
 
+describe("dictionaries", () => {
   it("translate every error code the backend can send", () => {
     const registry = readFileSync(join(BACKEND, "core/error_codes.py"), "utf8");
     const codes = [...registry.matchAll(/^ {4}"(\w+)": /gm)].map((match) => match[1]).sort();
     expect(codes.length).toBeGreaterThan(100);
     expect(Object.keys(zh.serverErrors).sort()).toEqual(codes);
+    expect(Object.keys(ko.serverErrors).sort()).toEqual(codes);
   });
 
   it("translate every notification body the backend stores", () => {
@@ -71,6 +78,9 @@ describe("t", () => {
     setActiveLanguage("zh");
     expect(t("boards.taskCount", { count: 3 })).toBe("3 个任务");
     expect(t("dates.goodMorning", { name: "Ada" })).toBe("早上好，Ada");
+    setActiveLanguage("ko");
+    expect(t("boards.taskCount", { count: 3 })).toBe("작업 3개");
+    expect(t("dates.goodMorning", { name: "Ada" })).toBe("좋은 아침이에요, Ada님");
   });
 
   it("names weekdays, colors and lists in the current language", () => {
@@ -82,6 +92,10 @@ describe("t", () => {
     expect(weekdayName(6)).toBe("周日");
     expect(colorName("teal")).toBe("青绿");
     expect(formatList(["甲", "乙", "丙"])).toBe("甲、乙和丙");
+    setActiveLanguage("ko");
+    expect(weekdayName(6, "long")).toBe("일요일");
+    expect(colorName("teal")).toBe("청록");
+    expect(formatList(["월", "수", "금"])).toBe("월, 수, 금");
   });
 });
 

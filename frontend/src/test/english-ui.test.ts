@@ -5,6 +5,7 @@ import { en } from "@/i18n/en";
 
 const HANGUL = /[가-힣]/;
 const SRC_ROOT = join(__dirname, "..");
+const I18N_ROOT = join(SRC_ROOT, "i18n");
 
 function englishText(key: string): string {
   let node: unknown = en;
@@ -27,6 +28,8 @@ function walk(dir: string): string[] {
     if (statSync(full).isDirectory()) {
       files.push(...walk(full));
     } else if (/\.(ts|tsx|css)$/.test(name) && !name.endsWith("english-ui.test.ts")) {
+      // Translations belong in the i18n dictionaries; everywhere else must stay English.
+      if (full.startsWith(I18N_ROOT)) continue;
       files.push(full);
     }
   }

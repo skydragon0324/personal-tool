@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { normalizeStoredColorScheme } from "@/features/board/utils/color-scheme";
 import { ssrSafeColorSchemeManager } from "@/features/board/utils/ssr-color-scheme-manager";
 import { AuthProvider } from "@/features/auth/components/auth-provider";
+import { LOCALES } from "@/i18n";
 import { I18nProvider, useLanguage } from "@/i18n/provider";
 import { makeQueryClient } from "@/lib/query-client";
 
@@ -73,7 +74,7 @@ function LocalizedDates({ children }: { children: React.ReactNode }) {
   const { language } = useLanguage();
   return (
     <DatesProvider
-      settings={{ consistentWeeks: true, firstDayOfWeek: 1, locale: language === "zh" ? "zh-cn" : "en" }}
+      settings={{ consistentWeeks: true, firstDayOfWeek: 1, locale: LOCALES[language].dayjs }}
     >
       {children}
     </DatesProvider>

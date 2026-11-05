@@ -1,9 +1,7 @@
 import { ActionIcon, Menu } from "@mantine/core";
 
-import { LANGUAGES, t } from "@/i18n";
+import { LANGUAGES, LOCALES, t } from "@/i18n";
 import { useLanguage } from "@/i18n/provider";
-
-const SHORT_LABEL = { en: "EN", zh: "中" } as const;
 
 /** A compact language menu, sized to sit next to the theme toggle. */
 export function LanguageSwitcher() {
@@ -13,7 +11,7 @@ export function LanguageSwitcher() {
     <Menu shadow="md" position="top-end" withinPortal>
       <Menu.Target>
         <ActionIcon variant="subtle" color="gray" size="lg" aria-label={t("common.language")} title={t("common.language")}>
-          <span className="text-xs font-semibold">{SHORT_LABEL[language]}</span>
+          <span className="text-xs font-semibold">{LOCALES[language].shortLabel}</span>
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
@@ -21,7 +19,7 @@ export function LanguageSwitcher() {
         {LANGUAGES.map((option) => (
           <Menu.Item
             key={option.value}
-            lang={option.value === "zh" ? "zh-CN" : "en"}
+            lang={option.value === "en" ? "en" : LOCALES[option.value].bcp47}
             onClick={() => setLanguage(option.value)}
             rightSection={option.value === language ? "✓" : null}
             aria-current={option.value === language ? "true" : undefined}

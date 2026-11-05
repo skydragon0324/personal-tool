@@ -1,25 +1,68 @@
 /**
- * App translations (English and Simplified Chinese).
+ * App translations (English, Simplified Chinese and Korean).
  *
  * `t("section.key", { name })` returns the text in the current language. It is a plain function so
  * it also works outside React (validation, date helpers, notifications). Switching language
  * re-renders the whole app (see I18nProvider), so every `t` call picks up the new language.
  *
- * English (`en.ts`) is the source of truth; `zh.ts` must have exactly the same keys.
+ * English (`en.ts`) is the source of truth; `zh.ts` and `ko.ts` must have exactly the same keys.
  */
 import { en, type Messages } from "./en";
+import { ko } from "./ko";
 import { zh } from "./zh";
 
-export type Language = "en" | "zh";
+export type Language = "en" | "zh" | "ko";
 
 export const LANGUAGES: { value: Language; label: string }[] = [
   { value: "en", label: "English" },
   { value: "zh", label: "简体中文" },
+  { value: "ko", label: "한국어" },
 ];
+
+export function isLanguage(value: unknown): value is Language {
+  return value === "en" || value === "zh" || value === "ko";
+}
+
+interface LocaleInfo {
+  /** For dates, numbers and `<html lang>`. */
+  bcp47: string;
+  dayjs: string;
+  /** Shown on the compact language button. */
+  shortLabel: string;
+  /** Date-picker display formats that differ from English, keyed by the English format. */
+  dateFormats: Record<string, string>;
+}
+
+export const LOCALES: Record<Language, LocaleInfo> = {
+  en: { bcp47: "en-US", dayjs: "en", shortLabel: "EN", dateFormats: {} },
+  // Chinese and Korean readers expect year-first dates, not a translated "Oct 22, 2026".
+  zh: {
+    bcp47: "zh-CN",
+    dayjs: "zh-cn",
+    shortLabel: "中",
+    dateFormats: {
+      "MMM D, YYYY": "YYYY年M月D日",
+      "MMMM YYYY": "YYYY年M月",
+      "YYYY": "YYYY年",
+      "dddd, MMMM D, YYYY": "YYYY年M月D日 dddd",
+    },
+  },
+  ko: {
+    bcp47: "ko-KR",
+    dayjs: "ko",
+    shortLabel: "한",
+    dateFormats: {
+      "MMM D, YYYY": "YYYY년 M월 D일",
+      "MMMM YYYY": "YYYY년 M월",
+      "YYYY": "YYYY년",
+      "dddd, MMMM D, YYYY": "YYYY년 M월 D일 dddd",
+    },
+  },
+};
 
 export const LANGUAGE_STORAGE_KEY = "app-language";
 
-const DICTIONARIES: Record<Language, Messages> = { en, zh };
+const DICTIONARIES: Record<Language, Messages> = { en, zh, ko };
 
 /** A text with English singular/plural forms; picked by the `count` parameter. */
 export interface Plural {
@@ -50,7 +93,7 @@ export function setActiveLanguage(language: Language): void {
 
 /** The BCP 47 locale for dates and numbers in the current language. */
 export function dateLocale(): string {
-  return current === "zh" ? "zh-CN" : "en-US";
+  return LOCALES[current].bcp47;
 }
 
 function lookup(dictionary: Messages, key: string): Leaf | undefined {
