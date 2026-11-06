@@ -14,7 +14,7 @@ import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { Extension } from "@tiptap/core";
-import { type ReactNode, useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 
 import type { TiptapJSON } from "@/features/board/types";
@@ -93,6 +93,13 @@ interface TaskRichTextEditorProps {
   placeholder?: string;
   onEditorReady?: (editor: Editor | null) => void;
   extraToolbar?: ReactNode;
+  /** Images pasted or dropped into the text. When set, the editor inserts nothing itself. */
+  onImageFiles?: (files: File[]) => void;
+}
+
+/** The image files in a paste or drop, if any. */
+export function imageFilesFrom(data: DataTransfer | null | undefined): File[] {
+  return Array.from(data?.files ?? []).filter((file) => file.type.startsWith("image/"));
 }
 
 export function TaskRichTextEditor({
@@ -101,7 +108,12 @@ export function TaskRichTextEditor({
   placeholder = t("editor.placeholder"),
   onEditorReady,
   extraToolbar,
+  onImageFiles,
 }: TaskRichTextEditorProps) {
+  // Read through a ref: the editor is created once, but the handler can change between renders.
+  const imageFilesHandler = useRef(onImageFiles);
+  imageFilesHandler.current = onImageFiles;
+
   const extensions = useMemo(
     () => [
       StarterKit,
@@ -129,6 +141,23 @@ export function TaskRichTextEditor({
       onChange(current.getJSON() as TiptapJSON);
     },
     immediatelyRender: false,
+    editorProps: {
+      handlePaste: (_view, event) => {
+        const files = imageFilesFrom(event.clipboardData);
+        if (!files.length || !imageFilesHandler.current) return false;
+        event.preventDefault();
+        imageFilesHandler.current(files);
+        return true;
+      },
+      handleDrop: (_view, event, _slice, moved) => {
+        if (moved) return false; // Moving an image already in the text.
+        const files = imageFilesFrom(event.dataTransfer);
+        if (!files.length || !imageFilesHandler.current) return false;
+        event.preventDefault();
+        imageFilesHandler.current(files);
+        return true;
+      },
+    },
   });
 
   useEffect(() => {
@@ -157,7 +186,8 @@ export function TaskRichTextEditor({
   const currentFont = editor.getAttributes("textStyle").fontFamily || "inherit";
 
   return (
-    <RichTextEditor editor={editor} labels={editorLabels()}>
+    // task-content-editor: images in the text show as thumbnails (see globals.css).
+    <RichTextEditor editor={editor} labels={editorLabels()} className="task-content-editor">
       <RichTextEditor.Toolbar sticky stickyOffset={0} className="flex flex-wrap gap-y-1">
         <RichTextEditor.ControlsGroup>
           <RichTextEditor.Undo />

@@ -321,6 +321,18 @@ export function TaskForm({
     const alt = altDraft.trim() || altFile.name;
     const file = altFile;
     setAltFile(null);
+    insertImage(file, alt);
+  }
+
+  /** Pasted or dropped images go straight in, named after the file (no alt-text step). */
+  function insertPastedImages(files: File[]) {
+    files.forEach((file, index) => {
+      const named = namePastedImage(file, index);
+      insertImage(named, named.name.replace(/\.[^.]+$/, ""));
+    });
+  }
+
+  function insertImage(file: File, alt: string) {
     const taskId = savedTaskId ?? initial?.id;
     if (taskId && onUploadFile) {
       void insertUploadedImage(file, alt);
@@ -570,11 +582,17 @@ export function TaskForm({
         <Divider />
 
         <section className="space-y-3">
-          <Title order={5}>{t("taskForm.details")}</Title>
+          <div>
+            <Title order={5}>{t("taskForm.details")}</Title>
+            <Text size="xs" c="dimmed">
+              {t("taskForm.pasteImageHint")}
+            </Text>
+          </div>
           <TaskRichTextEditor
             value={content}
             onChange={setContent}
             onEditorReady={handleEditorReady}
+            onImageFiles={insertPastedImages}
             extraToolbar={
               <FileButton
                 accept="image/*"
@@ -907,4 +925,17 @@ export function TaskForm({
       </Modal>
     </form>
   );
+}
+
+/**
+ * Screenshots arrive as "image.png"; give them a dated name so several pasted images can be told
+ * apart in the file list.
+ */
+export function namePastedImage(file: File, index = 0, now = new Date()): File {
+  if (!/^image\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name) && file.name) return file;
+  const extension = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+  const suffix = index ? ` (${index + 1})` : "";
+  return new File([file], `${t("taskForm.pastedImageName")} ${stamp}${suffix}.${extension}`, { type: file.type });
 }

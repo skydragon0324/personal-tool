@@ -385,6 +385,8 @@ export const en = {
     couldNotCancelInvitation: "Could not cancel the invitation",
   },
   taskForm: {
+    pastedImageName: "Pasted image",
+    pasteImageHint: "Paste or drop an image into the text to add it.",
     imageUploadFailed: "Image upload failed",
     uploadsUnavailable: "Uploads are not available",
     noUploadUrl: "Upload URL was not returned",
@@ -539,6 +541,8 @@ export const en = {
     placeholder: "Write task details…",
   },
   tasks: {
+    imagePreview: "Image",
+    viewImage: "Open full image: {name}",
     editTitle: "Edit {noun}",
     nounTask: "task",
     nounSubtask: "subtask",

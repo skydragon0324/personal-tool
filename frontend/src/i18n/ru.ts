@@ -399,6 +399,8 @@ export const ru: Messages = {
     couldNotCancelInvitation: "Не удалось отменить приглашение",
   },
   taskForm: {
+    pastedImageName: "Вставленное изображение",
+    pasteImageHint: "Вставьте или перетащите изображение в текст, чтобы добавить его.",
     imageUploadFailed: "Не удалось загрузить изображение",
     uploadsUnavailable: "Загрузка файлов недоступна",
     noUploadUrl: "Не получен адрес для загрузки",
@@ -553,6 +555,8 @@ export const ru: Messages = {
     placeholder: "Опишите задачу…",
   },
   tasks: {
+    imagePreview: "Изображение",
+    viewImage: "Открыть изображение целиком: {name}",
     editTitle: "Изменить {noun}",
     nounTask: "задачу",
     nounSubtask: "подзадачу",

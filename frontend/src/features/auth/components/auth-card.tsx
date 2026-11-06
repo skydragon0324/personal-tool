@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/features/board/components/theme-toggle";
+import { screenHeight } from "@/lib/viewport";
 
 export function AuthCard({
   title,
@@ -14,7 +15,7 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[var(--app-bg)] px-4 py-10">
+    <div style={{ minHeight: screenHeight(100) }} className="flex items-center justify-center bg-[var(--app-bg)] px-4 py-10">
       <div className="absolute right-4 top-4 flex items-center gap-1">
         <LanguageSwitcher />
         <ThemeToggle />

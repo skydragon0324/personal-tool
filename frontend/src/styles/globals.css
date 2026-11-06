@@ -120,3 +120,39 @@ body {
   flex: 1 1 auto;
   min-width: 0;
 }
+
+/* Task details (read-only): images are thumbnails; clicking one opens the full image. */
+.task-content-viewer .ProseMirror img {
+  display: block;
+  width: auto;
+  max-width: min(100%, 14rem);
+  max-height: 10rem;
+  object-fit: contain;
+  margin: 0.25rem 0;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  cursor: zoom-in;
+  transition: box-shadow 120ms ease;
+}
+
+.task-content-viewer .ProseMirror img:hover,
+.task-content-viewer .ProseMirror img:focus-visible {
+  box-shadow: 0 0 0 2px var(--app-primary);
+  outline: none;
+}
+
+/* Task edit form: images in the text show as thumbnails too; a selected image gets an outline. */
+.task-content-editor .ProseMirror img {
+  display: block;
+  width: auto;
+  max-width: min(100%, 14rem);
+  max-height: 10rem;
+  object-fit: contain;
+  margin: 0.25rem 0;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+}
+
+.task-content-editor .ProseMirror img.ProseMirror-selectednode {
+  box-shadow: 0 0 0 2px var(--app-primary);
+}

@@ -162,3 +162,16 @@ def test_outsiders_cannot_read_history(client: TestClient, db: Session) -> None:
         assert outsider.get(f"/api/v1/tasks/{task['id']}/history").status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+def test_history_failure_never_blocks_the_change(client: TestClient, monkeypatch) -> None:
+    from app.services import task_history_service
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("history table missing")
+
+    monkeypatch.setattr(task_history_service, "_add_entry", broken)
+    task = _task(client)
+    edited = client.patch(f"/api/v1/tasks/{task['id']}", json={"title": "Still saved"})
+    assert edited.status_code == 200, edited.text
+    assert client.get(f"/api/v1/tasks/{task['id']}").json()["title"] == "Still saved"

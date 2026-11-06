@@ -384,6 +384,8 @@ export const zh: Messages = {
     couldNotCancelInvitation: "无法取消邀请",
   },
   taskForm: {
+    pastedImageName: "粘贴的图片",
+    pasteImageHint: "可将图片直接粘贴或拖入文本中。",
     imageUploadFailed: "图片上传失败",
     uploadsUnavailable: "暂时无法上传",
     noUploadUrl: "未返回上传地址",
@@ -538,6 +540,8 @@ export const zh: Messages = {
     placeholder: "填写任务详情…",
   },
   tasks: {
+    imagePreview: "图片",
+    viewImage: "查看原图：{name}",
     editTitle: "编辑{noun}",
     nounTask: "任务",
     nounSubtask: "子任务",

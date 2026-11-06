@@ -11,6 +11,7 @@ reads correctly after something is renamed or deleted.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import Counter
 from collections.abc import Iterator
@@ -33,6 +34,8 @@ from app.models import (
 )
 from app.schemas.task_history import TaskHistoryRead
 from app.services.ownership import get_task_for_user
+
+logger = logging.getLogger(__name__)
 
 # Fields compared as single values, in the order they are listed in an entry.
 SCALAR_FIELDS = ("title", "board", "status", "category", "priority", "start_date", "due_date", "reminder", "repeat")
@@ -103,43 +106,70 @@ def diff(before: Snapshot, after: Snapshot) -> list[dict[str, Any]]:
 
 
 def _add_entry(
-    db: Session, task_id: uuid.UUID, actor: User, action: str, changes: list[dict[str, Any]]
+    db: Session,
+    task_id: uuid.UUID,
+    actor: tuple[uuid.UUID, str],
+    action: str,
+    changes: list[dict[str, Any]],
 ) -> None:
     db.add(
         TaskHistoryEntry(
             task_id=task_id,
-            actor_id=actor.id,
-            actor_name=actor.display_name,
+            actor_id=actor[0],
+            actor_name=actor[1],
             action=action,
             changes=changes,
         )
     )
 
 
+def _give_up(db: Session, what: str, task_ids: list[uuid.UUID]) -> None:
+    """History is a side record: if writing it fails, the change itself must still succeed."""
+    logger.exception("Could not %s task history for %s", what, task_ids)
+    db.rollback()
+
+
 def record_created(db: Session, task_id: uuid.UUID, actor: User) -> None:
-    """Note that `actor` created the task. Commits."""
-    _add_entry(db, task_id, actor, "created", [])
-    db.commit()
+    """Note that `actor` created the task. Commits; never raises."""
+    try:
+        _add_entry(db, task_id, (actor.id, actor.display_name), "created", [])
+        db.commit()
+    except Exception:
+        _give_up(db, "record", [task_id])
 
 
 @contextmanager
 def track_changes(db: Session, actor: User, *task_ids: uuid.UUID | None) -> Iterator[None]:
-    """Record what the wrapped code changed on each task. Nothing is recorded if it raises."""
+    """Record what the wrapped code changed on each task.
+
+    Nothing is recorded if the wrapped code raises. A failure while recording is logged and
+    skipped, so it never turns a successful change into an error.
+    """
     ids = [task_id for task_id in dict.fromkeys(task_ids) if task_id is not None]
-    before = {task_id: snapshot(db, task_id) for task_id in ids}
+    who = (actor.id, actor.display_name)
+    try:
+        before = {task_id: snapshot(db, task_id) for task_id in ids}
+    except Exception:
+        _give_up(db, "read", ids)
+        before = {}
     yield
-    recorded = False
-    for task_id in ids:
-        old = before[task_id]
-        new = snapshot(db, task_id)
-        if old is None or new is None:
-            continue  # Missing before (not visible) or deleted by the call.
-        changes = diff(old, new)
-        if changes:
-            _add_entry(db, task_id, actor, "updated", changes)
-            recorded = True
-    if recorded:
-        db.commit()
+    if not before:
+        return
+    try:
+        recorded = False
+        for task_id in ids:
+            old = before.get(task_id)
+            new = snapshot(db, task_id)
+            if old is None or new is None:
+                continue  # Missing before (not visible) or deleted by the call.
+            changes = diff(old, new)
+            if changes:
+                _add_entry(db, task_id, who, "updated", changes)
+                recorded = True
+        if recorded:
+            db.commit()
+    except Exception:
+        _give_up(db, "record", ids)
 
 
 def list_history(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> list[TaskHistoryRead]:

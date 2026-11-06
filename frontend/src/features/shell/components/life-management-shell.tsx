@@ -30,6 +30,9 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
           overflow: "auto",
           background: "var(--app-bg)",
         },
+        // Mantine sizes the sidebar with `100dvh`, which Chrome < 108 ignores (the sidebar then
+        // shrinks to its content and its footer can fall off a short screen).
+        navbar: { height: `calc(${screenHeight(100)} - var(--app-shell-header-offset, 0rem))` },
       }}
       navbar={{
         width: 272,
