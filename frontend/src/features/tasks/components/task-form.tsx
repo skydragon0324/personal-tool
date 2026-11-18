@@ -55,7 +55,10 @@ import {
   replacePendingImageSrc,
   sanitizeContentForPersist,
 } from "../utils/pending-images";
-import { TaskRichTextEditor } from "./task-rich-text-editor";
+import { type EditorImage, TaskRichTextEditor } from "./task-rich-text-editor";
+import { ImageAnnotator } from "./image-annotator";
+import { ScreenshotButton } from "./screenshot-button";
+import { fetchImageBlob } from "../utils/screen-capture";
 import { t } from "@/i18n";
 
 interface PendingFile {
@@ -185,6 +188,8 @@ export function TaskForm({
   const [savedTaskId, setSavedTaskId] = useState<string | null>(initial?.id ?? null);
   const [altDraft, setAltDraft] = useState("");
   const [altFile, setAltFile] = useState<File | null>(null);
+  /** The image open in the markup editor: a new screenshot (no target) or an image already in the text. */
+  const [annotating, setAnnotating] = useState<{ source: Blob; target: EditorImage | null } | null>(null);
   const editorRef = useRef<Editor | null>(null);
 
   const categoriesQuery = useCategories(boardId);
@@ -330,6 +335,91 @@ export function TaskForm({
       const named = namePastedImage(file, index);
       insertImage(named, named.name.replace(/\.[^.]+$/, ""));
     });
+  }
+
+  /** Opens an image already in the text in the markup editor. */
+  async function openImageForAnnotation(image: EditorImage) {
+    setError(null);
+    try {
+      setAnnotating({ source: await fetchImageBlob(image.src), target: image });
+    } catch {
+      setError(t("taskForm.couldNotOpenImage"));
+    }
+  }
+
+  function finishAnnotation(result: Blob) {
+    const current = annotating;
+    setAnnotating(null);
+    if (!current) return;
+    if (!current.target) {
+      const file = datedImageFile(result, t("taskForm.screenshotName"));
+      insertImage(file, file.name.replace(/\.[^.]+$/, ""));
+      return;
+    }
+    void replaceImage(current.target, editedImageFile(result, current.target.alt));
+  }
+
+  /** Points the image node that showed `target` at a new picture. False if it is no longer in the text. */
+  function setImageAttrs(target: EditorImage, attrs: Record<string, unknown>): boolean {
+    const editor = editorRef.current;
+    if (!editor || editor.isDestroyed) return false;
+    const doc = editor.state.doc;
+    let pos: number | null = null;
+    const atTarget = doc.nodeAt(target.pos);
+    if (atTarget?.type.name === "image" && atTarget.attrs.src === target.src) {
+      pos = target.pos;
+    } else {
+      // The text changed while the editor was open; find the same image by its source.
+      doc.descendants((node, nodePos) => {
+        if (pos !== null) return false;
+        if (node.type.name === "image" && node.attrs.src === target.src) pos = nodePos;
+        return true;
+      });
+    }
+    if (pos === null) return false;
+    const imagePos: number = pos;
+    return editor
+      .chain()
+      .command(({ tr }) => {
+        const node = tr.doc.nodeAt(imagePos);
+        if (!node) return false;
+        tr.setNodeMarkup(imagePos, undefined, { ...node.attrs, ...attrs });
+        return true;
+      })
+      .run();
+  }
+
+  /** Swaps an image in the text for its marked-up version, uploading it like any other image. */
+  async function replaceImage(target: EditorImage, file: File) {
+    const alt = target.alt || file.name.replace(/\.[^.]+$/, "");
+    const dropOldPending = () => {
+      if (target.pendingId) {
+        setPendingImages((current) => current.filter((item) => item.pendingId !== target.pendingId));
+      }
+    };
+    const taskId = savedTaskId ?? initial?.id;
+    if (taskId && onUploadFile) {
+      try {
+        const uploaded = await onUploadFile(taskId, file);
+        if (!uploaded.download_url) throw new Error(t("taskForm.noUploadUrl"));
+        if (!setImageAttrs(target, { src: uploaded.download_url, alt, pendingId: null })) {
+          editorRef.current?.chain().focus().setImage({ src: uploaded.download_url, alt }).run();
+        }
+        dropOldPending();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("taskForm.imageUploadFailed"));
+      }
+      return;
+    }
+    const pendingId = createPendingImageId();
+    const blobUrl = URL.createObjectURL(file);
+    if (!setImageAttrs(target, { src: blobUrl, alt, pendingId })) {
+      URL.revokeObjectURL(blobUrl);
+      insertLocalImage(file, alt);
+      return;
+    }
+    dropOldPending();
+    setPendingImages((current) => [...current, { pendingId, file, alt, blobUrl }]);
   }
 
   function insertImage(file: File, alt: string) {
@@ -593,7 +683,9 @@ export function TaskForm({
             onChange={setContent}
             onEditorReady={handleEditorReady}
             onImageFiles={insertPastedImages}
+            onAnnotateImage={(image) => void openImageForAnnotation(image)}
             extraToolbar={
+              <>
               <FileButton
                 accept="image/*"
                 onChange={(file) => {
@@ -612,6 +704,14 @@ export function TaskForm({
                   </Button>
                 )}
               </FileButton>
+              <ScreenshotButton
+                onCaptured={(image) => {
+                  setError(null);
+                  setAnnotating({ source: image, target: null });
+                }}
+                onError={setError}
+              />
+              </>
             }
           />
           {pendingImages.length > 0 ? (
@@ -873,6 +973,12 @@ export function TaskForm({
           </Group>
         </Stack>
       </Modal>
+      <ImageAnnotator
+        source={annotating?.source ?? null}
+        startWithCrop={annotating !== null && annotating.target === null}
+        onCancel={() => setAnnotating(null)}
+        onDone={finishAnnotation}
+      />
       <RecurrenceScopeDialog
         open={pendingScopePayload !== null}
         mode="edit"
@@ -933,9 +1039,22 @@ export function TaskForm({
  */
 export function namePastedImage(file: File, index = 0, now = new Date()): File {
   if (!/^image\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name) && file.name) return file;
-  const extension = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+  return datedImageFile(file, t("taskForm.pastedImageName"), index, now);
+}
+
+/** "<label> 2026-11-05 09.04.07.png", with " (2)" and so on for later images taken at the same moment. */
+export function datedImageFile(image: Blob, label: string, index = 0, now = new Date()): File {
+  const extension = (image.type.split("/")[1] || "png").replace("jpeg", "jpg");
   const pad = (value: number) => String(value).padStart(2, "0");
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
   const suffix = index ? ` (${index + 1})` : "";
-  return new File([file], `${t("taskForm.pastedImageName")} ${stamp}${suffix}.${extension}`, { type: file.type });
+  return new File([image], `${label} ${stamp}${suffix}.${extension}`, { type: image.type || "image/png" });
+}
+
+/** "<alt> (edited).png"; editing again does not stack another "(edited)". */
+export function editedImageFile(image: Blob, alt: string): File {
+  const marker = ` (${t("annotator.edited")})`;
+  const base = (alt.trim() || t("taskForm.pastedImageName")).replace(/\.[^.]+$/, "");
+  const name = base.endsWith(marker) ? base : `${base}${marker}`;
+  return new File([image], `${name}.png`, { type: image.type || "image/png" });
 }

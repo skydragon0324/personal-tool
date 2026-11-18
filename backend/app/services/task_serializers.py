@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+from typing import Any
+
 from app.core.config import get_settings
 from app.models import Task, TaskAttachment
 from app.schemas.category import CategorySummary
@@ -14,6 +17,35 @@ from app.schemas.task import (
     TaskSummaryRead,
 )
 from app.services.content_utils import content_preview, count_checklist_items
+
+
+# An attachment link inside rich text, with whatever host it was saved under.
+_ATTACHMENT_URL = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*://[^/]+)?(/api/v1/tasks/[^/]+/attachments/[^/]+/download)$")
+
+
+def with_current_attachment_urls(content: Any) -> Any:
+    """Point inline images at PUBLIC_BASE_URL.
+
+    Images are saved in the text with the full address the API had at the time, so moving the
+    server (a new PUBLIC_BASE_URL) would break them. Rewriting on the way out keeps old tasks working
+    without touching stored data.
+    """
+    base = get_settings().public_base
+
+    def visit(node: Any) -> Any:
+        if isinstance(node, list):
+            return [visit(child) for child in node]
+        if not isinstance(node, dict):
+            return node
+        result = {key: visit(value) for key, value in node.items()}
+        attrs = result.get("attrs")
+        if result.get("type") == "image" and isinstance(attrs, dict) and isinstance(attrs.get("src"), str):
+            match = _ATTACHMENT_URL.match(attrs["src"])
+            if match:
+                result["attrs"] = {**attrs, "src": f"{base}{match.group(1)}"}
+        return result
+
+    return visit(content) if content is not None else None
 
 
 def recurrence_from_task(task: Task) -> RecurrenceRead | None:
@@ -104,8 +136,7 @@ def to_attachment_read(attachment: TaskAttachment) -> TaskAttachmentRead:
         attachment_kind=attachment.attachment_kind,
         created_at=attachment.created_at,
         download_url=(
-            f"{settings.public_base_url.rstrip('/')}"
-            f"/api/v1/tasks/{attachment.task_id}/attachments/{attachment.id}/download"
+            f"{settings.public_base}/api/v1/tasks/{attachment.task_id}/attachments/{attachment.id}/download"
         ),
     )
 
@@ -116,7 +147,7 @@ def to_detail(task: Task) -> TaskDetailRead:
         column_id=task.column_id,
         title=task.title,
         description=task.description,
-        content=task.content,
+        content=with_current_attachment_urls(task.content),
         content_text=task.content_text,
         content_schema_version=task.content_schema_version,
         start_date=task.start_date,

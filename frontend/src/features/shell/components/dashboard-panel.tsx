@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Children, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 
 export function DashboardPanel({
@@ -25,7 +25,8 @@ export function DashboardPanel({
   return (
     <section
       aria-label={title}
-      className="flex h-full min-h-[16rem] max-h-[min(48vh,24rem)] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:max-h-none"
+      // Capped height: a long list scrolls inside the panel instead of growing the page.
+      className="flex min-h-[16rem] max-h-[min(70vh,36rem)] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
     >
       <header className="flex shrink-0 items-start justify-between gap-3">
         <div className="min-w-0">
@@ -56,14 +57,39 @@ export function DashboardPanel({
   );
 }
 
+/**
+ * Panels in two columns (one on small screens), each as tall as its own content.
+ *
+ * Not a CSS grid: grid rows take the height of their tallest panel, so one long list stretched
+ * its neighbour too. Panels alternate left and right in the order given; on small screens the
+ * columns dissolve (`contents`) and `order` keeps that original order.
+ */
 export function DashboardGrid({ children, label }: { children: ReactNode; label?: string }) {
+  const items = Children.toArray(children);
+  const columns = [0, 1].map((column) =>
+    items
+      .map((child, index) => ({ child, index }))
+      .filter(({ index }) => index % 2 === column),
+  );
   return (
     <div
       role={label ? "region" : undefined}
       aria-label={label}
-      className="grid grid-cols-1 gap-4 md:grid-cols-2 md:grid-rows-2 md:min-h-[36rem] lg:min-h-[40rem]"
+      className="flex flex-col gap-4 md:flex-row md:items-start"
     >
-      {children}
+      {columns.map((column, columnIndex) => (
+        <div key={columnIndex} className="contents md:flex md:min-w-0 md:flex-1 md:flex-col md:gap-4">
+          {column.map(({ child, index }) => (
+            <div
+              key={isValidElement(child) && child.key != null ? child.key : index}
+              className="flex min-w-0 flex-col"
+              style={{ order: index }}
+            >
+              {child}
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

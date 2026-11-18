@@ -37,7 +37,7 @@ from app.services.ownership import (
 )
 from app.services.recurrence_dates import list_occurrence_dates, occurrence_index_for
 from app.services.storage import get_storage
-from app.services.task_serializers import to_detail
+from app.services.task_serializers import to_detail, with_current_attachment_urls
 
 HORIZON_DAYS = 62
 MAX_GENERATE_DAYS = 92
@@ -179,7 +179,7 @@ def _to_series_read(
         completed_count=completed_count,
         detached_count=detached_count,
         version=series.version,
-        content=series.content,
+        content=with_current_attachment_urls(series.content),
         content_schema_version=series.content_schema_version,
         links=[
             RecurrenceSeriesLinkRead(

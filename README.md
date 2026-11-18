@@ -51,6 +51,18 @@ npm run dev
 
 App: http://localhost:3000
 
+### Changing the server address
+
+No code changes are needed; set these and restart:
+
+| File | Setting | What it is |
+|------|---------|------------|
+| `backend/.env` | `PUBLIC_BASE_URL` | Address browsers use to reach the API (image and file links are built from it, including images already in tasks). |
+| `backend/.env` | `CORS_ORIGINS` | Comma-separated addresses the frontend is served from. |
+| `frontend/.env.local` | `NEXT_PUBLIC_API_URL` | Same address as `PUBLIC_BASE_URL`. Built into the app: run `npm run build` again after changing it. Unset, the app uses port 8000 on the host it was loaded from. |
+
+The backend always reads `backend/.env`, whichever folder it is started from; real environment variables override it.
+
 **Node 12.16 notes**
 
 - Always use the npm scripts (`npm run dev`, `build`, `start`, `lint`, `test`). They pass `--experimental-modules`, which Next.js 12 needs on Node < 12.17. Running `npx next ...` directly fails on 12.16.

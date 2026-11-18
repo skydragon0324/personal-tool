@@ -1,10 +1,15 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# backend/.env, wherever the server is started from. Real environment variables still win.
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql://todo:todo@localhost:5432/daily_todo"
     test_database_url: str | None = None
@@ -18,6 +23,11 @@ class Settings(BaseSettings):
     csrf_header_name: str = "X-CSRF-Token"
     session_ttl_days: int = 30
     cookie_secure: bool | None = None
+
+    @property
+    def public_base(self) -> str:
+        """PUBLIC_BASE_URL without a trailing slash: the address browsers use to reach this API."""
+        return self.public_base_url.strip().rstrip("/")
 
     @property
     def cors_origin_list(self) -> list[str]:

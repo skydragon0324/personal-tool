@@ -1,7 +1,21 @@
 import { translateServerText } from "@/i18n";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+/**
+ * Where the FastAPI backend is. Set NEXT_PUBLIC_API_URL in `.env.local` (see `.env.example`); Next
+ * builds it into the bundle, so run `npm run build` again after changing it. Unset, the backend is
+ * taken to be on port 8000 of whatever host served this page, so a plain install works on any server.
+ */
+export function apiBaseUrl(
+  configured: string | undefined = process.env.NEXT_PUBLIC_API_URL,
+  page: { protocol: string; hostname: string } | undefined = typeof window === "undefined" ? undefined : window.location,
+): string {
+  const explicit = configured?.trim().replace(/\/+$/, "");
+  if (explicit) return explicit;
+  if (page) return `${page.protocol}//${page.hostname}:8000`;
+  return "http://localhost:8000";
+}
+
+const API_BASE_URL = apiBaseUrl();
 
 export class ApiError extends Error {
   status: number;

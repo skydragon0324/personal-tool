@@ -132,6 +132,8 @@ export function TaskCard({
                 <>
                   <Menu.Divider />
                   <Menu.Label>{t("task.assignTo")}</Menu.Label>
+                  {/* Long member lists scroll instead of stretching the menu off the screen. */}
+                  <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: "min(15rem, 40vh)" }}>
                   {people.map((person) => {
                     const ids = (task.assignees ?? []).map((item) => item.id);
                     const assigned = ids.includes(person.user_id);
@@ -151,6 +153,7 @@ export function TaskCard({
                       </Menu.Item>
                     );
                   })}
+                  </div>
                   {task.assignees?.length ? (
                     <Menu.Item onClick={() => onAssign(task, [])}>{t("task.unassignEveryone")}</Menu.Item>
                   ) : null}

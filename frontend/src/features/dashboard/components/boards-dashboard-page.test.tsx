@@ -130,8 +130,8 @@ describe("Boards dashboard", () => {
     expect(screen.getByRole("button", { name: "New board" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage boards" })).toBeInTheDocument();
     const grid = screen.getByLabelText("Boards dashboard");
-    expect(grid.className).toContain("grid-cols-1");
-    expect(grid.className).toContain("md:grid-cols-2");
+    expect(grid.className).toContain("flex-col");
+    expect(grid.className).toContain("md:flex-row");
     expect(screen.getByLabelText("Overview")).toBeInTheDocument();
     expect(screen.getByLabelText("Board progress")).toBeInTheDocument();
     expect(screen.getByLabelText("Workload")).toBeInTheDocument();

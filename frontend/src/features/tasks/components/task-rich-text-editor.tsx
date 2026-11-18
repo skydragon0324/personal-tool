@@ -1,5 +1,5 @@
 import { RichTextEditor } from "@mantine/tiptap";
-import { Group, Select } from "@mantine/core";
+import { Button, Group, Select, Tooltip } from "@mantine/core";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -14,6 +14,7 @@ import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { Extension } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 
@@ -95,6 +96,27 @@ interface TaskRichTextEditorProps {
   extraToolbar?: ReactNode;
   /** Images pasted or dropped into the text. When set, the editor inserts nothing itself. */
   onImageFiles?: (files: File[]) => void;
+  /** Opens an image in the text for markup: from the toolbar when it is selected, or by double-click. */
+  onAnnotateImage?: (image: EditorImage) => void;
+}
+
+/** An image node in the text, by position. */
+export interface EditorImage {
+  pos: number;
+  src: string;
+  alt: string;
+  pendingId: string | null;
+}
+
+function editorImageAt(pos: number, attrs: Record<string, unknown>): EditorImage | null {
+  const src = typeof attrs.src === "string" ? attrs.src : "";
+  if (!src) return null;
+  return {
+    pos,
+    src,
+    alt: typeof attrs.alt === "string" ? attrs.alt : "",
+    pendingId: typeof attrs.pendingId === "string" ? attrs.pendingId : null,
+  };
 }
 
 /** The image files in a paste or drop, if any. */
@@ -109,10 +131,13 @@ export function TaskRichTextEditor({
   onEditorReady,
   extraToolbar,
   onImageFiles,
+  onAnnotateImage,
 }: TaskRichTextEditorProps) {
   // Read through a ref: the editor is created once, but the handler can change between renders.
   const imageFilesHandler = useRef(onImageFiles);
   imageFilesHandler.current = onImageFiles;
+  const annotateHandler = useRef(onAnnotateImage);
+  annotateHandler.current = onAnnotateImage;
 
   const extensions = useMemo(
     () => [
@@ -157,6 +182,13 @@ export function TaskRichTextEditor({
         imageFilesHandler.current(files);
         return true;
       },
+      handleDoubleClickOn: (_view, _pos, node, nodePos, _event, direct) => {
+        if (!direct || node.type.name !== "image" || !annotateHandler.current) return false;
+        const image = editorImageAt(nodePos, node.attrs);
+        if (!image) return false;
+        annotateHandler.current(image);
+        return true;
+      },
     },
   });
 
@@ -184,6 +216,11 @@ export function TaskRichTextEditor({
 
   const currentSize = editor.getAttributes("textStyle").fontSize || "";
   const currentFont = editor.getAttributes("textStyle").fontFamily || "inherit";
+  const selection = editor.state.selection;
+  const selectedImage =
+    selection instanceof NodeSelection && selection.node.type.name === "image"
+      ? editorImageAt(selection.from, selection.node.attrs)
+      : null;
 
   return (
     // task-content-editor: images in the text show as thumbnails (see globals.css).
@@ -273,6 +310,25 @@ export function TaskRichTextEditor({
           <RichTextEditor.Link />
           <RichTextEditor.Unlink />
         </RichTextEditor.ControlsGroup>
+
+        {onAnnotateImage ? (
+          <Tooltip label={t("taskForm.annotateImageHint")} disabled={selectedImage !== null} withinPortal zIndex={400}>
+            {/* The wrapper keeps the tooltip working while the button is disabled. */}
+            <span>
+              <Button
+                size="xs"
+                variant="default"
+                type="button"
+                disabled={!selectedImage}
+                onClick={() => {
+                  if (selectedImage) onAnnotateImage(selectedImage);
+                }}
+              >
+                {t("taskForm.annotateImage")}
+              </Button>
+            </span>
+          </Tooltip>
+        ) : null}
 
         {extraToolbar ? (
           <Group gap={6} wrap="wrap">

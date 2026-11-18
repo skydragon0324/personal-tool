@@ -208,8 +208,8 @@ describe("Today page", () => {
     expect(screen.getByText("Grocery list")).toBeInTheDocument();
     expect(screen.getByText("View all notes")).toBeInTheDocument();
     const grid = screen.getByLabelText("Today dashboard");
-    expect(grid.className).toContain("grid-cols-1");
-    expect(grid.className).toContain("md:grid-cols-2");
+    expect(grid.className).toContain("flex-col");
+    expect(grid.className).toContain("md:flex-row");
   });
 
   it("keeps completed tasks visible and dimmed", () => {
@@ -292,8 +292,32 @@ describe("Today page", () => {
   it("uses theme tokens and a mobile-first layout", () => {
     const { container } = wrap(createElement(TodayPage));
     expect(container.innerHTML).toContain("bg-[var(--app-bg)]");
-    expect(screen.getByLabelText("Today dashboard").className).toContain("grid-cols-1");
+    expect(screen.getByLabelText("Today dashboard").className).toContain("flex-col");
     expect(screen.getByLabelText("Pinned notes").innerHTML).not.toContain("sm:grid-cols-2");
     expect(screen.getByLabelText("Today's schedule").innerHTML).toContain("dark:");
+  });
+});
+
+describe("Today panels", () => {
+  it("cap their height and scroll, without stretching the panel beside them", () => {
+    const { DashboardGrid, DashboardPanel } = jest.requireActual("@/features/shell/components/dashboard-panel");
+    render(
+      createElement(
+        DashboardGrid,
+        { label: "Grid" },
+        createElement(DashboardPanel, { key: "a", title: "A", description: "" }),
+        createElement(DashboardPanel, { key: "b", title: "B", description: "" }),
+        createElement(DashboardPanel, { key: "c", title: "C", description: "" }),
+      ),
+    );
+    const panel = screen.getByLabelText("A");
+    expect(panel.className).toContain("max-h-");
+    expect(panel.className).not.toContain("h-full");
+    // Two independent columns (A, C | B) that keep the A, B, C order when stacked on phones.
+    const columns = Array.from(screen.getByLabelText("Grid").children);
+    expect(columns).toHaveLength(2);
+    expect(columns[0].textContent).toBe("AC");
+    expect(columns[1].textContent).toBe("B");
+    expect((screen.getByLabelText("B").parentElement as HTMLElement).style.order).toBe("1");
   });
 });
