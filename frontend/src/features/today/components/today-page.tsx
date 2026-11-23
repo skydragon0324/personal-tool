@@ -29,9 +29,9 @@ export function TodayPage() {
   const [openSchedule, setOpenSchedule] = useState<TodaySchedule | null>(null);
 
   useEffect(() => {
-    document.title = "Dashboard · Life Management";
+    document.title = "Dashboard · Task Management";
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, []);
 

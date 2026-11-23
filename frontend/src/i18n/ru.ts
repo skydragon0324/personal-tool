@@ -8,7 +8,7 @@ import type { Messages } from "./en";
 
 export const ru: Messages = {
   common: {
-    appName: "Управление жизнью",
+    appName: "Управление задачами",
     save: "Сохранить",
     cancel: "Отмена",
     delete: "Удалить",
@@ -299,7 +299,7 @@ export const ru: Messages = {
     movedAndUnassigned: "Перемещено: «{title}». Сняты исполнители: {names} (нет на той доске).",
     couldNotMove: "Не удалось переместить задачу",
     couldNotUpdateAssignees: "Не удалось обновить исполнителей",
-    documentTitle: "{name} · Life Management",
+    documentTitle: "{name} · Управление задачами",
     failedToLoad: "Не удалось загрузить доску",
     loading: "Загрузка доски…",
     noStatusesForMember: "Владелец доски ещё не настроил статусы.",
@@ -833,7 +833,7 @@ export const ru: Messages = {
     },
     openBell: "Откройте колокольчик на боковой панели, чтобы увидеть все.",
     turnOnTitle: "Включить уведомления на рабочем столе?",
-    turnOnBody: "Получайте напоминания и оповещения о расписании от операционной системы, пока Life Management открыт.",
+    turnOnBody: "Получайте напоминания и оповещения о расписании от операционной системы, пока «Управление задачами» открыто.",
     turnOn: "Включить",
     notNow: "Не сейчас",
     open: "Открыть",

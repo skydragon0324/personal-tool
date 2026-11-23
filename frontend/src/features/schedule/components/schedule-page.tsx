@@ -40,9 +40,9 @@ export function SchedulePage() {
   const empty = !scheduleQuery.isLoading && entries.length === 0;
 
   useEffect(() => {
-    document.title = "Schedule · Life Management";
+    document.title = "Schedule · Task Management";
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, []);
 

@@ -25,9 +25,9 @@ export function PlansPage() {
   const plans = plansQuery.data ?? [];
 
   useEffect(() => {
-    document.title = "Plans · Life Management";
+    document.title = "Plans · Task Management";
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, []);
 

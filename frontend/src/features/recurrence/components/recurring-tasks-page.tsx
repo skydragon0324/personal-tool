@@ -28,9 +28,9 @@ export function RecurringTasksPage() {
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
-    document.title = "Recurring tasks · Life Management";
+    document.title = "Recurring tasks · Task Management";
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, []);
 

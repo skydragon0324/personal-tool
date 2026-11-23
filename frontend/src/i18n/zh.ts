@@ -3,7 +3,7 @@ import type { Messages } from "./en";
 
 export const zh: Messages = {
   common: {
-    appName: "生活管理",
+    appName: "任务管理",
     save: "保存",
     cancel: "取消",
     delete: "删除",
@@ -294,7 +294,7 @@ export const zh: Messages = {
     movedAndUnassigned: "已移动“{title}”。已取消分配 {names}（他们不在该看板中）。",
     couldNotMove: "无法移动任务",
     couldNotUpdateAssignees: "无法更新负责人",
-    documentTitle: "{name} · 生活管理",
+    documentTitle: "{name} · 任务管理",
     failedToLoad: "无法加载看板",
     loading: "正在加载看板…",
     noStatusesForMember: "看板所有者尚未设置任何状态。",
@@ -813,7 +813,7 @@ export const zh: Messages = {
     moreNotifications: { one: "还有 {count} 条通知", other: "还有 {count} 条通知" },
     openBell: "打开侧边栏中的铃铛即可查看全部。",
     turnOnTitle: "开启桌面通知？",
-    turnOnBody: "在生活管理打开期间，通过操作系统接收提醒和日程通知。",
+    turnOnBody: "在任务管理打开期间，通过操作系统接收提醒和日程通知。",
     turnOn: "开启",
     notNow: "暂不",
     open: "打开",

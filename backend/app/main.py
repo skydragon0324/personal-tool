@@ -15,7 +15,7 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Life Management API",
+    title="Task Management API",
     description="Personal workspace API for tasks, statuses, and daily planning.",
     version="2.0.0",
 )

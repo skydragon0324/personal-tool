@@ -23,9 +23,9 @@ export function BoardsDashboardPage() {
   const summaryQuery = useDashboardSummary();
 
   useEffect(() => {
-    document.title = "Boards · Life Management";
+    document.title = "Boards · Task Management";
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, []);
 

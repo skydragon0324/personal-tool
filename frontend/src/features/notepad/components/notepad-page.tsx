@@ -34,11 +34,11 @@ export function NotepadPage() {
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
 
   useEffect(() => {
-    document.title = "Notepad · Life Management";
+    document.title = "Notepad · Task Management";
     setView(readNotepadView(window.localStorage));
     setViewReady(true);
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, []);
 

@@ -4,7 +4,7 @@
  */
 export const en = {
   common: {
-    appName: "Life Management",
+    appName: "Task Management",
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
@@ -295,7 +295,7 @@ export const en = {
     movedAndUnassigned: "Moved “{title}”. Unassigned {names} (not on that board).",
     couldNotMove: "Could not move the task",
     couldNotUpdateAssignees: "Could not update the assignees",
-    documentTitle: "{name} · Life Management",
+    documentTitle: "{name} · Task Management",
     failedToLoad: "Failed to load board",
     loading: "Loading board…",
     noStatusesForMember: "The board owner has not set up any statuses yet.",
@@ -814,7 +814,7 @@ export const en = {
     moreNotifications: { one: "{count} more notification", other: "{count} more notifications" },
     openBell: "Open the bell in the sidebar to see them all.",
     turnOnTitle: "Turn on desktop notifications?",
-    turnOnBody: "Get reminders and schedule alerts from your operating system while Life Management is open.",
+    turnOnBody: "Get reminders and schedule alerts from your operating system while Task Management is open.",
     turnOn: "Turn on",
     notNow: "Not now",
     open: "Open",

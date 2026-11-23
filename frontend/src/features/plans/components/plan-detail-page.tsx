@@ -28,9 +28,9 @@ export function PlanDetailPage({ planId }: { planId: string }) {
 
   useEffect(() => {
     if (!plan) return;
-    document.title = `${plan.name} · Plans · Life Management`;
+    document.title = `${plan.name} · Plans · Task Management`;
     return () => {
-      document.title = "Life Management";
+      document.title = "Task Management";
     };
   }, [plan]);
 

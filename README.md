@@ -1,4 +1,4 @@
-# Life Management
+# Task Management
 
 Personal workspace for managing tasks across separate boards such as Personal, Work, and Friends.
 
