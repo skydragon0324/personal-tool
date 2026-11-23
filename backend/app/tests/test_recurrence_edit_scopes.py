@@ -482,7 +482,7 @@ def test_other_user_cannot_edit_any_scope(edit_board) -> None:
     try:
         with independent_session(engine) as db:
             other = User(
-                email=f"edit-other-{uuid4().hex[:8]}@example.com",
+                login_id=f"edit-other-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",
@@ -951,7 +951,7 @@ def test_form_payload_cannot_cross_user_or_board(edit_board) -> None:
     try:
         with independent_session(engine) as db:
             other = User(
-                email=f"form-other-{uuid4().hex[:8]}@example.com",
+                login_id=f"form-other-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",

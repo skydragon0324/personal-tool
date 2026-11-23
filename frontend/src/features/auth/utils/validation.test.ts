@@ -3,20 +3,21 @@ import {
   browserTimezone,
   isAuthPath,
   validateConfirmPassword,
-  validateEmail,
+  validateLoginId,
   validateName,
   validatePassword,
 } from "./validation";
 
 describe("auth validation", () => {
-  it("requires name, email, password confirmation, and a long enough password", () => {
+  it("requires name, login ID, password confirmation, and a long enough password", () => {
     expect(validateName("")).toBe("Name is required");
     expect(validateName("Ada")).toBeNull();
-    expect(validateEmail("")).toBe("Email is required");
-    expect(validateEmail("not-an-email")).toBe("Enter a valid email address");
-    expect(validateEmail("ada@example.com")).toBeNull();
-    expect(validatePassword("short")).toBe("Password must be at least 10 characters");
-    expect(validatePassword("long-enough")).toBeNull();
+    expect(validateLoginId("")).toBe("Login ID is required");
+    expect(validateLoginId("ab")).toContain("3-32");
+    expect(validateLoginId("ada@example.com")).toContain("3-32");
+    expect(validateLoginId("Ada.Lovelace-1")).toBeNull();
+    expect(validatePassword("1234567")).toBe("Password must be at least 8 characters");
+    expect(validatePassword("12345678")).toBeNull();
     expect(validateConfirmPassword("long-enough", "other")).toBe("Passwords do not match");
     expect(validateConfirmPassword("long-enough", "long-enough")).toBeNull();
   });

@@ -64,10 +64,10 @@ describe("filterTasksByColumn", () => {
 
 describe("assignee filter", () => {
   const category = { id: "cat", name: "Work", color: "blue" };
-  const ann = { id: "user-ann", display_name: "Ann", email: "ann@example.com" };
+  const ann = { id: "user-ann", display_name: "Ann", login_id: "ann" };
   const tasks = {
     "col-1": [
-      task({ id: "a", title: "Ann's", category, assignees: [ann, { id: "user-bo", display_name: "Bo", email: "bo@example.com" }] }),
+      task({ id: "a", title: "Ann's", category, assignees: [ann, { id: "user-bo", display_name: "Bo", login_id: "bo" }] }),
       task({ id: "b", title: "Nobody's", category, assignees: [] }),
     ],
   };

@@ -62,6 +62,7 @@ class BoardRead(BaseModel):
     timezone: str
     position: int
     archived_at: datetime | None
+    folder_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
     total_tasks: int = 0
@@ -102,6 +103,7 @@ class BoardCreate(BaseModel):
     color: str = DEFAULT_BOARD_COLOR
     icon_name: str | None = DEFAULT_BOARD_ICON
     timezone: str = "UTC"
+    folder_id: uuid.UUID | None = None
     statuses: list[BoardStatusSeed] | None = Field(default=None, max_length=20)
 
     @field_validator("name")
@@ -159,6 +161,7 @@ class BoardUpdate(BaseModel):
     color: str | None = None
     icon_name: str | None = None
     timezone: str | None = None
+    folder_id: uuid.UUID | None = None
 
     @field_validator("name")
     @classmethod

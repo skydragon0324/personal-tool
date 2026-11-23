@@ -34,14 +34,14 @@ describe("auth forms", () => {
     const user = userEvent.setup();
     wrap(createElement(LoginForm));
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(screen.getByText("Email is required")).toBeInTheDocument();
+    expect(screen.getByText("Login ID is required")).toBeInTheDocument();
     expect(screen.getByText("Password is required")).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
 
-    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.type(screen.getByLabelText("Login ID"), "ada");
     await user.type(screen.getByLabelText("Password"), "long-enough");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(login).toHaveBeenCalledWith({ email: "ada@example.com", password: "long-enough" });
+    expect(login).toHaveBeenCalledWith({ login_id: "ada", password: "long-enough" });
   });
 
   it("validates register fields and includes the browser timezone", async () => {
@@ -52,7 +52,7 @@ describe("auth forms", () => {
     expect(register).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText("Name"), "Ada");
-    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.type(screen.getByLabelText("Login ID"), "ada");
     await user.type(screen.getByLabelText("Password"), "long-enough");
     await user.type(screen.getByLabelText("Confirm password"), "mismatch");
     await user.click(screen.getByRole("button", { name: "Create account" }));
@@ -63,7 +63,7 @@ describe("auth forms", () => {
     await user.click(screen.getByRole("button", { name: "Create account" }));
     expect(register).toHaveBeenCalledWith({
       display_name: "Ada",
-      email: "ada@example.com",
+      login_id: "ada",
       password: "long-enough",
       timezone: expect.any(String),
     });

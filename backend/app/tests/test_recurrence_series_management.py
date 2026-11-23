@@ -199,7 +199,7 @@ def test_list_returns_only_authenticated_user_series(manage_board) -> None:
     try:
         with independent_session(engine) as db:
             other = User(
-                email=f"manage-other-{uuid4().hex[:8]}@example.com",
+                login_id=f"manage-other-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",
@@ -681,7 +681,7 @@ def test_other_user_receives_404(manage_board) -> None:
     try:
         with independent_session(engine) as db:
             other = User(
-                email=f"manage-404-{uuid4().hex[:8]}@example.com",
+                login_id=f"manage-404-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",

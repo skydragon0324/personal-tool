@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 from app.core.security import verify_password
 from app.main import app
 from app.models import User, UserSession
-from app.tests.auth_helpers import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD, bind_client, register_user
+from app.tests.auth_helpers import TEST_OWNER_LOGIN_ID, TEST_OWNER_PASSWORD, bind_client, register_user
 
 NEW_PASSWORD = "brand-new-password"
 
 
-def _login(client: TestClient, email: str, password: str):
-    return client.post("/api/v1/auth/login", json={"email": email, "password": password})
+def _login(client: TestClient, login_id: str, password: str):
+    return client.post("/api/v1/auth/login", json={"login_id": login_id, "password": password})
 
 
 def test_update_name_without_password(client: TestClient) -> None:
@@ -26,60 +26,42 @@ def test_update_name_without_password(client: TestClient) -> None:
     assert blank.status_code == 422
 
 
-def test_change_email_needs_current_password(client: TestClient) -> None:
-    missing = client.patch("/api/v1/auth/me", json={"email": "new@example.com"})
+def test_change_login_id_needs_current_password(client: TestClient) -> None:
+    missing = client.patch("/api/v1/auth/me", json={"login_id": "new"})
     assert missing.status_code == 400
     assert missing.json()["code"] == "current_password_required"
 
     wrong = client.patch(
-        "/api/v1/auth/me", json={"email": "new@example.com", "current_password": "not-the-password"}
+        "/api/v1/auth/me", json={"login_id": "new", "current_password": "not-the-password"}
     )
     assert wrong.status_code == 400
     assert wrong.json()["code"] == "current_password_wrong"
 
     ok = client.patch(
-        "/api/v1/auth/me", json={"email": "New@Example.com", "current_password": TEST_OWNER_PASSWORD}
+        "/api/v1/auth/me", json={"login_id": "New", "current_password": TEST_OWNER_PASSWORD}
     )
     assert ok.status_code == 200, ok.text
-    assert ok.json()["email"] == "new@example.com"
+    assert ok.json()["login_id"] == "new"
 
     client.post("/api/v1/auth/logout")
-    assert _login(client, TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD).status_code == 401
-    assert _login(client, "new@example.com", TEST_OWNER_PASSWORD).status_code == 200
+    assert _login(client, TEST_OWNER_LOGIN_ID, TEST_OWNER_PASSWORD).status_code == 401
+    assert _login(client, "new", TEST_OWNER_PASSWORD).status_code == 200
 
 
-def test_same_email_in_other_case_needs_no_password(client: TestClient) -> None:
-    response = client.patch("/api/v1/auth/me", json={"email": TEST_OWNER_EMAIL.upper()})
+def test_same_login_id_in_other_case_needs_no_password(client: TestClient) -> None:
+    response = client.patch("/api/v1/auth/me", json={"login_id": TEST_OWNER_LOGIN_ID.upper()})
     assert response.status_code == 200, response.text
-    assert response.json()["email"] == TEST_OWNER_EMAIL
+    assert response.json()["login_id"] == TEST_OWNER_LOGIN_ID
 
 
-def test_cannot_take_another_users_email(client: TestClient, db: Session) -> None:
+def test_cannot_take_another_users_login_id(client: TestClient, db: Session) -> None:
     other = bind_client(db)
-    register_user(other, email="taken@example.com", display_name="Other")
+    register_user(other, login_id="taken", display_name="Other")
     response = client.patch(
-        "/api/v1/auth/me", json={"email": "Taken@example.com", "current_password": TEST_OWNER_PASSWORD}
+        "/api/v1/auth/me", json={"login_id": "Taken", "current_password": TEST_OWNER_PASSWORD}
     )
     assert response.status_code == 409
-    assert response.json()["code"] == "email_already_registered"
-
-
-def test_new_email_picks_up_pending_invitations(client: TestClient, db: Session) -> None:
-    newcomer = bind_client(db)
-    register_user(newcomer, email="someone@example.com", display_name="Someone")
-    try:
-        board_id = next(item["id"] for item in client.get("/api/v1/boards").json() if item["role"] == "owner")
-        invited = client.post(f"/api/v1/boards/{board_id}/members", json={"email": "work@example.com"})
-        assert invited.status_code == 201, invited.text
-        assert invited.json()["status"] == "invited"
-
-        changed = newcomer.patch(
-            "/api/v1/auth/me", json={"email": "work@example.com", "current_password": TEST_OWNER_PASSWORD}
-        )
-        assert changed.status_code == 200, changed.text
-        assert any(item["id"] == board_id for item in newcomer.get("/api/v1/boards").json())
-    finally:
-        app.dependency_overrides.clear()
+    assert response.json()["code"] == "login_id_taken"
 
 
 def test_change_password(client: TestClient, db: Session) -> None:
@@ -98,19 +80,19 @@ def test_change_password(client: TestClient, db: Session) -> None:
         "/api/v1/auth/password", json={"current_password": TEST_OWNER_PASSWORD, "new_password": NEW_PASSWORD}
     )
     assert ok.status_code == 204, ok.text
-    user = db.scalar(select(User).where(User.email == TEST_OWNER_EMAIL))
+    user = db.scalar(select(User).where(User.login_id == TEST_OWNER_LOGIN_ID))
     assert user is not None and verify_password(NEW_PASSWORD, user.password_hash)
     # This session stays signed in.
     assert client.get("/api/v1/auth/me").status_code == 200
 
     client.post("/api/v1/auth/logout")
-    assert _login(client, TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD).status_code == 401
-    assert _login(client, TEST_OWNER_EMAIL, NEW_PASSWORD).status_code == 200
+    assert _login(client, TEST_OWNER_LOGIN_ID, TEST_OWNER_PASSWORD).status_code == 401
+    assert _login(client, TEST_OWNER_LOGIN_ID, NEW_PASSWORD).status_code == 200
 
 
 def test_change_password_signs_out_other_sessions(client: TestClient, db: Session) -> None:
     other_device = bind_client(db)
-    assert _login(other_device, TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD).status_code == 200
+    assert _login(other_device, TEST_OWNER_LOGIN_ID, TEST_OWNER_PASSWORD).status_code == 200
     assert other_device.get("/api/v1/auth/me").status_code == 200
 
     ok = client.post(
@@ -120,7 +102,7 @@ def test_change_password_signs_out_other_sessions(client: TestClient, db: Sessio
     assert client.get("/api/v1/auth/me").status_code == 200
     assert other_device.get("/api/v1/auth/me").status_code == 401
 
-    user = db.scalar(select(User).where(User.email == TEST_OWNER_EMAIL))
+    user = db.scalar(select(User).where(User.login_id == TEST_OWNER_LOGIN_ID))
     sessions = db.scalars(select(UserSession).where(UserSession.user_id == user.id)).all()
     assert len(sessions) == 1
 

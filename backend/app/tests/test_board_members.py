@@ -16,7 +16,7 @@ DAY = date.today().isoformat()
 def team(client: TestClient, db: Session):
     """The default owner plus a registered teammate, each with their own client."""
     mate = bind_client(db)
-    mate_user = register_user(mate, email="mate@example.com", display_name="Mate")["user"]
+    mate_user = register_user(mate, login_id="mate", display_name="Mate")["user"]
     try:
         yield client, mate, mate_user
     finally:
@@ -48,10 +48,17 @@ def _task(client: TestClient, column: str, category: str, title: str, **extra) -
     return response.json()
 
 
-def _share(owner: TestClient, board_id: str, email: str = "mate@example.com") -> dict:
-    response = owner.post(f"/api/v1/boards/{board_id}/members", json={"email": email})
+def _share(owner: TestClient, board_id: str, login_id: str = "mate") -> dict:
+    response = owner.post(f"/api/v1/boards/{board_id}/members", json={"login_id": login_id})
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_share_needs_an_existing_login_id(client: TestClient) -> None:
+    board_id, *_ = _board(client)
+    response = client.post(f"/api/v1/boards/{board_id}/members", json={"login_id": "nobody"})
+    assert response.status_code == 404
+    assert response.json()["code"] == "login_id_not_found"
 
 
 def _notifications(client: TestClient, kind: str) -> list[dict]:
@@ -82,12 +89,11 @@ def test_owner_shares_board_and_member_sees_it(team) -> None:
     assert view.json()["role"] == "member"
     members = mate.get(f"/api/v1/boards/{board_id}/members").json()
     assert members["can_manage"] is False
-    assert members["invitations"] == []
 
     shared_notice = _notifications(mate, "board_shared")
     assert shared_notice and shared_notice[0]["board_id"] == board_id
 
-    again = owner.post(f"/api/v1/boards/{board_id}/members", json={"email": "MATE@example.com"})
+    again = owner.post(f"/api/v1/boards/{board_id}/members", json={"login_id": "MATE"})
     assert again.status_code == 409
 
 
@@ -158,35 +164,10 @@ def test_member_cannot_manage_statuses_board_or_members(team) -> None:
     assert mate.patch(f"/api/v1/boards/{board_id}", json={"name": "Mine now"}).status_code == 403
     assert mate.post(f"/api/v1/boards/{board_id}/archive").status_code == 403
     assert mate.post(
-        f"/api/v1/boards/{board_id}/members", json={"email": "someone@example.com"}
+        f"/api/v1/boards/{board_id}/members", json={"login_id": "someone"}
     ).status_code == 403
     # Listing statuses is still allowed so the board can render.
     assert mate.get(f"/api/v1/boards/{board_id}/columns").status_code == 200
-
-
-def test_pending_invitation_joins_on_registration(client: TestClient, db: Session) -> None:
-    board_id, *_ = _board(client)
-    result = _share(client, board_id, "later@example.com")
-    assert result["status"] == "invited"
-    assert [item["email"] for item in result["members"]["invitations"]] == ["later@example.com"]
-
-    newcomer = bind_client(db)
-    register_user(newcomer, email="Later@example.com", display_name="Later")
-    try:
-        assert any(item["id"] == board_id for item in newcomer.get("/api/v1/boards").json())
-        members = client.get(f"/api/v1/boards/{board_id}/members").json()
-        assert members["invitations"] == []
-        assert [person["display_name"] for person in members["people"]] == ["Test Owner", "Later"]
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_cancel_invitation(client: TestClient) -> None:
-    board_id, *_ = _board(client)
-    invitation = _share(client, board_id, "maybe@example.com")["members"]["invitations"][0]
-    response = client.delete(f"/api/v1/boards/{board_id}/invitations/{invitation['id']}")
-    assert response.status_code == 204
-    assert client.get(f"/api/v1/boards/{board_id}/members").json()["invitations"] == []
 
 
 def test_removing_member_revokes_access_and_unassigns(team) -> None:
@@ -208,8 +189,8 @@ def test_member_can_leave_but_not_remove_others(team, db: Session) -> None:
     _share(owner, board_id)
     owner_id = owner.get("/api/v1/auth/me").json()["id"]
     third = bind_client(db)
-    third_user = register_user(third, email="third@example.com", display_name="Third")["user"]
-    _share(owner, board_id, "third@example.com")
+    third_user = register_user(third, login_id="third", display_name="Third")["user"]
+    _share(owner, board_id, "third")
 
     assert mate.delete(f"/api/v1/boards/{board_id}/members/{third_user['id']}").status_code == 403
     assert mate.delete(f"/api/v1/boards/{board_id}/members/{owner_id}").status_code == 403
@@ -237,10 +218,10 @@ def test_outsider_cannot_see_members(team, db: Session) -> None:
     owner, _mate, _mate_user = team
     board_id, *_ = _board(owner)
     outsider = bind_client(db)
-    register_user(outsider, email="outsider@example.com")
+    register_user(outsider, login_id="outsider")
     assert outsider.get(f"/api/v1/boards/{board_id}/members").status_code == 404
     assert outsider.post(
-        f"/api/v1/boards/{board_id}/members", json={"email": "x@example.com"}
+        f"/api/v1/boards/{board_id}/members", json={"login_id": "xxx"}
     ).status_code == 404
 
 
@@ -269,8 +250,8 @@ def test_task_with_several_assignees(team, db: Session) -> None:
     board_id, todo, _done, category = _board(owner)
     _share(owner, board_id)
     third = bind_client(db)
-    third_user = register_user(third, email="third-assignee@example.com", display_name="Zoe")["user"]
-    _share(owner, board_id, "third-assignee@example.com")
+    third_user = register_user(third, login_id="third-assignee", display_name="Zoe")["user"]
+    _share(owner, board_id, "third-assignee")
     owner_id = owner.get("/api/v1/auth/me").json()["id"]
 
     task = _task(owner, todo, category, "Team retro", assignee_ids=[mate_user["id"], third_user["id"]])

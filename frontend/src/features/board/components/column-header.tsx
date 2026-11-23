@@ -5,7 +5,8 @@ import { notifyApiError, notifySuccess } from "@/lib/notify";
 
 import { useColumnMutations } from "../hooks/use-columns";
 import type { BoardColumn } from "../types";
-import { STATUS_COLORS, statusHeaderClass } from "../utils/status-colors";
+import { STATUS_COLORS, statusHeaderClass, statusTintClass } from "../utils/status-colors";
+import { CheckCircleIcon, ClockIcon, DotsIcon, PlusIcon, RefreshIcon } from "./board-ui-icons";
 import { colorName, t } from "@/i18n";
 
 interface ColumnHeaderProps {
@@ -64,9 +65,12 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
 
   return (
     <header
-      className={`sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2.5 text-white ${statusHeaderClass(column.color)}`}
+      className={`sticky top-0 z-10 flex items-center justify-between gap-2 px-3.5 py-3 ${statusTintClass(column.color)}`}
     >
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="shrink-0">
+          {column.is_done ? <CheckCircleIcon size={22} /> : index === 0 ? <ClockIcon size={22} /> : <RefreshIcon size={22} />}
+        </span>
         {editing ? (
           <TextInput
             size="xs"
@@ -86,7 +90,7 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
           />
         ) : (
           <h2
-            className={`truncate font-display text-lg leading-tight ${canManage ? "cursor-text" : ""}`}
+            className={`min-w-0 truncate font-display text-lg font-semibold leading-tight text-[var(--app-text)] ${canManage ? "cursor-text" : ""}`}
             title={canManage ? t("status.doubleClickToRename") : undefined}
             onDoubleClick={() => {
               if (!canManage) return;
@@ -97,29 +101,32 @@ export function ColumnHeader({ boardId, column, columns, taskCount, canManage, o
             {column.name}
           </h2>
         )}
-        <p className="text-xs text-white/80">
-          {taskCount}
-          {column.is_done ? t("status.countsAsCompletedSuffix") : ""}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onAdd(column.id)}
-          className="rounded-lg bg-white/15 px-2.5 py-1 text-sm font-medium hover:bg-white/25"
+        <span
+          className="shrink-0 rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-semibold text-[var(--app-text)] dark:bg-white/10"
+          title={column.is_done ? t("status.countsAsCompleted") : undefined}
         >
-          {t("common.add")}
-        </button>
+          {taskCount}
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          onClick={() => onAdd(column.id)}
+          aria-label={`${t("common.add")}: ${column.name}`}
+          title={t("common.add")}
+        >
+          <PlusIcon size={17} />
+        </ActionIcon>
         {canManage ? (
           <Menu shadow="md" position="bottom-end" width={220} withinPortal>
             <Menu.Target>
               <ActionIcon
                 variant="subtle"
-                color="white"
+                color="gray"
                 aria-label={t("status.menuFor", { name: column.name })}
-                className="hover:!bg-white/20"
               >
-                ⋯
+                <DotsIcon />
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>

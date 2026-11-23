@@ -317,6 +317,8 @@ def _to_read(
         timezone=board.timezone,
         position=board.position,
         archived_at=board.archived_at,
+        # Folders are personal: someone a board is shared with does not see the owner's.
+        folder_id=board.folder_id if viewer_id is None or board.user_id == viewer_id else None,
         created_at=board.created_at,
         updated_at=board.updated_at,
         total_tasks=total,
@@ -405,6 +407,10 @@ def seed_personal_board(db: Session, user_id: uuid.UUID, timezone: str = "UTC") 
 
 def create_board(db: Session, user_id: uuid.UUID, payload: BoardCreate) -> BoardRead:
     _ensure_unique_name(db, user_id, payload.name)
+    if payload.folder_id is not None:
+        from app.services.workspace_service import get_folder_or_404
+
+        get_folder_or_404(db, user_id, payload.folder_id)
     max_active = db.scalar(
         select(func.coalesce(func.max(Board.position), -1)).where(
             Board.user_id == user_id,
@@ -417,6 +423,7 @@ def create_board(db: Session, user_id: uuid.UUID, payload: BoardCreate) -> Board
         color=payload.color,
         icon_name=payload.icon_name or DEFAULT_BOARD_ICON,
         timezone=payload.timezone,
+        folder_id=payload.folder_id,
         position=_unused_board_position(db, user_id, start_from=int(max_active) + 1),
     )
     db.add(board)
@@ -462,6 +469,10 @@ def update_board(db: Session, user_id: uuid.UUID, board_id: uuid.UUID, payload: 
     data = payload.model_dump(exclude_unset=True)
     if "name" in data and data["name"] is not None:
         _ensure_unique_name(db, user_id, data["name"], exclude_id=board.id)
+    if data.get("folder_id") is not None:
+        from app.services.workspace_service import get_folder_or_404
+
+        get_folder_or_404(db, user_id, data["folder_id"])
     for key, value in data.items():
         setattr(board, key, value)
     try:

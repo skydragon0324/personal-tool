@@ -4,28 +4,28 @@ import { useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
 import { AuthCard } from "@/features/auth/components/auth-card";
-import { validateEmail, validatePassword } from "@/features/auth/utils/validation";
+import { validateLoginId, validatePassword } from "@/features/auth/utils/validation";
 import { ApiError } from "@/lib/api-client";
 import { t } from "@/i18n";
 
 export function LoginForm() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  const [errors, setErrors] = useState<{ loginId?: string; password?: string; form?: string }>({});
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const next = {
-      email: validateEmail(email) ?? undefined,
+      loginId: validateLoginId(loginId) ?? undefined,
       password: validatePassword(password) ?? undefined,
     };
     setErrors(next);
-    if (next.email || next.password) return;
+    if (next.loginId || next.password) return;
     setSubmitting(true);
     try {
-      await login({ email: email.trim(), password });
+      await login({ login_id: loginId.trim(), password });
     } catch (error) {
       const message = error instanceof ApiError ? error.message : t("auth.couldNotSignIn");
       setErrors({ form: message });
@@ -39,12 +39,14 @@ export function LoginForm() {
       <form onSubmit={handleSubmit}>
         <Stack gap="md">
           <TextInput
-            label={t("auth.email")}
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.currentTarget.value)}
-            error={errors.email}
+            label={t("auth.loginId")}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={32}
+            value={loginId}
+            onChange={(event) => setLoginId(event.currentTarget.value)}
+            error={errors.loginId}
           />
           <PasswordInput
             label={t("auth.password")}

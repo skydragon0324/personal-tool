@@ -20,14 +20,14 @@ jest.mock("@/lib/api-client", () => {
     apiClient: {
       ...actual.apiClient,
       getBoardMembers: (id: string) => getBoardMembers(id),
-      inviteBoardMember: (id: string, email: string) => inviteBoardMember(id, email),
+      inviteBoardMember: (id: string, loginId: string) => inviteBoardMember(id, loginId),
       removeBoardMember: (id: string, userId: string) => removeBoardMember(id, userId),
     },
   };
 });
 
 jest.mock("@/features/auth/components/auth-provider", () => ({
-  useAuth: () => ({ user: { id: currentUserId, display_name: "Me", email: "me@example.com" } }),
+  useAuth: () => ({ user: { id: currentUserId, display_name: "Me", login_id: "me" } }),
 }));
 
 jest.mock("@/lib/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -36,12 +36,9 @@ function members(canManage: boolean): BoardMembers {
   return {
     can_manage: canManage,
     people: [
-      { user_id: "owner-1", display_name: "Olivia Owner", email: "olivia@example.com", role: "owner" },
-      { user_id: "mate-1", display_name: "Max Mate", email: "max@example.com", role: "member" },
+      { user_id: "owner-1", display_name: "Olivia Owner", login_id: "olivia", role: "owner" },
+      { user_id: "mate-1", display_name: "Max Mate", login_id: "max", role: "member" },
     ],
-    invitations: canManage
-      ? [{ id: "inv-1", email: "later@example.com", created_at: "2026-09-23T09:00:00Z" }]
-      : [],
   };
 }
 
@@ -68,25 +65,24 @@ describe("BoardMembersModal", () => {
     push.mockReset();
   });
 
-  it("lets the owner invite by email, remove members and see pending invitations", async () => {
+  it("lets the owner invite by login ID and remove members", async () => {
     currentUserId = "owner-1";
     getBoardMembers.mockResolvedValue(members(true));
     inviteBoardMember.mockResolvedValue({ status: "added", members: members(true) });
     renderModal();
 
     expect(await screen.findByText("Max Mate")).toBeInTheDocument();
-    expect(screen.getByText("later@example.com")).toBeInTheDocument();
 
-    const input = screen.getByRole("textbox", { name: /Invite by email/ });
-    await userEvent.type(input, "not-an-email");
+    const input = screen.getByRole("textbox", { name: /Invite by login ID/ });
+    await userEvent.type(input, "not an id");
     await userEvent.click(screen.getByRole("button", { name: "Invite" }));
-    expect(await screen.findByText("Enter a valid email address")).toBeInTheDocument();
+    expect(await screen.findByText(/Use 3-32 letters/)).toBeInTheDocument();
     expect(inviteBoardMember).not.toHaveBeenCalled();
 
     await userEvent.clear(input);
-    await userEvent.type(input, "new@example.com");
+    await userEvent.type(input, "new-mate");
     await userEvent.click(screen.getByRole("button", { name: "Invite" }));
-    await waitFor(() => expect(inviteBoardMember).toHaveBeenCalledWith("board-1", "new@example.com"));
+    await waitFor(() => expect(inviteBoardMember).toHaveBeenCalledWith("board-1", "new-mate"));
 
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(removeBoardMember).toHaveBeenCalledWith("board-1", "mate-1"));
@@ -98,7 +94,7 @@ describe("BoardMembersModal", () => {
     renderModal();
 
     expect(await screen.findByText("Max Mate (you)")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /Invite by email/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /Invite by login ID/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Leave" }));

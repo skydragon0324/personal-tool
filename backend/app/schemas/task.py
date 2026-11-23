@@ -57,7 +57,7 @@ class TaskAssigneeRead(BaseModel):
 
     id: uuid.UUID
     display_name: str
-    email: str
+    login_id: str
 
 
 class SubtaskRead(BaseModel):

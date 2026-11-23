@@ -18,7 +18,7 @@ const theme = createTheme({
   headings: {
     fontFamily: "var(--font-display), ui-serif, Georgia, serif",
   },
-  defaultRadius: "md",
+  defaultRadius: "lg",
   colors: {
     teal: [
       "#F0FDFA",

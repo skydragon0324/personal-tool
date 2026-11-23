@@ -22,10 +22,11 @@ if TYPE_CHECKING:
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (Index("uq_users_email_lower", text("lower(email)"), unique=True),)
+    __table_args__ = (Index("uq_users_login_id_lower", text("lower(login_id)"), unique=True),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    # Stored lower-cased.
+    login_id: Mapped[str] = mapped_column(String(32), nullable=False)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     timezone: Mapped[str] = mapped_column(String(50), nullable=False, default="UTC")

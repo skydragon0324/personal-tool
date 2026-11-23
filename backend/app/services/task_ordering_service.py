@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import Task
+from app.models import BoardColumn, Task
 from app.schemas.task import TaskDetailRead, TaskMove
 from app.services.ownership import get_column_for_user, get_task_for_user
 from app.services.task_serializers import to_detail
@@ -64,6 +64,21 @@ def renumber_columns(db: Session, column_ids: set[uuid.UUID]) -> None:
         .execution_options(synchronize_session=False)
     )
     db.expire_all()
+
+
+def make_room_at_top(db: Session, column_id: uuid.UUID) -> int:
+    """Shift a column's tasks down one place and return the free top position."""
+    # Locking the column keeps two simultaneous creates from both taking position 0.
+    db.execute(
+        select(BoardColumn.id).where(BoardColumn.id == column_id).with_for_update(key_share=True)
+    )
+    db.execute(
+        select(Task.id).where(Task.column_id == column_id).order_by(Task.position).with_for_update()
+    )
+    db.execute(
+        update(Task).where(Task.column_id == column_id).values(position=Task.position + 1)
+    )
+    return 0
 
 
 def move_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskMove) -> TaskDetailRead:

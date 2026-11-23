@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (payload: ProfileUpdatePayload) => {
       const user = await apiClient.updateProfile(payload);
       queryClient.setQueryData(authKeys.me, user);
-      // Names and emails also show up in board members and assignees.
+      // Names and login IDs also show up in board members and assignees.
       void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== authKeys.me[0] });
       return user;
     },

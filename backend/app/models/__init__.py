@@ -1,6 +1,7 @@
 from app.models.board import Board
 from app.models.board_column import BoardColumn
-from app.models.board_member import BoardInvitation, BoardMember
+from app.models.board_folder import BoardFolder
+from app.models.board_member import BoardMember
 from app.models.category import Category
 from app.models.inbox_item import InboxItem
 from app.models.note import Note
@@ -26,7 +27,7 @@ from app.models.user_session import UserSession
 __all__ = [
     "Board",
     "BoardColumn",
-    "BoardInvitation",
+    "BoardFolder",
     "BoardMember",
     "Category",
     "InboxItem",

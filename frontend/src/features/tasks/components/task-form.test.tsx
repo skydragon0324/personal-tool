@@ -22,8 +22,7 @@ jest.mock("@/lib/api-client", () => {
       createCategory: jest.fn(),
       getBoardMembers: jest.fn().mockResolvedValue({
         can_manage: true,
-        people: [{ user_id: "user-1", display_name: "Me", email: "me@example.com", role: "owner" }],
-        invitations: [],
+        people: [{ user_id: "user-1", display_name: "Me", login_id: "me", role: "owner" }],
       }),
     },
   };
@@ -102,7 +101,7 @@ describe("TaskForm", () => {
             initial: {
               ...TASK,
               remind_at: "2026-09-23T09:30:00Z",
-              assignees: [{ id: "user-1", display_name: "Me", email: "me@example.com" }],
+              assignees: [{ id: "user-1", display_name: "Me", login_id: "me" }],
             },
             boardId: "board-1",
             columnId: TASK.column_id,

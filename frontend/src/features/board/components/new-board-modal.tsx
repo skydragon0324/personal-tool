@@ -19,6 +19,8 @@ import { colorName, t } from "@/i18n";
 interface NewBoardModalProps {
   opened: boolean;
   onClose: () => void;
+  /** The folder the new board goes in, if any. */
+  folderId?: string | null;
 }
 
 interface DraftStatus {
@@ -134,7 +136,7 @@ function SeedStatusList({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
+export function NewBoardModal({ opened, onClose, folderId = null }: NewBoardModalProps) {
   const router = useRouter();
   const { create } = useBoardMutations();
   const [name, setName] = useState("");
@@ -169,6 +171,7 @@ export function NewBoardModal({ opened, onClose }: NewBoardModalProps) {
         color,
         icon_name: icon,
         timezone,
+        folder_id: folderId,
         statuses: payloadStatuses,
       });
       writeLastBoardId(created.id, window.localStorage);

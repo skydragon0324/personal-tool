@@ -470,7 +470,7 @@ def test_cross_user_deletion_returns_404(delete_board) -> None:
     try:
         with independent_session(engine) as db:
             other = User(
-                email=f"delete-other-{uuid4().hex[:8]}@example.com",
+                login_id=f"delete-other-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",

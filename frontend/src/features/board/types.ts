@@ -81,7 +81,7 @@ export interface TaskAttachment {
 export interface TaskAssignee {
   id: string;
   display_name: string;
-  email: string;
+  login_id: string;
 }
 
 export interface TaskSummary {
@@ -190,6 +190,8 @@ export interface BoardListItem {
   timezone: string;
   position: number;
   archived_at: string | null;
+  /** Your personal folder for this board; null when ungrouped or shared with you. */
+  folder_id?: string | null;
   created_at: string;
   updated_at: string;
   total_tasks: number;
@@ -200,6 +202,14 @@ export interface BoardListItem {
   role?: BoardRole;
   owner_name?: string | null;
   member_count?: number;
+}
+
+export interface BoardFolder {
+  id: string;
+  name: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export type BoardRole = "owner" | "member";
@@ -217,6 +227,7 @@ export interface BoardCreate {
   color?: string;
   icon_name?: string | null;
   timezone?: string;
+  folder_id?: string | null;
   statuses?: BoardStatusSeed[];
 }
 
@@ -302,24 +313,17 @@ export type Task = TaskSummary;
 export interface BoardPerson {
   user_id: string;
   display_name: string;
-  email: string;
+  login_id: string;
   role: BoardRole;
-}
-
-export interface BoardInvitation {
-  id: string;
-  email: string;
-  created_at: string;
 }
 
 export interface BoardMembers {
   people: BoardPerson[];
-  invitations: BoardInvitation[];
-  /** True for the owner: can invite, remove members and cancel invitations. */
+  /** True for the owner: can add and remove members. */
   can_manage: boolean;
 }
 
 export interface BoardInviteResult {
-  status: "added" | "invited";
+  status: "added";
   members: BoardMembers;
 }

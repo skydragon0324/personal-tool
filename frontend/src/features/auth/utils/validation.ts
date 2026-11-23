@@ -1,6 +1,7 @@
 import { t } from "@/i18n";
 
-export const MIN_PASSWORD_LENGTH = 10;
+export const MIN_PASSWORD_LENGTH = 8;
+const LOGIN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/i;
 
 export function validateName(value: string): string | null {
   if (!value.trim()) return t("auth.nameRequired");
@@ -8,10 +9,10 @@ export function validateName(value: string): string | null {
   return null;
 }
 
-export function validateEmail(value: string): string | null {
-  const email = value.trim();
-  if (!email) return t("auth.emailRequired");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return t("auth.emailInvalid");
+export function validateLoginId(value: string): string | null {
+  const loginId = value.trim();
+  if (!loginId) return t("auth.loginIdRequired");
+  if (!LOGIN_ID_PATTERN.test(loginId)) return t("auth.loginIdInvalid");
   return null;
 }
 

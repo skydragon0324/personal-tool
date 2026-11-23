@@ -39,8 +39,8 @@ def test_unauthenticated_api_is_rejected(anonymous_client: TestClient) -> None:
 
 
 def test_first_register_claims_legacy_data(anonymous_client: TestClient, db: Session) -> None:
-    body = register_user(anonymous_client, email="first@example.com")
-    assert body["user"]["email"] == "first@example.com"
+    body = register_user(anonymous_client, login_id="first")
+    assert body["user"]["login_id"] == "first"
     assert body["user"]["id"] == str(BOOTSTRAP_USER_ID)
     assert "csrf_token" in body
     assert "password" not in body["user"]
@@ -49,7 +49,7 @@ def test_first_register_claims_legacy_data(anonymous_client: TestClient, db: Ses
     user = db.get(User, BOOTSTRAP_USER_ID)
     assert user is not None
     assert user.is_bootstrap is False
-    assert user.email == "first@example.com"
+    assert user.login_id == "first"
     assert verify_password("test-password-ok", user.password_hash)
 
     boards = anonymous_client.get("/api/v1/boards").json()
@@ -57,14 +57,14 @@ def test_first_register_claims_legacy_data(anonymous_client: TestClient, db: Ses
 
     me = anonymous_client.get("/api/v1/auth/me")
     assert me.status_code == 200
-    assert me.json()["email"] == "first@example.com"
+    assert me.json()["login_id"] == "first"
 
 
 def test_second_register_gets_empty_personal_workspace(db: Session) -> None:
     first = bind_client(db)
-    register_user(first, email="alpha@example.com")
+    register_user(first, login_id="alpha")
     second = _second_client(db)
-    body = register_user(second, email="beta@example.com", display_name="Beta")
+    body = register_user(second, login_id="beta", display_name="Beta")
     assert body["user"]["id"] != str(BOOTSTRAP_USER_ID)
 
     boards = second.get("/api/v1/boards").json()
@@ -83,17 +83,17 @@ def test_second_register_gets_empty_personal_workspace(db: Session) -> None:
     app.dependency_overrides.clear()
 
 
-def test_email_is_normalized_and_unique(anonymous_client: TestClient, db: Session) -> None:
-    register_user(anonymous_client, email="Person@Example.COM")
+def test_login_id_is_normalized_and_unique(anonymous_client: TestClient, db: Session) -> None:
+    register_user(anonymous_client, login_id="Person")
     me = anonymous_client.get("/api/v1/auth/me").json()
-    assert me["email"] == "person@example.com"
+    assert me["login_id"] == "person"
 
     other = bind_client(db)
     duplicate = other.post(
         "/api/v1/auth/register",
         json={
             "display_name": "Other",
-            "email": "PERSON@example.com",
+            "login_id": "PERSON",
             "password": "another-pass-1",
             "timezone": "UTC",
         },
@@ -107,47 +107,57 @@ def test_password_minimum_length(anonymous_client: TestClient) -> None:
         "/api/v1/auth/register",
         json={
             "display_name": "Short",
-            "email": "short@example.com",
-            "password": "123456789",
+            "login_id": "short",
+            "password": "1234567",
             "timezone": "UTC",
         },
     )
     assert response.status_code == 422
+    accepted = anonymous_client.post(
+        "/api/v1/auth/register",
+        json={
+            "display_name": "Short",
+            "login_id": "short",
+            "password": "12345678",
+            "timezone": "UTC",
+        },
+    )
+    assert accepted.status_code == 201, accepted.text
 
 
 def test_login_logout_and_wrong_password(anonymous_client: TestClient) -> None:
-    register_user(anonymous_client, email="login@example.com")
+    register_user(anonymous_client, login_id="login")
     anonymous_client.post("/api/v1/auth/logout")
     me = anonymous_client.get("/api/v1/auth/me")
     assert me.status_code == 401
 
     wrong = anonymous_client.post(
         "/api/v1/auth/login",
-        json={"email": "login@example.com", "password": "not-the-password"},
+        json={"login_id": "login", "password": "not-the-password"},
     )
     missing = anonymous_client.post(
         "/api/v1/auth/login",
-        json={"email": "nobody@example.com", "password": "not-the-password"},
+        json={"login_id": "nobody", "password": "not-the-password"},
     )
     assert wrong.status_code == 401
     assert missing.status_code == 401
     assert wrong.json()["detail"] == missing.json()["detail"]
-    assert "email" not in wrong.json()["detail"].lower() or "or password" in wrong.json()["detail"].lower()
+    assert "login_id" not in wrong.json()["detail"].lower() or "or password" in wrong.json()["detail"].lower()
 
     ok = anonymous_client.post(
         "/api/v1/auth/login",
-        json={"email": "LOGIN@example.com", "password": TEST_OWNER_PASSWORD},
+        json={"login_id": "LOGIN", "password": TEST_OWNER_PASSWORD},
     )
     assert ok.status_code == 200, ok.text
     assert anonymous_client.get("/api/v1/auth/me").status_code == 200
 
 
 def test_bootstrap_user_cannot_login(anonymous_client: TestClient, db: Session) -> None:
-    from app.core.constants import BOOTSTRAP_EMAIL
+    from app.core.constants import BOOTSTRAP_LOGIN_ID
 
     response = anonymous_client.post(
         "/api/v1/auth/login",
-        json={"email": BOOTSTRAP_EMAIL, "password": "anything-at-all"},
+        json={"login_id": BOOTSTRAP_LOGIN_ID, "password": "anything-at-all"},
     )
     assert response.status_code == 401
     user = db.get(User, BOOTSTRAP_USER_ID)
@@ -188,7 +198,7 @@ def test_expired_session_is_rejected(client: TestClient, db: Session) -> None:
 
 def test_users_cannot_access_each_others_resources(db: Session, today) -> None:
     first = bind_client(db)
-    register_user(first, email="owner-a@example.com")
+    register_user(first, login_id="owner-a")
     note = first.post("/api/v1/notes", json={"title": "Private note", "body": "secret"}).json()
     entry = first.post(
         "/api/v1/schedule",
@@ -222,7 +232,7 @@ def test_users_cannot_access_each_others_resources(db: Session, today) -> None:
     category_id = task["category"]["id"]
 
     second = _second_client(db)
-    register_user(second, email="owner-b@example.com")
+    register_user(second, login_id="owner-b")
     second_board = second.get("/api/v1/boards").json()[0]["id"]
 
     assert second.get(f"/api/v1/boards/{DEFAULT_BOARD_ID}").status_code == 404
@@ -260,9 +270,9 @@ def test_users_cannot_access_each_others_resources(db: Session, today) -> None:
 
 def test_board_name_and_position_are_unique_per_user(db: Session) -> None:
     first = bind_client(db)
-    register_user(first, email="unique-a@example.com")
+    register_user(first, login_id="unique-a")
     second = _second_client(db)
-    register_user(second, email="unique-b@example.com")
+    register_user(second, login_id="unique-b")
 
     created = second.post("/api/v1/boards", json={"name": "Personal", "timezone": "UTC"})
     assert created.status_code == 409

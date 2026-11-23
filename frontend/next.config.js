@@ -62,7 +62,6 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/", destination: "/today", permanent: false },
-      { source: "/inbox", destination: "/today", permanent: false },
     ];
   },
 };

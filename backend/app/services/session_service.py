@@ -11,7 +11,7 @@ from app.core.security import generate_token, hash_token, tokens_match
 from app.models import User, UserSession
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
-LOGIN_ERROR = "Invalid email or password"
+LOGIN_ERROR = "Invalid login ID or password"
 
 
 def _cookie_kwargs(settings: Settings) -> dict[str, str | bool | int]:

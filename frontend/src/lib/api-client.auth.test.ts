@@ -63,13 +63,13 @@ describe("api client auth helpers", () => {
       ok: true,
       status: 200,
       json: async () => ({
-        user: { id: "u1", email: "a@b.com", display_name: "A", timezone: "UTC", created_at: "" },
+        user: { id: "u1", login_id: "a", display_name: "A", timezone: "UTC", created_at: "" },
         csrf_token: "from-login",
       }),
     });
     stubGlobal("fetch", fetchMock);
 
-    await apiClient.login({ email: "a@b.com", password: "password12" });
+    await apiClient.login({ login_id: "a", password: "password12" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/v1/auth/login");
   });

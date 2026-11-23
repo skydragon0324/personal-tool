@@ -112,9 +112,9 @@ function Tile({
           ? "border-teal-200 bg-teal-50 dark:border-teal-500/30 dark:bg-teal-500/10"
           : "border-[var(--app-border)] bg-[var(--app-surface-muted)]";
   return (
-    <div className={`rounded-xl border px-3 py-2.5 ${box}`}>
-      <p className="truncate text-xs font-medium text-[var(--app-text-muted)]">{label}</p>
-      <p className="mt-1 font-display text-xl text-[var(--app-text)]">{value}</p>
+    <div className={`rounded-2xl border px-3.5 py-3 ${box}`}>
+      <p className="truncate text-xs font-semibold uppercase tracking-[0.06em] text-[var(--app-text-muted)]">{label}</p>
+      <p className="mt-1.5 font-display text-2xl font-semibold text-[var(--app-text)]">{value}</p>
     </div>
   );
 }

@@ -61,9 +61,9 @@ describe("English UI copy", () => {
       join(SRC_ROOT, "features/shell/components/app-sidebar.tsx"),
     );
     expect(sidebar).toContain(en.common.appName);
-    expect(sidebar).toContain("Today");
-    expect(sidebar).not.toContain("Inbox");
-    expect(sidebar).not.toContain("New board");
+    expect(sidebar).toContain("Home");
+    expect(sidebar).toContain("Inbox");
+    expect(sidebar).toContain("New board");
     expect(sidebar).not.toContain("Manage boards");
     expect(sidebar).not.toContain("Recurring tasks");
     expect(sidebar).toContain("Boards");
@@ -128,7 +128,7 @@ describe("English UI copy", () => {
     expect(todayProgress).toContain('label={Tasks)}');
     expect(todayProgress).toContain('label={Schedule)}');
     expect(today).toContain("DashboardGrid");
-    expect(today).toContain("max-w-[1400px]");
+    expect(today).toContain("max-w-[1480px]");
     const todayNotes = readUi(
       join(SRC_ROOT, "features/today/components/today-notes-section.tsx"),
     );
@@ -139,8 +139,7 @@ describe("English UI copy", () => {
     const todayRoute = readUi(join(SRC_ROOT, "pages/today.tsx"));
     expect(todayRoute).toContain("TodayPage");
     const nextConfig = readUi(join(SRC_ROOT, "../next.config.js"));
-    expect(nextConfig).toContain('{ source: "/inbox", destination: "/today", permanent: false }');
-    expect(nextConfig).not.toContain("InboxPage");
+    expect(nextConfig).not.toContain('source: "/inbox"');
     const schedule = readUi(
       join(SRC_ROOT, "features/schedule/components/schedule-page.tsx"),
     );

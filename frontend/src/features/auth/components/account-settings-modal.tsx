@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/components/auth-provider";
 import {
   validateConfirmPassword,
-  validateEmail,
+  validateLoginId,
   validateName,
   validatePassword,
 } from "@/features/auth/utils/validation";
@@ -12,7 +12,7 @@ import { t } from "@/i18n";
 import { ApiError } from "@/lib/api-client";
 import { notifySuccess } from "@/lib/notify";
 
-/** Lets the signed-in user change their name, email and password. */
+/** Lets the signed-in user change their name, login ID and password. */
 export function AccountSettingsModal({ opened, onClose }: { opened: boolean; onClose: () => void }) {
   return (
     <Modal opened={opened} onClose={onClose} title={t("account.title")} radius="lg" size="md">
@@ -34,38 +34,38 @@ function errorText(error: unknown, fallback: string): string {
 function ProfileForm() {
   const { user, updateProfile } = useAuth();
   const [name, setName] = useState(user?.display_name ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
+  const [loginId, setLoginId] = useState(user?.login_id ?? "");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; form?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; loginId?: string; password?: string; form?: string }>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setName(user?.display_name ?? "");
-    setEmail(user?.email ?? "");
-  }, [user?.display_name, user?.email]);
+    setLoginId(user?.login_id ?? "");
+  }, [user?.display_name, user?.login_id]);
 
   if (!user) return null;
   const nameChanged = name.trim() !== user.display_name;
-  const emailChanged = email.trim().toLowerCase() !== user.email.toLowerCase();
+  const loginIdChanged = loginId.trim().toLowerCase() !== user.login_id.toLowerCase();
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!nameChanged && !emailChanged) {
+    if (!nameChanged && !loginIdChanged) {
       setErrors({ form: t("account.noChanges") });
       return;
     }
     const next = {
       name: validateName(name) ?? undefined,
-      email: validateEmail(email) ?? undefined,
-      password: emailChanged && !password ? t("account.currentPasswordForEmail") : undefined,
+      loginId: validateLoginId(loginId) ?? undefined,
+      password: loginIdChanged && !password ? t("account.currentPasswordForLoginId") : undefined,
     };
     setErrors(next);
-    if (next.name || next.email || next.password) return;
+    if (next.name || next.loginId || next.password) return;
     setSaving(true);
     try {
       await updateProfile({
         ...(nameChanged ? { display_name: name.trim() } : {}),
-        ...(emailChanged ? { email: email.trim(), current_password: password } : {}),
+        ...(loginIdChanged ? { login_id: loginId.trim(), current_password: password } : {}),
       });
       setPassword("");
       setErrors({});
@@ -97,17 +97,19 @@ function ProfileForm() {
           error={errors.name}
         />
         <TextInput
-          label={t("auth.email")}
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.currentTarget.value)}
-          error={errors.email}
+          label={t("auth.loginId")}
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          maxLength={32}
+          value={loginId}
+          onChange={(event) => setLoginId(event.currentTarget.value)}
+          error={errors.loginId}
         />
-        {emailChanged ? (
+        {loginIdChanged ? (
           <PasswordInput
             label={t("account.currentPassword")}
-            description={t("account.currentPasswordForEmail")}
+            description={t("account.currentPasswordForLoginId")}
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.currentTarget.value)}

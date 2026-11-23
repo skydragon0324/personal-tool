@@ -164,7 +164,7 @@ export function NotificationBell() {
   );
 }
 
-function NotificationRow({
+export function NotificationRow({
   item,
   onOpen,
   onDismiss,

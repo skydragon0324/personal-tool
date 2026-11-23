@@ -1,7 +1,7 @@
 import { Burger } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { usePathname } from "@/lib/navigation";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { ManageBoardsModal } from "@/features/board/components/manage-boards-modal";
 import { NewBoardModal } from "@/features/board/components/new-board-modal";
@@ -14,7 +14,8 @@ interface WorkspaceChromeValue {
   toggleSidebar: () => void;
   closeSidebar: () => void;
   sidebarOpened: boolean;
-  openNewBoard: () => void;
+  /** Opens the new-board dialog, optionally creating the board inside a folder. */
+  openNewBoard: (folderId?: string) => void;
   openManageBoards: () => void;
 }
 
@@ -30,6 +31,14 @@ export function WorkspaceChromeProvider({ children }: { children: React.ReactNod
   const [mobileOpened, mobile] = useDisclosure(false);
   const [newOpened, newBoard] = useDisclosure(false);
   const [manageOpened, manage] = useDisclosure(false);
+  const [newBoardFolderId, setNewBoardFolderId] = useState<string | null>(null);
+  const openNewBoard = useCallback(
+    (folderId?: string) => {
+      setNewBoardFolderId(folderId ?? null);
+      newBoard.open();
+    },
+    [newBoard],
+  );
 
   const chrome = useMemo(
     () => ({
@@ -37,16 +46,16 @@ export function WorkspaceChromeProvider({ children }: { children: React.ReactNod
       toggleSidebar: mobile.toggle,
       closeSidebar: mobile.close,
       sidebarOpened: mobileOpened,
-      openNewBoard: newBoard.open,
+      openNewBoard,
       openManageBoards: manage.open,
     }),
-    [mobile.open, mobile.toggle, mobile.close, mobileOpened, newBoard.open, manage.open],
+    [mobile.open, mobile.toggle, mobile.close, mobileOpened, openNewBoard, manage.open],
   );
 
   return (
     <WorkspaceChromeContext.Provider value={chrome}>
       {children}
-      <NewBoardModal opened={newOpened} onClose={newBoard.close} />
+      <NewBoardModal opened={newOpened} onClose={newBoard.close} folderId={newBoardFolderId} />
       <ManageBoardsModal
         opened={manageOpened}
         onClose={manage.close}

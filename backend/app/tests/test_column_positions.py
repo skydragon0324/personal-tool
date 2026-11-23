@@ -127,12 +127,13 @@ def test_due_date_change_keeps_column_position(
     assert [task.position for task in remaining] == [0, 1, 2]
 
 
-def test_create_appends_to_column_regardless_of_due_date(
+def test_create_puts_new_task_at_top_regardless_of_due_date(
     db: Session,
     seed_tasks: list[Task],
     today: date,
     uncategorized_id,
 ) -> None:
+    earlier_ids = [task.id for task in seed_tasks]
     created = task_service.create_task(
         db,
         BOOTSTRAP_USER_ID,
@@ -143,12 +144,16 @@ def test_create_appends_to_column_regardless_of_due_date(
             due_date=today + timedelta(days=12),
         ),
     )
-    assert created.position == 3
-    positions = list(
-        db.scalars(select(Task.position).where(Task.column_id == COLUMN_TODO_ID)).all()
+    assert created.position == 0
+    ordered = list(
+        db.execute(
+            select(Task.id, Task.position)
+            .where(Task.column_id == COLUMN_TODO_ID)
+            .order_by(Task.position)
+        ).all()
     )
-    assert sorted(positions) == [0, 1, 2, 3]
-    assert len(set(positions)) == 4
+    assert [row.position for row in ordered] == [0, 1, 2, 3]
+    assert [row.id for row in ordered] == [created.id, *earlier_ids]
 
 
 def test_positions_stay_unique_after_filtered_anchor_move(

@@ -48,8 +48,8 @@ export function PlanDayCard({
   return (
     <section
       aria-label={heading}
-      className={`flex flex-col rounded-xl border bg-[var(--app-surface)] shadow-sm ${
-        isToday ? "border-[var(--app-primary)]" : "border-[var(--app-border)]"
+      className={`flex flex-col overflow-hidden rounded-[1.25rem] border bg-[var(--app-surface)] shadow-[0_8px_26px_rgba(31,55,50,0.055)] ${
+        isToday ? "border-[var(--app-primary)] ring-2 ring-[var(--app-primary)]/10" : "border-[var(--app-border)]"
       }`}
     >
       <header className="flex items-start justify-between gap-2 border-b border-[var(--app-border)] px-3 py-2">

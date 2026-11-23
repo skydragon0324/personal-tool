@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api-client";
 import { formatRangeLabel, todayISO } from "@/lib/dates";
 import { notifyApiError, notifyConflict, notifySuccess } from "@/lib/notify";
 import { OPEN_TASK_EVENT, type OpenTaskDetail } from "@/lib/open-task-event";
+import { screenHeight } from "@/lib/viewport";
 import { tasksByColumnFromView } from "../api/board-queries";
 import { useBoard } from "../hooks/use-board";
 import { useBoardMembers } from "../hooks/use-board-members";
@@ -48,7 +49,7 @@ import { BoardToolbar } from "./board-toolbar";
 import { KanbanBoard } from "./kanban-board";
 import { NoStatusesState } from "./no-statuses-state";
 import { ProgressView } from "./progress-view";
-import { SaveNotice } from "./save-notice";
+import { showSaveNotice } from "./save-notice";
 import { StatusManagerModal } from "./status-manager-modal";
 import { TaskTable } from "./task-table";
 import { t } from "@/i18n";
@@ -155,9 +156,6 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   const people = membersQuery.data?.people ?? [];
   const { user } = useAuth();
   const [statusTab, setStatusTab] = useState<"active" | "archived">("active");
-  const [saveNotice, setSaveNotice] = useState<ReturnType<typeof createSaveNotice> | null>(
-    null,
-  );
 
   useEffect(() => {
     const task = new URLSearchParams(window.location.search).get("task");
@@ -238,19 +236,18 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     setUploadErrors(failures);
   }
 
-  function showSaveNotice(task: TaskDetail) {
-    setSaveNotice(
-      createSaveNotice(
-        task,
-        {
-          startDate: unbounded ? null : startDate,
-          endDate: unbounded ? null : endDate,
-          unbounded,
-          dateField,
-        },
-        filters,
-      ),
+  function notifyTaskSaved(task: TaskDetail) {
+    const notice = createSaveNotice(
+      task,
+      {
+        startDate: unbounded ? null : startDate,
+        endDate: unbounded ? null : endDate,
+        unbounded,
+        dateField,
+      },
+      filters,
     );
+    showSaveNotice(notice, () => viewSavedTaskRef.current(notice.jumpDate));
   }
 
   async function handleCreate(
@@ -279,14 +276,14 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       if (pendingFiles.length) {
         await uploadPending(existingId, pendingFiles);
       }
-      showSaveNotice(updated);
+      notifyTaskSaved(updated);
       return updated;
     }
     const created = await create.mutateAsync(payload);
     if (pendingFiles.length) {
       await uploadPending(created.id, pendingFiles);
     }
-    showSaveNotice(created);
+    notifyTaskSaved(created);
     return created;
   }
 
@@ -313,7 +310,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       await uploadPending(viewingId, pendingFiles);
     }
     // Sub-tasks never show on the board, so there is no card to point at.
-    if (!updated.parent) showSaveNotice(updated);
+    if (!updated.parent) notifyTaskSaved(updated);
     return updated;
   }
 
@@ -334,6 +331,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     }
     if (viewingId === deleting.id) setViewingId(deleting.parentId ?? null);
     setDeleting(null);
+    notifySuccess(t("status.deleted", { name: deleting.title }));
   }
 
   async function handleDuplicate(taskId: string) {
@@ -407,17 +405,16 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     }
   }
 
-  function viewSavedTask() {
-    if (!saveNotice) return;
-    const next = expandRangeToInclude(
-      unbounded ? [null, null] : appliedRange,
-      saveNotice.jumpDate,
-    );
+  function viewSavedTask(jumpDate: string) {
+    const next = expandRangeToInclude(unbounded ? [null, null] : appliedRange, jumpDate);
     setRangeMode("custom");
     setPickerRange(next);
     setAppliedRange(next);
     updatePrefs({ rangeMode: "custom", customRange: next, anchorDate: next[0] });
   }
+  // The notification outlives this render, so its button must use the latest date range.
+  const viewSavedTaskRef = useRef(viewSavedTask);
+  viewSavedTaskRef.current = viewSavedTask;
 
   const hasStatuses = (data?.columns.length ?? 0) > 0;
   const showEmptyStatuses = Boolean(data && !hasStatuses);
@@ -433,7 +430,10 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   }, [data?.name]);
 
   return (
-    <div className="min-h-full bg-[var(--app-bg)] text-[var(--app-text)]">
+    <div
+      className="flex min-h-0 flex-col overflow-hidden bg-[var(--app-bg)] text-[var(--app-text)]"
+      style={{ height: screenHeight(100), maxHeight: screenHeight(100) }}
+    >
       <BoardHeader
         boardName={data?.name ?? t("board.board")}
         boardColor={data?.color}
@@ -488,15 +488,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         }}
       />
 
-      {saveNotice ? (
-        <SaveNotice
-          message={saveNotice.message}
-          outOfRange={saveNotice.outOfRange}
-          hiddenByFilters={saveNotice.hiddenByFilters}
-          onViewTask={saveNotice.outOfRange ? viewSavedTask : undefined}
-          onDismiss={() => setSaveNotice(null)}
-        />
-      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
       {data ? (
         <BoardSummaryCard
@@ -593,20 +585,25 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       ) : null}
 
       {data && hasStatuses && viewMode === "table" ? (
-        <TaskTable
-          columns={data.columns}
-          tasksByColumn={tasksByColumn}
-          onOpenDetail={(task, mode = "view") => {
-            setViewingId(task.id);
-            setDetailMode(mode);
-          }}
-          onMoveStatus={(task, columnId) => void handleMoveStatus(task, columnId)}
-        />
+        <div className="min-h-0 flex-1 overflow-auto">
+          <TaskTable
+            columns={data.columns}
+            tasksByColumn={tasksByColumn}
+            onOpenDetail={(task, mode = "view") => {
+              setViewingId(task.id);
+              setDetailMode(mode);
+            }}
+            onMoveStatus={(task, columnId) => void handleMoveStatus(task, columnId)}
+          />
+        </div>
       ) : null}
 
       {data && hasStatuses && viewMode === "progress" ? (
-        <ProgressView columns={data.columns} tasksByColumn={tasksByColumn} />
+        <div className="min-h-0 flex-1 overflow-auto">
+          <ProgressView columns={data.columns} tasksByColumn={tasksByColumn} />
+        </div>
       ) : null}
+      </div>
 
       <TaskDialog
         open={createColumnId !== null}

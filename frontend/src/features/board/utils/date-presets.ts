@@ -86,6 +86,28 @@ export function rangeForMode(
   }
 }
 
+/** The previous or next period for the date stepper. Custom and all-time ranges have no step. */
+export function shiftRange(
+  mode: DateRangeMode,
+  range: DateRangeValue,
+  direction: -1 | 1,
+): DateRangeValue | null {
+  if (!range[0]) return null;
+  const start = parseISODate(range[0]);
+  switch (mode) {
+    case "year":
+      return yearRange(start.getFullYear() + direction);
+    case "month":
+      return monthRange(toISODate(new Date(start.getFullYear(), start.getMonth() + direction, 1)));
+    case "week":
+      return weekRange(toISODate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7 * direction)));
+    case "day":
+      return dayRange(toISODate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + direction)));
+    default:
+      return null;
+  }
+}
+
 export function migrateDateRangeMode(value: unknown): DateRangeMode {
   switch (value) {
     case "year":

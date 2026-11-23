@@ -12,6 +12,7 @@ import { apiClient } from "@/lib/api-client";
 import { formatDisplayDate, todayISO } from "@/lib/dates";
 
 import { dashboardKeys } from "../hooks/use-dashboard";
+import { isMyTask } from "../utils/my-tasks";
 import type { DashboardTaskRow } from "../types";
 import {
   dueBucketLabel,
@@ -37,7 +38,7 @@ const BUCKET_STYLE: Record<DueBucket, string> = {
 };
 
 /** Every task across your boards with where it is, who has it and when it is due. */
-export function TaskOverview() {
+export function TaskOverview({ mineOnly = false }: { mineOnly?: boolean }) {
   const router = useRouter();
   const { user } = useAuth();
   const today = todayISO();
@@ -48,7 +49,10 @@ export function TaskOverview() {
     queryKey: [...dashboardKeys.all, "tasks", state] as const,
     queryFn: () => apiClient.getDashboardTasks({ state }),
   });
-  const rows = useMemo(() => tasksQuery.data?.items ?? [], [tasksQuery.data]);
+  const rows = useMemo(() => {
+    const items = tasksQuery.data?.items ?? [];
+    return mineOnly ? items.filter((row) => isMyTask(row, user?.id)) : items;
+  }, [mineOnly, tasksQuery.data, user?.id]);
 
   const boards = useMemo(() => {
     const seen = new Map<string, string>();
@@ -88,7 +92,7 @@ export function TaskOverview() {
   return (
     <section
       aria-label={t("dashboard.tasks")}
-      className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+      className="rounded-[1.35rem] border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_10px_32px_rgba(31,55,50,0.055)]"
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>

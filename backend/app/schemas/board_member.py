@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, field_validator
+
+from app.schemas.auth import validate_login_id
 
 
 class BoardPerson(BaseModel):
@@ -12,28 +13,26 @@ class BoardPerson(BaseModel):
 
     user_id: uuid.UUID
     display_name: str
-    email: str
+    login_id: str
     role: Literal["owner", "member"]
 
 
-class BoardInvitationRead(BaseModel):
-    id: uuid.UUID
-    email: str
-    created_at: datetime
-
-
 class BoardMembersRead(BaseModel):
-    """Owner first, then members by name. Pending invitations are only shown to the owner."""
+    """Owner first, then members by name."""
 
     people: list[BoardPerson]
-    invitations: list[BoardInvitationRead]
     can_manage: bool
 
 
 class BoardInvite(BaseModel):
-    email: EmailStr
+    login_id: str
+
+    @field_validator("login_id")
+    @classmethod
+    def _login_id(cls, value: str) -> str:
+        return validate_login_id(value)
 
 
 class BoardInviteResult(BaseModel):
-    status: Literal["added", "invited"]
+    status: Literal["added"]
     members: BoardMembersRead

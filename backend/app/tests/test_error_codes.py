@@ -48,10 +48,6 @@ def test_every_api_error_message_has_a_code() -> None:
 
 
 def test_templates_return_their_parameters() -> None:
-    assert error_code("ada@example.com has already been invited") == (
-        "already_invited",
-        {"email": "ada@example.com"},
-    )
     assert error_code("File exceeds 10485760 bytes") == ("file_too_large", {"bytes": "10485760"})
     # A fixed message wins over a template that would also match it.
     assert error_code("category_id cannot be null") == ("category_id_null", {})

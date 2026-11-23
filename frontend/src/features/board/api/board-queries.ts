@@ -71,7 +71,8 @@ export function applyDetailToView(view: BoardView, task: TaskDetail): BoardView 
   const columns = view.columns.map((column) => {
     const without = column.tasks.filter((t) => t.id !== task.id);
     if (column.id === task.column_id) {
-      const next = [...without, summary].sort((a, b) => a.position - b.position);
+      // A new task takes position 0 before the others' shifted positions reload, so it must win ties.
+      const next = [summary, ...without].sort((a, b) => a.position - b.position);
       return { ...column, tasks: next };
     }
     return { ...column, tasks: without };

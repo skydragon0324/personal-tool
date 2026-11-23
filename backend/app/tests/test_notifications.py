@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.main import app
 from app.models import Notification, User
 from app.services import notification_service
-from app.tests.auth_helpers import TEST_OWNER_EMAIL, bind_client, register_user
+from app.tests.auth_helpers import TEST_OWNER_LOGIN_ID, bind_client, register_user
 
 DAY = date(2026, 9, 23)  # Wednesday
 
@@ -18,8 +18,8 @@ def _at(hour: int, minute: int = 0, day: date = DAY) -> datetime:
     return datetime.combine(day, time(hour, minute), tzinfo=UTC)
 
 
-def _user(db: Session, email: str = TEST_OWNER_EMAIL) -> User:
-    user = db.scalar(select(User).where(User.email == email))
+def _user(db: Session, login_id: str = TEST_OWNER_LOGIN_ID) -> User:
+    user = db.scalar(select(User).where(User.login_id == login_id))
     assert user is not None
     return user
 
@@ -266,8 +266,8 @@ def test_empty_day_digest_is_hidden(client: TestClient, db: Session) -> None:
 def test_digest_uses_user_timezone(db: Session) -> None:
     client = bind_client(db)
     try:
-        register_user(client, email="seoul@example.com", timezone="Asia/Seoul")
-        user = _user(db, "seoul@example.com")
+        register_user(client, login_id="seoul", timezone="Asia/Seoul")
+        user = _user(db, "seoul")
         _task(client, "Seoul task")
         # 07:30 / 08:30 in Seoul on DAY are 22:30 / 23:30 UTC the day before; the digest is at 08:00.
         notification_service.sync_notifications(db, user, _at(22, 30, DAY - timedelta(days=1)))
@@ -353,7 +353,7 @@ def test_other_user_cannot_touch_notifications(client: TestClient, db: Session) 
     notification_id = client.get("/api/v1/notifications").json()["items"][0]["id"]
 
     outsider = bind_client(db)
-    register_user(outsider, email="notif-outsider@example.com")
+    register_user(outsider, login_id="notif-outsider")
     assert all(
         item["title"] != "Private reminder"
         for item in outsider.get("/api/v1/notifications").json()["items"]

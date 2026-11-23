@@ -98,7 +98,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className={`${BOARD_CONTENT_GUTTER} pb-8`}>
+    <div className={`${BOARD_CONTENT_GUTTER} flex min-h-0 flex-1 flex-col pb-4`}>
       <DragDropProvider
         sensors={sensors}
         onDragStart={(event) => {
@@ -109,7 +109,7 @@ export function KanbanBoard({
           void onDragEnd(event);
         }}
       >
-        <div className="flex h-[calc(100vh-16rem)] min-h-[28rem] gap-4 overflow-x-auto overflow-y-hidden">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {orderedColumns.map((column) => (
             <KanbanColumn
               key={column.id}

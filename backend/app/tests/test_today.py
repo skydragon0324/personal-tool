@@ -172,7 +172,7 @@ def test_today_schedule_routine_and_this_week(client: TestClient) -> None:
 
 def test_schedule_occurrence_toggle_and_isolation(db: Session) -> None:
     first = bind_client(db)
-    register_user(first, email="today-a@example.com")
+    register_user(first, login_id="today-a")
     created = first.post(
         "/api/v1/schedule",
         json={
@@ -205,7 +205,7 @@ def test_schedule_occurrence_toggle_and_isolation(db: Session) -> None:
     assert invalid_day.status_code == 422
 
     second = bind_client(db)
-    register_user(second, email="today-b@example.com")
+    register_user(second, login_id="today-b")
     stolen = second.put(
         f"/api/v1/schedule/{entry_id}/occurrences/{SELECTED.isoformat()}",
         json={"is_completed": False},

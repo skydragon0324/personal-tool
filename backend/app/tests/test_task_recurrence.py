@@ -129,7 +129,7 @@ def test_generate_is_idempotent_and_range_limited(client: TestClient, db: Sessio
 
 def test_recurrence_is_restricted_to_owner(db: Session) -> None:
     owner = bind_client(db)
-    register_user(owner, email="recur-owner@example.com")
+    register_user(owner, login_id="recur-owner")
     column_id, _done_id, category_id = _board_todo_category(owner)
     created = owner.post(
         "/api/v1/tasks",
@@ -147,7 +147,7 @@ def test_recurrence_is_restricted_to_owner(db: Session) -> None:
     task_id = created.json()["id"]
 
     outsider = bind_client(db)
-    register_user(outsider, email="recur-other@example.com")
+    register_user(outsider, login_id="recur-other")
     assert outsider.get(f"/api/v1/task-recurrence/{series_id}").status_code == 404
     assert outsider.post(f"/api/v1/task-recurrence/{series_id}/stop").status_code == 404
     stolen = outsider.patch(

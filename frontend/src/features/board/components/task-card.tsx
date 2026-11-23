@@ -12,6 +12,7 @@ import {
   wasShortClick,
 } from "../utils/pointer-activation";
 import { AssigneeAvatars } from "./assignee-avatars";
+import { CalendarIcon, DotsIcon, PersonIcon, ProgressMark } from "./board-ui-icons";
 import { t } from "@/i18n";
 
 interface TaskCardProps {
@@ -54,12 +55,23 @@ export function TaskCard({
   const today = todayISO();
   const overdue = !task.completed_at && task.due_date < today;
   const dueToday = task.due_date === today;
+  const done = Boolean(task.completed_at);
+  const stepsTotal = task.checklist_total + task.subtask_total;
+  const started = columns.findIndex((column) => column.id === columnId) > 0;
+  // Real step progress when the task has steps; otherwise a small arc once it has left the first status.
+  const progress = stepsTotal
+    ? (task.checklist_completed + task.subtask_completed) / stepsTotal
+    : started
+      ? 0.25
+      : 0;
+  const hasDetails =
+    task.checklist_total > 0 || task.subtask_total > 0 || task.link_count > 0 || task.attachment_count > 0;
 
   return (
     <article
       ref={ref}
       data-dragging={isDragging || undefined}
-      className={`touch-none cursor-grab select-none rounded-xl border bg-[var(--app-surface)] px-2.5 py-2 shadow-sm transition ${
+      className={`touch-none cursor-grab select-none rounded-2xl border bg-[var(--app-surface)] px-3.5 py-3 shadow-[0_4px_14px_rgba(31,55,50,0.06)] transition ${
         isDragging
           ? "cursor-grabbing scale-[1.02] opacity-40 shadow-xl"
           : "hover:shadow-md"
@@ -91,20 +103,16 @@ export function TaskCard({
         onOpenDetail(task, "view");
       }}
     >
-      <div className="flex items-start justify-between gap-1">
-        <h2 className="min-w-0 flex-1 text-left text-sm font-medium leading-snug text-[var(--app-text)]">
-          <span className="line-clamp-2">{task.title}</span>
-        </h2>
-        {task.assignees?.length ? (
-          <div className="shrink-0">
-            <AssigneeAvatars people={task.assignees} size={22} max={3} />
-          </div>
-        ) : null}
-        <div data-no-dnd="true" className="-mr-1 -mt-0.5 shrink-0">
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="min-w-0 flex-1">
+          {task.category ? <CategoryBadge category={task.category} /> : null}
+        </div>
+        <PriorityBadge priority={task.priority} />
+        <div data-no-dnd="true" className="-mr-1 shrink-0">
           <Menu shadow="md" position="bottom-end" withinPortal>
             <Menu.Target>
               <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t("task.menu")}>
-                ⋯
+                <DotsIcon size={15} />
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
@@ -167,11 +175,38 @@ export function TaskCard({
           </Menu>
         </div>
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--app-text-muted)]">
-        {task.category ? <CategoryBadge category={task.category} /> : null}
-        <PriorityBadge priority={task.priority} />
+      <h2
+        className={`mt-2 text-left font-display text-[1.05rem] font-semibold leading-snug text-[var(--app-text)] ${
+          done ? "line-through decoration-[var(--app-text-muted)]" : ""
+        }`}
+      >
+        <span className="line-clamp-2">{task.title}</span>
+      </h2>
+      {task.content_preview ? (
+        <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-[var(--app-text-muted)]">
+          {task.content_preview}
+        </p>
+      ) : null}
+      {hasDetails ? (
+        <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--app-text-muted)]">
+          {task.checklist_total > 0 ? (
+            <span>
+              {t("task.checklistCount", { done: task.checklist_completed, total: task.checklist_total })}
+            </span>
+          ) : null}
+          {task.subtask_total > 0 ? (
+            <span>
+              {t("task.subtasksCount", { done: task.subtask_completed, total: task.subtask_total })}
+            </span>
+          ) : null}
+          {task.link_count > 0 ? <span>{t("task.linksCount", { count: task.link_count })}</span> : null}
+          {task.attachment_count > 0 ? <span>{t("task.filesCount", { count: task.attachment_count })}</span> : null}
+        </div>
+      ) : null}
+      <div className="mt-2.5 flex items-center gap-2 text-xs text-[var(--app-text-muted)]">
+        <CalendarIcon size={15} className="shrink-0" />
         <span
-          className={`font-medium ${
+          className={`min-w-0 font-medium ${
             overdue
               ? "text-rose-600 dark:text-rose-300"
               : dueToday
@@ -182,18 +217,18 @@ export function TaskCard({
           {overdue ? t("task.overduePrefix") : dueToday ? t("task.dueTodayPrefix") : ""}
           {formatTaskPeriod(task.start_date, task.due_date)}
         </span>
-        {task.checklist_total > 0 ? (
-          <span>
-            {t("task.checklistCount", { done: task.checklist_completed, total: task.checklist_total })}
-          </span>
-        ) : null}
-        {task.subtask_total > 0 ? (
-          <span>
-            {t("task.subtasksCount", { done: task.subtask_completed, total: task.subtask_total })}
-          </span>
-        ) : null}
-        {task.link_count > 0 ? <span>{t("task.linksCount", { count: task.link_count })}</span> : null}
-        {task.attachment_count > 0 ? <span>{t("task.filesCount", { count: task.attachment_count })}</span> : null}
+        <span className="ml-1">
+          <ProgressMark done={done} progress={progress} />
+        </span>
+        <div className="ml-auto shrink-0">
+          {task.assignees?.length ? (
+            <AssigneeAvatars people={task.assignees} size={28} max={3} />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--app-surface-muted)]">
+              <PersonIcon size={15} />
+            </span>
+          )}
+        </div>
       </div>
     </article>
   );

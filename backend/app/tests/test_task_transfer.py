@@ -160,12 +160,12 @@ def test_move_to_done_status_on_other_board_completes_it(client: TestClient, db:
 
 def test_move_keeps_assignee_only_if_on_target_board(client: TestClient, db: Session) -> None:
     mate = bind_client(db)
-    mate_user = register_user(mate, email="mover-mate@example.com", display_name="Mate")["user"]
+    mate_user = register_user(mate, login_id="mover-mate", display_name="Mate")["user"]
     try:
         home, _columns, _categories = _board_ids(client)
-        client.post(f"/api/v1/boards/{home}/members", json={"email": "mover-mate@example.com"})
+        client.post(f"/api/v1/boards/{home}/members", json={"login_id": "mover-mate"})
         shared_target = _new_board(client, "Shared target")
-        client.post(f"/api/v1/boards/{shared_target}/members", json={"email": "mover-mate@example.com"})
+        client.post(f"/api/v1/boards/{shared_target}/members", json={"login_id": "mover-mate"})
         private_target = _new_board(client, "Private target")
 
         kept = _rich_task(client, db, assignee_ids=[mate_user["id"]])
@@ -186,7 +186,7 @@ def test_move_keeps_assignee_only_if_on_target_board(client: TestClient, db: Ses
 def test_cannot_move_to_a_board_you_cannot_access(client: TestClient, db: Session) -> None:
     task = _rich_task(client, db)
     stranger = bind_client(db)
-    register_user(stranger, email="stranger@example.com")
+    register_user(stranger, login_id="stranger")
     try:
         foreign = stranger.post("/api/v1/boards", json={"name": "Not yours"}).json()["id"]
     finally:

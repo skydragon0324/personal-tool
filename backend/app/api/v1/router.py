@@ -13,6 +13,7 @@ from app.api.v1 import (
     task_recurrence,
     tasks,
     today,
+    workspace,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -20,6 +21,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(today.router)
+api_router.include_router(workspace.router)
 api_router.include_router(boards.router)
 api_router.include_router(columns.router)
 api_router.include_router(notes.router)

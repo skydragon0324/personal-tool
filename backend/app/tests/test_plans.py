@@ -120,7 +120,7 @@ def test_other_user_cannot_see_or_change_plans(client: TestClient, db: Session) 
     item = _item(client, day["id"], "Private item")
 
     outsider = bind_client(db)
-    register_user(outsider, email="plans-outsider@example.com")
+    register_user(outsider, login_id="plans-outsider")
     assert outsider.get("/api/v1/plans").json() == []
     assert outsider.get(f"/api/v1/plans/{plan['id']}").status_code == 404
     assert outsider.patch(f"/api/v1/plans/{plan['id']}", json={"name": "Mine"}).status_code == 404
@@ -183,6 +183,6 @@ def test_overview_requires_today_and_is_private(client: TestClient, db: Session)
     assert client.get("/api/v1/plans/overview").status_code == 422
     _plan(client, "Mine")
     outsider = bind_client(db)
-    register_user(outsider, email="plans-overview-outsider@example.com")
+    register_user(outsider, login_id="plans-overview-outsider")
     assert outsider.get("/api/v1/plans/overview", params={"today": "2026-09-23"}).json()["totals"]["plans"] == 0
     app.dependency_overrides.clear()

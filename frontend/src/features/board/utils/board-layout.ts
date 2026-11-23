@@ -1,1 +1,1 @@
-export const BOARD_CONTENT_GUTTER = "mx-auto px-4 sm:px-6";
+export const BOARD_CONTENT_GUTTER = "w-full px-4 sm:px-6 lg:px-8";

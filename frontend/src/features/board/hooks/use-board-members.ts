@@ -30,7 +30,7 @@ export function useBoardMemberMutations(boardId: string) {
   }
 
   const invite = useMutation({
-    mutationFn: (email: string) => apiClient.inviteBoardMember(boardId, email),
+    mutationFn: (loginId: string) => apiClient.inviteBoardMember(boardId, loginId),
     onSuccess: (result) => store(result.members),
   });
 
@@ -39,10 +39,5 @@ export function useBoardMemberMutations(boardId: string) {
     onSettled: refresh,
   });
 
-  const cancelInvitation = useMutation({
-    mutationFn: (invitationId: string) => apiClient.cancelBoardInvitation(boardId, invitationId),
-    onSettled: refresh,
-  });
-
-  return { invite, remove, cancelInvitation };
+  return { invite, remove };
 }

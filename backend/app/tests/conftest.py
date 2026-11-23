@@ -25,7 +25,7 @@ from app.core.constants import (
 from app.main import app
 from app.models import BoardColumn, Category, Task
 from app.tests.auth_helpers import (
-    TEST_OWNER_EMAIL,
+    TEST_OWNER_LOGIN_ID,
     TEST_OWNER_NAME,
     TEST_OWNER_PASSWORD,
     bind_client,
@@ -115,7 +115,7 @@ def anonymous_client(db: Session) -> Generator[TestClient, None, None]:
 def client(anonymous_client: TestClient) -> TestClient:
     register_user(
         anonymous_client,
-        email=TEST_OWNER_EMAIL,
+        login_id=TEST_OWNER_LOGIN_ID,
         password=TEST_OWNER_PASSWORD,
         display_name=TEST_OWNER_NAME,
     )

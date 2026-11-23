@@ -71,7 +71,8 @@ def test_move_reorders_inside_the_same_status(client: TestClient) -> None:
     assert status == 200, body
     assert body["column_id"] == todo
     assert body["version"] == alpha["version"] + 1
-    assert _view_titles(client, "To Do")[-3:] == ["Move Bravo", "Move Charlie", "Move Alpha"]
+    # New tasks go on top, so the column started as Charlie, Bravo, Alpha.
+    assert _view_titles(client, "To Do")[:3] == ["Move Charlie", "Move Alpha", "Move Bravo"]
 
 
 def test_move_to_another_status_and_empty_status(client: TestClient) -> None:
@@ -143,14 +144,14 @@ def test_invalid_csrf_returns_403(client: TestClient) -> None:
 
 def test_another_user_cannot_move_task(db: Session) -> None:
     first = bind_client(db)
-    register_user(first, email=f"move-a-{uuid4().hex[:8]}@example.com")
+    register_user(first, login_id=f"move-a-{uuid4().hex[:8]}")
     columns = _columns(first)
     todo = columns["To Do"]["id"]
     doing = columns["In Progress"]["id"]
     task = _create_task(first, "Private Move", todo)
 
     second = bind_client(db)
-    register_user(second, email=f"move-b-{uuid4().hex[:8]}@example.com")
+    register_user(second, login_id=f"move-b-{uuid4().hex[:8]}")
     stolen = second.patch(
         f"/api/v1/tasks/{task['id']}/move",
         json={"target_column_id": doing, "expected_version": task["version"]},

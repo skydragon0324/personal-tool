@@ -112,8 +112,8 @@ describe("translateServerText", () => {
     setActiveLanguage("zh");
     expect(translateServerText("serverErrors", "task_not_found", {}, "Task not found")).toBe("找不到任务");
     expect(
-      translateServerText("serverErrors", "already_invited", { email: "a@b.co" }, "a@b.co has already been invited"),
-    ).toBe("a@b.co 已被邀请");
+      translateServerText("serverErrors", "already_member", { name: "Ada" }, "Ada is already on this board"),
+    ).toBe(zh.serverErrors.already_member.replace("{name}", "Ada"));
   });
 
   it("falls back to the English text for unknown codes, and to a translation when there is no text", () => {

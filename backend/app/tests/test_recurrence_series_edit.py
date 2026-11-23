@@ -212,7 +212,7 @@ def test_other_user_get_and_patch_are_404(edit_api_board) -> None:
     try:
         with independent_session(engine) as db:
             other = User(
-                email=f"series-edit-{uuid4().hex[:8]}@example.com",
+                login_id=f"series-edit-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",

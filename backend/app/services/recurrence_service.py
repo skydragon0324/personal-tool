@@ -37,6 +37,7 @@ from app.services.ownership import (
 )
 from app.services.recurrence_dates import list_occurrence_dates, occurrence_index_for
 from app.services.storage import get_storage
+from app.services.task_ordering_service import make_room_at_top
 from app.services.task_serializers import to_detail, with_current_attachment_urls
 
 HORIZON_DAYS = 62
@@ -712,6 +713,7 @@ def create_recurring_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) 
             TaskRecurrenceLinkTemplate(label=item.label.strip(), url=item.url, position=item.position)
         )
 
+    top_position = make_room_at_top(db, column.id)
     first = Task(
         column_id=column.id,
         category_id=payload.category_id,
@@ -720,7 +722,7 @@ def create_recurring_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) 
         start_date=start,
         due_date=payload.due_date,
         priority=payload.priority.value,
-        position=_next_position(db, column.id),
+        position=top_position,
         version=1,
         completed_at=now if column.is_done else None,
         recurrence_series_id=series.id,

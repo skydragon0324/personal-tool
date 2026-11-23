@@ -1,15 +1,14 @@
-import { ActionIcon, Avatar, Badge, Button, Group, Input, Loader, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { Avatar, Badge, Button, Group, Input, Loader, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { useRouter } from "@/lib/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
+import { validateLoginId } from "@/features/auth/utils/validation";
 import { notifyApiError, notifySuccess } from "@/lib/notify";
 
 import { useBoardMemberMutations, useBoardMembers } from "../hooks/use-board-members";
 import { initials } from "../utils/person";
 import { t } from "@/i18n";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function BoardMembersModal({
   boardId,
@@ -25,27 +24,24 @@ export function BoardMembersModal({
   const router = useRouter();
   const { user } = useAuth();
   const membersQuery = useBoardMembers(boardId, opened);
-  const { invite, remove, cancelInvitation } = useBoardMemberMutations(boardId);
-  const [email, setEmail] = useState("");
+  const { invite, remove } = useBoardMemberMutations(boardId);
+  const [loginId, setLoginId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const members = membersQuery.data;
   const canManage = members?.can_manage ?? false;
 
   async function submit() {
-    const value = email.trim();
-    if (!EMAIL_PATTERN.test(value)) {
-      setError(t("auth.emailInvalid"));
+    const value = loginId.trim();
+    const invalid = validateLoginId(value);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setError(null);
     try {
-      const result = await invite.mutateAsync(value);
-      setEmail("");
-      notifySuccess(
-        result.status === "added"
-          ? t("members.added", { email: value, board: boardName })
-          : t("members.invitationSaved", { email: value, board: boardName }),
-      );
+      await invite.mutateAsync(value);
+      setLoginId("");
+      notifySuccess(t("members.added", { loginId: value, board: boardName }));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("members.couldNotInvite"));
     }
@@ -73,26 +69,27 @@ export function BoardMembersModal({
             }}
           >
             {/* Label and help text sit above the row so the button always lines up with the input. */}
-            <Input.Label htmlFor="invite-email">{t("members.inviteByEmail")}</Input.Label>
+            <Input.Label htmlFor="invite-login-id">{t("members.inviteByLoginId")}</Input.Label>
             <Input.Description mb={8}>
               {t("members.inviteHint")}
             </Input.Description>
             <Group align="flex-start" gap="xs" wrap="nowrap">
               <TextInput
-                id="invite-email"
+                id="invite-login-id"
                 className="flex-1"
-                inputMode="email"
-                autoComplete="email"
-                placeholder={t("members.emailPlaceholder")}
-                value={email}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder={t("members.loginIdPlaceholder")}
+                value={loginId}
                 onChange={(event) => {
-                  setEmail(event.currentTarget.value);
+                  setLoginId(event.currentTarget.value);
                   setError(null);
                 }}
                 error={error}
                 data-autofocus
               />
-              <Button type="submit" loading={invite.isPending} disabled={!email.trim()}>
+              <Button type="submit" loading={invite.isPending} disabled={!loginId.trim()}>
                 {t("members.invite")}
               </Button>
             </Group>
@@ -119,7 +116,7 @@ export function BoardMembersModal({
                       {isMe ? t("members.youSuffix") : ""}
                     </Text>
                     <Text size="xs" c="dimmed" truncate>
-                      {person.email}
+                      {person.login_id}
                     </Text>
                   </div>
                   {person.role === "owner" ? (
@@ -150,41 +147,6 @@ export function BoardMembersModal({
             })}
           </ul>
         </div>
-
-        {canManage && members?.invitations.length ? (
-          <div>
-            <Text size="sm" fw={600} mb={6}>
-              {t("members.pendingInvitations")}
-            </Text>
-            <ul aria-label={t("members.pendingInvitations")} className="divide-y divide-[var(--app-border)]">
-              {members.invitations.map((invitation) => (
-                <li key={invitation.id} className="flex items-center gap-3 py-2">
-                  <Text size="sm" className="min-w-0 flex-1" truncate>
-                    {invitation.email}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {t("members.joinsOnSignUp")}
-                  </Text>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    size="sm"
-                    aria-label={t("members.cancelInvitationFor", { email: invitation.email })}
-                    onClick={() =>
-                      cancelInvitation.mutate(invitation.id, {
-                        onError: (err) => notifyApiError(err, t("members.couldNotCancelInvitation")),
-                      })
-                    }
-                  >
-                    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
-                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </ActionIcon>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </Stack>
     </Modal>
   );

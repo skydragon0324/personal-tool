@@ -163,7 +163,7 @@ def test_occurrence_states_are_scoped_to_user_and_visible_week(db: Session) -> N
     week_start = date(2026, 8, 17)
     today = date(2026, 8, 20)
     owner = bind_client(db)
-    register_user(owner, email="sched-owner@example.com")
+    register_user(owner, login_id="sched-owner")
     created = owner.post(
         "/api/v1/schedule",
         json={
@@ -207,7 +207,7 @@ def test_occurrence_states_are_scoped_to_user_and_visible_week(db: Session) -> N
     assert "2026-08-24" not in dates
 
     outsider = bind_client(db)
-    register_user(outsider, email="sched-other@example.com")
+    register_user(outsider, login_id="sched-other")
     other_week = outsider.get(
         "/api/v1/schedule",
         params={"week_start": week_start.isoformat(), "today": today.isoformat()},

@@ -128,7 +128,7 @@ def test_patch_series_validates_title_urls_and_version(client: TestClient) -> No
 
 def test_patch_series_is_404_for_another_user(db: Session) -> None:
     owner = bind_client(db)
-    register_user(owner, email="series-edit-owner@example.com")
+    register_user(owner, login_id="series-edit-owner")
     _board_id, todo, _done, category = _board_ids(owner)
     created = owner.post(
         "/api/v1/tasks",
@@ -144,7 +144,7 @@ def test_patch_series_is_404_for_another_user(db: Session) -> None:
     assert created.status_code == 201, created.text
     series_id = created.json()["recurrence"]["series_id"]
     outsider = bind_client(db)
-    register_user(outsider, email="series-edit-other@example.com")
+    register_user(outsider, login_id="series-edit-other")
     assert outsider.get(f"/api/v1/task-recurrence/{series_id}").status_code == 404
     stolen = outsider.patch(
         f"/api/v1/task-recurrence/{series_id}",

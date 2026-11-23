@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import BoardColumn, Task, TaskLink, User
@@ -14,7 +14,7 @@ from app.services.category_service import ensure_category_on_board
 from app.services.content_utils import extract_text_from_content, validate_content_urls
 from app.services.ownership import get_task_for_user
 from app.services.storage import get_storage
-from app.services.task_ordering_service import renumber_columns
+from app.services.task_ordering_service import make_room_at_top, renumber_columns
 from app.services.task_serializers import to_detail
 
 
@@ -96,12 +96,7 @@ def create_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDet
     column = get_column_or_404(db, user_id, payload.column_id)
     ensure_category_on_board(db, payload.category_id, column.board_id)
 
-    max_pos = db.scalar(
-        select(func.coalesce(func.max(Task.position), -1)).where(
-            Task.column_id == payload.column_id,
-        )
-    )
-    assert max_pos is not None
+    top_position = make_room_at_top(db, payload.column_id)
 
     now = datetime.now(UTC)
     task = Task(
@@ -112,7 +107,7 @@ def create_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDet
         start_date=payload.start_date or payload.due_date,
         due_date=payload.due_date,
         priority=payload.priority.value,
-        position=max_pos + 1,
+        position=top_position,
         version=1,
         completed_at=now if column.is_done else None,
         remind_at=payload.remind_at,

@@ -7,7 +7,7 @@ import { AuthCard } from "@/features/auth/components/auth-card";
 import {
   browserTimezone,
   validateConfirmPassword,
-  validateEmail,
+  validateLoginId,
   validateName,
   validatePassword,
 } from "@/features/auth/utils/validation";
@@ -17,12 +17,12 @@ import { t } from "@/i18n";
 export function RegisterForm() {
   const { register } = useAuth();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<{
     name?: string;
-    email?: string;
+    loginId?: string;
     password?: string;
     confirm?: string;
     form?: string;
@@ -33,17 +33,17 @@ export function RegisterForm() {
     event.preventDefault();
     const next = {
       name: validateName(name) ?? undefined,
-      email: validateEmail(email) ?? undefined,
+      loginId: validateLoginId(loginId) ?? undefined,
       password: validatePassword(password) ?? undefined,
       confirm: validateConfirmPassword(password, confirm) ?? undefined,
     };
     setErrors(next);
-    if (next.name || next.email || next.password || next.confirm) return;
+    if (next.name || next.loginId || next.password || next.confirm) return;
     setSubmitting(true);
     try {
       await register({
         display_name: name.trim(),
-        email: email.trim(),
+        login_id: loginId.trim(),
         password,
         timezone: browserTimezone(),
       });
@@ -67,12 +67,14 @@ export function RegisterForm() {
             error={errors.name}
           />
           <TextInput
-            label={t("auth.email")}
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.currentTarget.value)}
-            error={errors.email}
+            label={t("auth.loginId")}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={32}
+            value={loginId}
+            onChange={(event) => setLoginId(event.currentTarget.value)}
+            error={errors.loginId}
           />
           <PasswordInput
             label={t("auth.password")}

@@ -27,7 +27,7 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
           minHeight: 0,
           minWidth: 0,
           height: screenHeight(100),
-          overflow: "auto",
+          overflow: "hidden",
           background: "var(--app-bg)",
         },
         // Mantine sizes the sidebar with `100dvh`, which Chrome < 108 ignores (the sidebar then

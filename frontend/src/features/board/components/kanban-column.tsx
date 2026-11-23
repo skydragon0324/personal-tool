@@ -47,8 +47,8 @@ export function KanbanColumn({
 
   return (
     <section
-      className="flex flex-none flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-muted)]"
-      style={{ width: "20rem", minWidth: "20rem", maxWidth: "20rem" }}
+      className="flex flex-col overflow-hidden rounded-[1.25rem] border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_8px_24px_rgba(31,55,50,0.045)]"
+      style={{ flex: "1 0 19rem", minWidth: "19rem", maxWidth: "27rem" }}
     >
       <ColumnHeader
         boardId={boardId}
@@ -61,7 +61,7 @@ export function KanbanColumn({
       <div
         ref={ref}
         data-column-id={column.id}
-        className={`flex min-h-[12rem] flex-1 flex-col gap-2 overflow-y-auto p-2 ${statusSoftClass(column.color)} ${
+        className={`flex min-h-[12rem] flex-1 flex-col gap-2.5 overflow-y-auto p-2.5 ${statusSoftClass(column.color)} ${
           isDropTarget ? "bg-[var(--app-primary)]/10" : ""
         }`}
       >

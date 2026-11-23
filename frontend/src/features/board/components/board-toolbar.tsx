@@ -1,4 +1,5 @@
-import { Button, Input, Select, Text, TextInput } from "@mantine/core";
+import { ActionIcon, Button, Select, Text, TextInput } from "@mantine/core";
+import type { ReactNode } from "react";
 
 import { DatePickerInput, DateRangePickerInput, MonthPickerInput, YearPickerInput } from "@/lib/date-pickers";
 import { formatLongDate } from "@/lib/dates";
@@ -13,12 +14,24 @@ import {
   monthRange,
   parseISODate,
   pickerToISO,
+  shiftRange,
   weekRange,
   yearRange,
   type DateField,
   type DateRangeMode,
   type DateRangeValue,
 } from "../utils/date-presets";
+import { BOARD_CONTENT_GUTTER } from "../utils/board-layout";
+import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FlagIcon,
+  PersonIcon,
+  ResetIcon,
+  SearchIcon,
+  TagIcon,
+} from "./board-ui-icons";
 import { t } from "@/i18n";
 
 interface BoardToolbarProps {
@@ -83,23 +96,24 @@ function DateRangeControl({
   onCustomError: (message: string | null) => void;
   onApplyCustom: (range: [string, string]) => void;
 }) {
-  const label = dateField === "created_at" ? t("filters.createdDate") : t("filters.dueDate");
+  const pickerProps = {
+    variant: "unstyled" as const,
+    classNames: { input: "text-center font-semibold" },
+  };
 
   if (mode === "all") {
     return (
-      <div className="min-w-0">
-        <Input.Label>{label}</Input.Label>
-        <Text size="sm" mt={8}>
-          {t("filters.noDateFilter")}
-        </Text>
-      </div>
+      <Text size="sm" fw={600} ta="center" py={6}>
+        {t("filters.noDateFilter")}
+      </Text>
     );
   }
 
   if (mode === "year") {
     return (
       <YearPickerInput
-        label={t("filters.rangeYear")}
+        {...pickerProps}
+        aria-label={t("filters.rangeYear")}
         placeholder={t("filters.selectYear")}
         value={range[0]}
         valueFormat="YYYY"
@@ -115,7 +129,8 @@ function DateRangeControl({
   if (mode === "month") {
     return (
       <MonthPickerInput
-        label={t("filters.rangeMonth")}
+        {...pickerProps}
+        aria-label={t("filters.rangeMonth")}
         placeholder={t("filters.selectMonth")}
         value={range[0]}
         valueFormat="MMMM YYYY"
@@ -132,10 +147,11 @@ function DateRangeControl({
   if (mode === "week") {
     return (
       <DatePickerInput
-        label={t("filters.rangeWeek")}
+        {...pickerProps}
+        aria-label={t("filters.rangeWeek")}
         placeholder={t("filters.selectWeek")}
         value={range[0]}
-        valueFormat="MMM D, YYYY"
+        valueFormatter={() => rangeSummary(mode, range, dateField)}
         firstDayOfWeek={1}
         withWeekNumbers
         weekendDays={[0, 6]}
@@ -162,7 +178,8 @@ function DateRangeControl({
   if (mode === "day") {
     return (
       <DatePickerInput
-        label={t("filters.rangeDay")}
+        {...pickerProps}
+        aria-label={t("filters.rangeDay")}
         placeholder={t("filters.selectDate")}
         value={range[0]}
         valueFormat="MMM D, YYYY"
@@ -177,9 +194,12 @@ function DateRangeControl({
 
   const canApply = Boolean(range[0] && range[1]);
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 px-1">
+      <div className="flex items-center gap-1">
       <DateRangePickerInput
-        label={dateField === "created_at" ? t("filters.createdRange") : t("filters.dueRange")}
+        {...pickerProps}
+        className="min-w-0 flex-1"
+        aria-label={dateField === "created_at" ? t("filters.createdRange") : t("filters.dueRange")}
         placeholder={t("filters.pickRange")}
         value={range}
         onChange={(value: DateRangeValue) => {
@@ -193,7 +213,7 @@ function DateRangeControl({
         numberOfColumns={2}
       />
       <Button
-        className="mt-2"
+        className="shrink-0"
         size="xs"
         disabled={!canApply}
         onClick={() => {
@@ -208,6 +228,7 @@ function DateRangeControl({
       >
         {t("filters.apply")}
       </Button>
+      </div>
       {customError ? (
         <Text size="xs" c="red" mt={6}>
           {customError}
@@ -234,116 +255,158 @@ export function BoardToolbar({
   onCustomError,
   onApplyCustom,
 }: BoardToolbarProps) {
+  const canStep = rangeMode !== "custom" && rangeMode !== "all";
+  const step = (direction: -1 | 1) => {
+    const next = shiftRange(rangeMode, range, direction);
+    if (next) onRangeChange(next);
+  };
+
   return (
-    <section className="border-b border-[var(--app-border)] bg-[var(--app-surface)]">
-      <div className="mx-auto grid max-w-[1400px] items-start gap-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(8rem,10rem)_minmax(9rem,12rem)_minmax(16rem,1.4fr)_minmax(9rem,12rem)_minmax(8rem,10rem)_minmax(9rem,12rem)_1fr_auto]">
-        <Select
-          label={t("filters.dateField")}
-          data={[
-            { value: "due_date", label: t("filters.dueDate") },
-            { value: "created_at", label: t("filters.createdDate") },
-          ]}
-          value={dateField}
-          onChange={(value) => {
-            if (value === "due_date" || value === "created_at") onDateFieldChange(value);
-          }}
-          allowDeselect={false}
-        />
-        <Select
-          label={t("filters.range")}
-          data={rangeOptions()}
-          value={rangeMode}
-          onChange={(value) => {
-            if (value) onRangeModeChange(value as DateRangeMode);
-          }}
-          allowDeselect={false}
-        />
-        <div className="min-w-0">
-          <DateRangeControl
-            mode={rangeMode}
-            range={range}
-            dateField={dateField}
-            onRangeChange={onRangeChange}
-            customError={customError}
-            onCustomError={onCustomError}
-            onApplyCustom={onApplyCustom}
-          />
-          <Text size="xs" c="dimmed" mt={6}>
-            {rangeSummary(rangeMode, range, dateField)}
-          </Text>
+    <section className="z-20 shrink-0 max-h-[min(44vh,24rem)] overflow-y-auto border-b border-[var(--app-border)] bg-[var(--app-surface-elevated)]">
+      <div className={`${BOARD_CONTENT_GUTTER} flex flex-col gap-2.5 py-3`}>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <FilterField label={t("filters.dateLabel")} className="w-full sm:w-[15rem]">
+            <Select
+              aria-label={t("filters.dateField")}
+              leftSection={<CalendarIcon />}
+              data={[
+                { value: "due_date", label: t("filters.dueDate") },
+                { value: "created_at", label: t("filters.createdDate") },
+              ]}
+              value={dateField}
+              onChange={(value) => {
+                if (value === "due_date" || value === "created_at") onDateFieldChange(value);
+              }}
+              allowDeselect={false}
+            />
+          </FilterField>
+          <FilterField label={t("filters.range")} className="w-full sm:w-[13rem]">
+            <Select
+              aria-label={t("filters.range")}
+              leftSection={<CalendarIcon />}
+              data={rangeOptions()}
+              value={rangeMode}
+              onChange={(value) => {
+                if (value) onRangeModeChange(value as DateRangeMode);
+              }}
+              allowDeselect={false}
+            />
+          </FilterField>
+          <div className="flex w-full min-w-0 items-center rounded-[var(--mantine-radius-lg)] border border-[var(--app-border)] px-1 sm:w-[18rem]">
+            {canStep ? (
+              <ActionIcon variant="subtle" color="gray" aria-label={t("filters.previousPeriod")} onClick={() => step(-1)}>
+                <ChevronLeftIcon />
+              </ActionIcon>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <DateRangeControl
+                mode={rangeMode}
+                range={range}
+                dateField={dateField}
+                onRangeChange={onRangeChange}
+                customError={customError}
+                onCustomError={onCustomError}
+                onApplyCustom={onApplyCustom}
+              />
+            </div>
+            {canStep ? (
+              <ActionIcon variant="subtle" color="gray" aria-label={t("filters.nextPeriod")} onClick={() => step(1)}>
+                <ChevronRightIcon />
+              </ActionIcon>
+            ) : null}
+          </div>
+          <FilterField label={t("task.category")} className="min-w-[15rem] flex-1">
+            <Select
+              aria-label={t("task.category")}
+              leftSection={<TagIcon />}
+              placeholder={t("filters.allCategories")}
+              data={[
+                { value: "", label: t("filters.allCategories") },
+                ...categories.map((category) => ({
+                  value: category.id,
+                  label: category.name,
+                })),
+              ]}
+              value={filters.categoryId}
+              onChange={(value) =>
+                onFiltersChange({
+                  ...filters,
+                  categoryId: value ?? "",
+                })
+              }
+              clearable={Boolean(filters.categoryId)}
+              searchable
+            />
+          </FilterField>
         </div>
-        <Select
-          label={t("task.category")}
-          placeholder={t("filters.all")}
-          data={[
-            { value: "", label: t("filters.all") },
-            ...categories.map((category) => ({
-              value: category.id,
-              label: category.name,
-            })),
-          ]}
-          value={filters.categoryId}
-          onChange={(value) =>
-            onFiltersChange({
-              ...filters,
-              categoryId: value ?? "",
-            })
-          }
-          clearable
-          searchable
-        />
-        <Select
-          label={t("task.priority")}
-          placeholder={t("filters.all")}
-          data={[
-            { value: "", label: t("filters.all") },
-            { value: "high", label: t("task.priorityHigh") },
-            { value: "medium", label: t("task.priorityMedium") },
-            { value: "low", label: t("task.priorityLow") },
-          ]}
-          value={filters.priority}
-          onChange={(value) =>
-            onFiltersChange({
-              ...filters,
-              priority: (value ?? "") as Priority | "",
-            })
-          }
-          clearable
-        />
-        <Select
-          label={t("filters.assignee")}
-          placeholder={t("filters.anyone")}
-          data={[
-            { value: "", label: t("filters.anyone") },
-            ...(currentUserId ? [{ value: currentUserId, label: t("filters.assignedToMe") }] : []),
-            { value: UNASSIGNED, label: t("filters.unassigned") },
-            ...people
-              .filter((person) => person.user_id !== currentUserId)
-              .map((person) => ({ value: person.user_id, label: person.display_name })),
-          ]}
-          value={filters.assigneeId ?? ""}
-          onChange={(value) => onFiltersChange({ ...filters, assigneeId: value ?? "" })}
-          clearable
-          searchable
-        />
-        <TextInput
-          label={t("filters.search")}
-          placeholder={t("filters.searchPlaceholder")}
-          value={filters.query}
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              query: event.currentTarget.value,
-            })
-          }
-        />
-        <div>
-          <Input.Label className="invisible">{t("filters.reset")}</Input.Label>
-          <Button variant="default" fullWidth onClick={onReset}>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <FilterField label={t("task.priority")} className="w-full sm:w-[17rem]">
+            <Select
+              aria-label={t("task.priority")}
+              leftSection={<FlagIcon />}
+              placeholder={t("filters.allPriorities")}
+              data={[
+                { value: "", label: t("filters.allPriorities") },
+                { value: "high", label: t("task.priorityHigh") },
+                { value: "medium", label: t("task.priorityMedium") },
+                { value: "low", label: t("task.priorityLow") },
+              ]}
+              value={filters.priority}
+              onChange={(value) =>
+                onFiltersChange({
+                  ...filters,
+                  priority: (value ?? "") as Priority | "",
+                })
+              }
+              clearable={Boolean(filters.priority)}
+            />
+          </FilterField>
+          <FilterField label={t("filters.assignee")} className="w-full sm:w-[19rem]">
+            <Select
+              aria-label={t("filters.assignee")}
+              leftSection={<PersonIcon />}
+              placeholder={t("filters.allAssignees")}
+              data={[
+                { value: "", label: t("filters.allAssignees") },
+                ...(currentUserId ? [{ value: currentUserId, label: t("filters.assignedToMe") }] : []),
+                { value: UNASSIGNED, label: t("filters.unassigned") },
+                ...people
+                  .filter((person) => person.user_id !== currentUserId)
+                  .map((person) => ({ value: person.user_id, label: person.display_name })),
+              ]}
+              value={filters.assigneeId ?? ""}
+              onChange={(value) => onFiltersChange({ ...filters, assigneeId: value ?? "" })}
+              clearable={Boolean(filters.assigneeId)}
+              searchable
+            />
+          </FilterField>
+          <TextInput
+            className="min-w-[14rem] flex-1"
+            aria-label={t("filters.search")}
+            leftSection={<SearchIcon />}
+            placeholder={t("filters.searchTasks")}
+            value={filters.query}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                query: event.currentTarget.value,
+              })
+            }
+          />
+          <Button variant="light" leftSection={<ResetIcon />} onClick={onReset}>
             {t("filters.reset")}
           </Button>
         </div>
       </div>
     </section>
+  );
+}
+
+function FilterField({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
+  return (
+    <div className={`flex min-w-0 items-center gap-2.5 ${className}`}>
+      <span className="shrink-0 text-sm font-semibold text-[var(--app-text)]">{label}</span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   );
 }

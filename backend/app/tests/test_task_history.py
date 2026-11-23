@@ -135,10 +135,10 @@ def test_failed_change_records_nothing(client: TestClient) -> None:
 
 def test_history_shows_who_made_each_change(client: TestClient, db: Session) -> None:
     mate = bind_client(db)
-    mate_user = register_user(mate, email="mate@example.com", display_name="Mate")["user"]
+    mate_user = register_user(mate, login_id="mate", display_name="Mate")["user"]
     try:
         board_id, _, _ = _board(client)
-        shared = client.post(f"/api/v1/boards/{board_id}/members", json={"email": "mate@example.com"})
+        shared = client.post(f"/api/v1/boards/{board_id}/members", json={"login_id": "mate"})
         assert shared.status_code == 201, shared.text
         task = _task(client)
         edited = mate.patch(
@@ -157,7 +157,7 @@ def test_history_shows_who_made_each_change(client: TestClient, db: Session) -> 
 def test_outsiders_cannot_read_history(client: TestClient, db: Session) -> None:
     task = _task(client)
     outsider = bind_client(db)
-    register_user(outsider, email="outsider@example.com", display_name="Outsider")
+    register_user(outsider, login_id="outsider", display_name="Outsider")
     try:
         assert outsider.get(f"/api/v1/tasks/{task['id']}/history").status_code == 404
     finally:

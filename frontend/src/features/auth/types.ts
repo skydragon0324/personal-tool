@@ -1,6 +1,6 @@
 export interface AuthUser {
   id: string;
-  email: string;
+  login_id: string;
   display_name: string;
   timezone: string;
   created_at: string;
@@ -13,15 +13,15 @@ export interface AuthResponse {
 
 export interface RegisterPayload {
   display_name: string;
-  email: string;
+  login_id: string;
   password: string;
   timezone: string;
 }
 
 export interface ProfileUpdatePayload {
   display_name?: string;
-  email?: string;
-  /** Needed only when the email changes. */
+  login_id?: string;
+  /** Needed only when the login ID changes. */
   current_password?: string;
 }
 
@@ -31,6 +31,6 @@ export interface PasswordChangePayload {
 }
 
 export interface LoginPayload {
-  email: string;
+  login_id: string;
   password: string;
 }

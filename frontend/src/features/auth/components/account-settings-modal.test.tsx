@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/api-client";
 
 const updateProfile = jest.fn();
 const changePassword = jest.fn();
-const user = { id: "u1", email: "ada@example.com", display_name: "Ada", timezone: "UTC", created_at: "" };
+const user = { id: "u1", login_id: "ada", display_name: "Ada", timezone: "UTC", created_at: "" };
 
 jest.mock("@/features/auth/components/auth-provider", () => ({
   useAuth: () => ({ user, updateProfile, changePassword }),
@@ -31,25 +31,25 @@ describe("AccountSettingsModal", () => {
     const name = screen.getByLabelText("Name");
     await actor.clear(name);
     await actor.type(name, "Ada Lovelace");
-    // Only the password section's field: the profile form adds its own only for an email change.
+    // Only the password section's field: the profile form adds its own only for a login ID change.
     expect(screen.getAllByLabelText(/Current password/)).toHaveLength(1);
     await actor.click(screen.getByRole("button", { name: "Save profile" }));
     expect(updateProfile).toHaveBeenCalledWith({ display_name: "Ada Lovelace" });
   });
 
-  it("asks for the current password when the email changes", async () => {
+  it("asks for the current password when the login ID changes", async () => {
     const actor = userEvent.setup();
     open();
-    const email = screen.getByLabelText("Email");
-    await actor.clear(email);
-    await actor.type(email, "lovelace@example.com");
+    const loginId = screen.getByLabelText("Login ID");
+    await actor.clear(loginId);
+    await actor.type(loginId, "lovelace");
     await actor.click(screen.getByRole("button", { name: "Save profile" }));
     expect(updateProfile).not.toHaveBeenCalled();
 
     const [profilePassword] = screen.getAllByLabelText(/Current password/);
     await actor.type(profilePassword, "my-current-pass");
     await actor.click(screen.getByRole("button", { name: "Save profile" }));
-    expect(updateProfile).toHaveBeenCalledWith({ email: "lovelace@example.com", current_password: "my-current-pass" });
+    expect(updateProfile).toHaveBeenCalledWith({ login_id: "lovelace", current_password: "my-current-pass" });
   });
 
   it("validates and changes the password, showing a wrong current password on its field", async () => {

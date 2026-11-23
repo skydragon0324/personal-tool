@@ -15,8 +15,6 @@ export function writeBoardsNavCollapsed(
   storage?.setItem(BOARDS_NAV_COLLAPSED_KEY, collapsed ? "true" : "false");
 }
 
-export function boardsGroupExpanded(pathname: string | null, storedCollapsed: boolean | null): boolean {
-  if (storedCollapsed === true) return false;
-  if (storedCollapsed === false) return true;
-  return pathname === "/boards" || Boolean(pathname?.startsWith("/boards/"));
+export function boardsGroupExpanded(_pathname: string | null, storedCollapsed: boolean | null): boolean {
+  return storedCollapsed !== true;
 }

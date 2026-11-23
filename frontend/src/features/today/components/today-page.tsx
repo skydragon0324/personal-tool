@@ -1,11 +1,10 @@
 import { Button, Loader, Text } from "@mantine/core";
 import { useEffect, useState } from "react";
 
-import { useAuth } from "@/features/auth/components/auth-provider";
 import type { Note } from "@/features/notepad/types";
 import { DashboardGrid } from "@/features/shell/components/dashboard-panel";
 import { PageHeader } from "@/features/shell/components/page-header";
-import { formatWeekdayDate, greetingForName, todayISO } from "@/lib/dates";
+import { formatWeekdayDate, todayISO } from "@/lib/dates";
 import { notifyApiError } from "@/lib/notify";
 import { mondayOf } from "@/features/schedule/utils/schedule-time";
 import { useScheduleOccurrence } from "@/features/schedule/hooks/use-schedule-occurrence";
@@ -21,7 +20,6 @@ import { t } from "@/i18n";
 
 export function TodayPage() {
   const date = todayISO();
-  const { user } = useAuth();
   const todayQuery = useToday(date);
   const occurrence = useScheduleOccurrence();
   const data = todayQuery.data;
@@ -31,7 +29,7 @@ export function TodayPage() {
   const [openSchedule, setOpenSchedule] = useState<TodaySchedule | null>(null);
 
   useEffect(() => {
-    document.title = "Today · Life Management";
+    document.title = "Dashboard · Life Management";
     return () => {
       document.title = "Life Management";
     };
@@ -51,16 +49,15 @@ export function TodayPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)]">
-      <PageHeader title={t("shell.today")}>
+      <PageHeader title={t("shell.dashboard")} description={t("today.intro")}>
+        {data ? <TodaySummaryStrip tasks={data.task_progress} schedule={data.schedule_progress} /> : null}
         <Text size="sm" c="dimmed">
           {formatWeekdayDate(date)}
         </Text>
       </PageHeader>
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
-          <p className="text-sm text-[var(--app-text-muted)]">
-            {t("today.intro")}
-          </p>
+      {/* On desktop the four panels share the screen and each scrolls inside itself. */}
+      <div className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
+        <div className="mx-auto h-full max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
           {todayQuery.isLoading ? (
             <div className="flex justify-center py-16">
               <Loader />
@@ -75,46 +72,38 @@ export function TodayPage() {
             </div>
           ) : null}
           {data ? (
-            <>
-              <TodaySummaryStrip
-                greeting={greetingForName(user?.display_name ?? "")}
-                dateLabel={formatWeekdayDate(date)}
-                tasks={data.task_progress}
-                schedule={data.schedule_progress}
+            <DashboardGrid label={t("today.gridLabel")} fill>
+              <TodayScheduleSection
+                date={data.date}
+                schedules={data.schedules}
+                togglingId={occurrence.pendingKey}
+                onToggleComplete={handleToggleComplete}
+                onOpen={setOpenSchedule}
               />
-              <DashboardGrid label={t("today.gridLabel")}>
-                <TodayScheduleSection
-                  date={data.date}
-                  schedules={data.schedules}
-                  togglingId={occurrence.pendingKey}
-                  onToggleComplete={handleToggleComplete}
-                  onOpen={setOpenSchedule}
-                />
-                <TodayTasksSection
-                  title={t("today.activeTasks")}
-                  description={t("today.activeTasksHint")}
-                  emptyText={t("today.noActiveTasks")}
-                  emptyActionHref="/boards"
-                  emptyActionLabel={t("today.openBoards")}
-                  icon="boards"
-                  tasks={data.active_tasks}
-                  onOpen={setOpenTask}
-                />
-                <TodayTasksSection
-                  title={t("today.needsAttention")}
-                  description={t("today.needsAttentionHint")}
-                  emptyText={t("today.allCaughtUp")}
-                  icon="today"
-                  tasks={data.overdue_tasks}
-                  onOpen={setOpenTask}
-                />
-                <TodayNotesSection
-                  notes={data.pinned_notes}
-                  total={data.pinned_notes_total}
-                  onOpen={(note) => void handleOpenNote(note)}
-                />
-              </DashboardGrid>
-            </>
+              <TodayTasksSection
+                title={t("today.activeTasks")}
+                description={t("today.activeTasksHint")}
+                emptyText={t("today.noActiveTasks")}
+                emptyActionHref="/boards"
+                emptyActionLabel={t("today.openBoards")}
+                icon="boards"
+                tasks={data.active_tasks}
+                onOpen={setOpenTask}
+              />
+              <TodayTasksSection
+                title={t("today.needsAttention")}
+                description={t("today.needsAttentionHint")}
+                emptyText={t("today.allCaughtUp")}
+                icon="today"
+                tasks={data.overdue_tasks}
+                onOpen={setOpenTask}
+              />
+              <TodayNotesSection
+                notes={data.pinned_notes}
+                total={data.pinned_notes_total}
+                onOpen={(note) => void handleOpenNote(note)}
+              />
+            </DashboardGrid>
           ) : null}
         </div>
       </div>

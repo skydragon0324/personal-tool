@@ -32,6 +32,9 @@ from app.services.session_service import (
 )
 
 
+LOGIN_ID_TAKEN = "Login ID already taken"
+
+
 def _auth_response(user: User, csrf_token: str) -> AuthResponse:
     return AuthResponse(user=UserRead.model_validate(user), csrf_token=csrf_token)
 
@@ -46,21 +49,18 @@ def _issue_session(db: Session, user: User, response: Response) -> AuthResponse:
 
 def register(db: Session, payload: RegisterRequest, request: Request, response: Response) -> AuthResponse:
     require_origin(request)
-    email = payload.email
-    claimed = db.scalar(select(User).where(User.email == email, User.is_bootstrap.is_(False)))
+    login_id = payload.login_id
+    claimed = db.scalar(select(User).where(User.login_id == login_id, User.is_bootstrap.is_(False)))
     if claimed is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LOGIN_ID_TAKEN)
 
     try:
         bootstrap = db.scalar(select(User).where(User.is_bootstrap.is_(True)).with_for_update())
         if bootstrap is not None:
-            taken = db.scalar(select(User).where(User.email == email, User.id != bootstrap.id))
+            taken = db.scalar(select(User).where(User.login_id == login_id, User.id != bootstrap.id))
             if taken is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Email already registered",
-                )
-            bootstrap.email = email
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LOGIN_ID_TAKEN)
+            bootstrap.login_id = login_id
             bootstrap.display_name = payload.display_name
             bootstrap.password_hash = hash_password(payload.password)
             bootstrap.timezone = payload.timezone
@@ -72,7 +72,7 @@ def register(db: Session, payload: RegisterRequest, request: Request, response: 
             user = bootstrap
         else:
             user = User(
-                email=email,
+                login_id=login_id,
                 display_name=payload.display_name,
                 password_hash=hash_password(payload.password),
                 timezone=payload.timezone,
@@ -81,21 +81,15 @@ def register(db: Session, payload: RegisterRequest, request: Request, response: 
             db.add(user)
             db.flush()
             seed_personal_board(db, user.id, payload.timezone)
-        from app.services.board_member_service import accept_pending_invitations
-
-        accept_pending_invitations(db, user)
         return _issue_session(db, user, response)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        ) from None
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LOGIN_ID_TAKEN) from None
 
 
 def login(db: Session, payload: LoginRequest, request: Request, response: Response) -> AuthResponse:
     require_origin(request)
-    user = db.scalar(select(User).where(User.email == payload.email))
+    user = db.scalar(select(User).where(User.login_id == payload.login_id))
     if (
         user is None
         or user.is_bootstrap
@@ -120,7 +114,7 @@ def read_me(user: User) -> UserRead:
     return UserRead.model_validate(user)
 
 
-CURRENT_PASSWORD_REQUIRED = "Enter your current password to change your email"
+CURRENT_PASSWORD_REQUIRED = "Enter your current password to change your login ID"
 CURRENT_PASSWORD_WRONG = "Current password is incorrect"
 
 
@@ -134,24 +128,20 @@ def _check_current_password(user: User, password: str | None) -> None:
 def update_profile(db: Session, user: User, payload: ProfileUpdateRequest) -> UserRead:
     if payload.display_name is not None:
         user.display_name = payload.display_name
-    if payload.email is not None and payload.email != user.email.strip().lower():
+    if payload.login_id is not None and payload.login_id != user.login_id:
         _check_current_password(user, payload.current_password)
         taken = db.scalar(
-            select(User.id).where(func.lower(User.email) == payload.email, User.id != user.id)
+            select(User.id).where(func.lower(User.login_id) == payload.login_id, User.id != user.id)
         )
         if taken is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-        user.email = payload.email
-        from app.services.board_member_service import accept_pending_invitations
-
-        # Invitations sent to the new address become memberships, as they do on sign-up.
-        accept_pending_invitations(db, user)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LOGIN_ID_TAKEN)
+        user.login_id = payload.login_id
     user.updated_at = datetime.now(UTC)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered") from None
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LOGIN_ID_TAKEN) from None
     db.refresh(user)
     return UserRead.model_validate(user)
 

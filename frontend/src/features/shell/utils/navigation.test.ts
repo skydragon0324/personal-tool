@@ -10,7 +10,10 @@ describe("application navigation", () => {
   it("treats the dashboard and board pages as the boards section", () => {
     expect(sectionFromPath("/")).toBe("boards");
     expect(sectionFromPath("/today")).toBe("today");
-    expect(sectionFromPath("/inbox")).toBe("today");
+    expect(sectionFromPath("/inbox")).toBe("inbox");
+    expect(sectionFromPath("/my-tasks")).toBe("myTasks");
+    expect(sectionFromPath("/calendar")).toBe("calendar");
+    expect(sectionFromPath("/reports")).toBe("reports");
     expect(sectionFromPath("/boards")).toBe("boards");
     expect(sectionFromPath("/boards/abc")).toBe("boards");
     expect(sectionFromPath("/plans")).toBe("plans");
@@ -30,11 +33,11 @@ describe("application navigation", () => {
     expect(isBoardsPath("/boards/recurring")).toBe(true);
   });
 
-  it("expands boards by default on board routes unless the user collapsed them", () => {
+  it("keeps boards expanded on every page unless the user collapsed them", () => {
     expect(boardsGroupExpanded("/boards/abc", null)).toBe(true);
     expect(boardsGroupExpanded("/boards/recurring", null)).toBe(true);
-    expect(boardsGroupExpanded("/notepad", null)).toBe(false);
-    expect(boardsGroupExpanded("/inbox", null)).toBe(false);
+    expect(boardsGroupExpanded("/notepad", null)).toBe(true);
+    expect(boardsGroupExpanded("/inbox", null)).toBe(true);
     expect(boardsGroupExpanded("/boards/abc", true)).toBe(false);
     expect(boardsGroupExpanded("/notepad", false)).toBe(true);
   });

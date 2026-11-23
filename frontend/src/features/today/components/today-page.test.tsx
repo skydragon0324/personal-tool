@@ -31,7 +31,7 @@ jest.mock("@/lib/dates", () => {
 
 jest.mock("@/features/auth/components/auth-provider", () => ({
   useAuth: () => ({
-    user: { display_name: "Ada", email: "ada@example.com" },
+    user: { display_name: "Ada", login_id: "ada" },
     isLoading: false,
     login: jest.fn(),
     register: jest.fn(),
@@ -184,11 +184,12 @@ describe("Today page", () => {
 
   it("renders a summary strip and four dashboard panels", () => {
     wrap(createElement(TodayPage));
-    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
+    const [header] = screen.getAllByRole("banner");
+    expect(within(header).getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("Your tasks, schedule, and pinned notes for today.")).toBeInTheDocument();
     expect(screen.getAllByText("Thursday, August 20, 2026").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Good (morning|afternoon|evening), Ada/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Today summary")).toBeInTheDocument();
+    expect(screen.queryByText(/Good (morning|afternoon|evening)/)).not.toBeInTheDocument();
+    expect(within(header).getByLabelText("Today summary")).toBeInTheDocument();
     expect(screen.getByText("Tasks")).toBeInTheDocument();
     expect(screen.getByText("Schedule")).toBeInTheDocument();
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
@@ -208,8 +209,8 @@ describe("Today page", () => {
     expect(screen.getByText("Grocery list")).toBeInTheDocument();
     expect(screen.getByText("View all notes")).toBeInTheDocument();
     const grid = screen.getByLabelText("Today dashboard");
-    expect(grid.className).toContain("flex-col");
-    expect(grid.className).toContain("md:flex-row");
+    expect(grid.className).toContain("md:grid-rows-2");
+    expect(grid.className).toContain("md:h-full");
   });
 
   it("keeps completed tasks visible and dimmed", () => {
@@ -292,7 +293,7 @@ describe("Today page", () => {
   it("uses theme tokens and a mobile-first layout", () => {
     const { container } = wrap(createElement(TodayPage));
     expect(container.innerHTML).toContain("bg-[var(--app-bg)]");
-    expect(screen.getByLabelText("Today dashboard").className).toContain("flex-col");
+    expect(screen.getByLabelText("Today dashboard").className).toContain("md:grid-cols-2");
     expect(screen.getByLabelText("Pinned notes").innerHTML).not.toContain("sm:grid-cols-2");
     expect(screen.getByLabelText("Today's schedule").innerHTML).toContain("dark:");
   });

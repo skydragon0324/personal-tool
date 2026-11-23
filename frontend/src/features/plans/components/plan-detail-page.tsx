@@ -102,7 +102,7 @@ export function PlanDetailPage({ planId }: { planId: string }) {
         </Menu>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
+        <div className="mx-auto max-w-[1480px] space-y-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {plan.item_count > 0 ? (
             <div className="flex max-w-md items-center gap-3">
               <Progress value={percent} size="sm" className="flex-1" aria-label={t("plans.progressLabel")} />

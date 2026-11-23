@@ -207,7 +207,7 @@ def test_other_user_cannot_view_or_generate_owner_occurrences(test_engine: Engin
     try:
         with independent_session(test_engine) as db:
             other = User(
-                email=f"other-{uuid4().hex[:8]}@example.com",
+                login_id=f"other-{uuid4().hex[:8]}",
                 display_name="Other",
                 password_hash="x",
                 timezone="UTC",

@@ -4,23 +4,35 @@
 :root {
   --font-sans: "Manrope";
   --font-display: "Fraunces";
-  --app-bg: #f6f7fb;
+  --app-bg: #f3f6f9;
   --app-surface: #ffffff;
-  --app-surface-muted: #f0f3f7;
-  --app-text: #172033;
-  --app-text-muted: #65738b;
-  --app-border: #e1e7ef;
+  --app-surface-elevated: #ffffff;
+  --app-surface-muted: #edf2f5;
+  --app-text: #182321;
+  --app-text-muted: #66756f;
+  --app-border: #dce5e1;
   --app-primary: #0f766e;
+  --app-primary-hover: #0b5f59;
+  --app-primary-soft: #e4f4f1;
+  --app-shadow: 0 16px 44px rgba(31, 55, 50, 0.08);
+  --app-scrollbar: #aabbb5;
+  --app-scrollbar-hover: #7f948d;
 }
 
 [data-mantine-color-scheme="dark"] {
-  --app-bg: #0b1220;
-  --app-surface: #111a2b;
-  --app-surface-muted: #172236;
-  --app-text: #eaf0f7;
-  --app-text-muted: #9aa8bd;
-  --app-border: #29374d;
-  --app-primary: #2dd4bf;
+  --app-bg: #0d1514;
+  --app-surface: #121d1b;
+  --app-surface-elevated: #172321;
+  --app-surface-muted: #1b2a27;
+  --app-text: #edf5f2;
+  --app-text-muted: #9cafaa;
+  --app-border: #2a3b37;
+  --app-primary: #43d5c2;
+  --app-primary-hover: #68e2d1;
+  --app-primary-soft: #153b36;
+  --app-shadow: 0 18px 52px rgba(0, 0, 0, 0.24);
+  --app-scrollbar: #48615b;
+  --app-scrollbar-hover: #648078;
 }
 
 /* Slightly denser than the 16px browser default; Tailwind and Mantine both size in rem. */
@@ -30,10 +42,63 @@ html {
 
 html,
 body {
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   background: var(--app-bg);
   color: var(--app-text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+#__next {
+  height: 100%;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 12% 0%, rgba(15, 118, 110, 0.06), transparent 28rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--app-bg) 86%, white), var(--app-bg) 18rem);
+}
+
+[data-mantine-color-scheme="dark"] body {
+  background-image:
+    radial-gradient(circle at 12% 0%, rgba(67, 213, 194, 0.06), transparent 28rem),
+    linear-gradient(180deg, #101b19, var(--app-bg) 18rem);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--app-primary) 24%, transparent);
+}
+
+/* A quiet, consistent scrollbar across the app's nested panels and board columns. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 2.5rem;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--app-scrollbar);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--app-scrollbar-hover);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .font-display {
@@ -42,6 +107,35 @@ body {
 
 .text-ink {
   color: var(--app-text);
+}
+
+/* Board / Table / Progress switcher: quiet tabs with a soft highlight on the active one. */
+.board-view-tabs {
+  background: transparent;
+}
+
+.board-view-tabs .mantine-SegmentedControl-indicator {
+  background: var(--app-primary-soft);
+  border: 0;
+  box-shadow: none;
+}
+
+.board-view-tabs .mantine-SegmentedControl-control {
+  border: 0 !important;
+}
+
+.board-view-tabs .mantine-SegmentedControl-control::before {
+  display: none;
+}
+
+.board-view-tabs .mantine-SegmentedControl-label {
+  color: var(--app-text-muted);
+  font-weight: 500;
+}
+
+.board-view-tabs .mantine-SegmentedControl-label[data-active],
+.board-view-tabs .mantine-SegmentedControl-label:hover {
+  color: var(--app-primary);
 }
 
 /*

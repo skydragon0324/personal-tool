@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.main import app
 
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-TEST_OWNER_EMAIL = "owner@example.com"
+TEST_OWNER_LOGIN_ID = "owner"
 TEST_OWNER_PASSWORD = "test-password-ok"
 TEST_OWNER_NAME = "Test Owner"
 
@@ -43,21 +43,21 @@ def bind_client(db) -> CsrfTestClient:
 
 def register_payload(
     *,
-    email: str,
+    login_id: str,
     password: str = TEST_OWNER_PASSWORD,
     display_name: str = TEST_OWNER_NAME,
     timezone: str = "UTC",
 ) -> dict[str, str]:
     return {
         "display_name": display_name,
-        "email": email,
+        "login_id": login_id,
         "password": password,
         "timezone": timezone,
     }
 
 
 def register_user(client: TestClient, **kwargs: str) -> dict:
-    email = kwargs.pop("email")
-    response = client.post("/api/v1/auth/register", json=register_payload(email=email, **kwargs))
+    login_id = kwargs.pop("login_id")
+    response = client.post("/api/v1/auth/register", json=register_payload(login_id=login_id, **kwargs))
     assert response.status_code == 201, response.text
     return response.json()

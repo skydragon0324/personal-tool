@@ -33,17 +33,17 @@ export function BoardsDashboardPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader title={t("shell.boards")}>
-        <Button variant="light" component={Link} href="/boards/recurring">
+      <PageHeader title={t("shell.boards")} description={t("dashboard.overviewHint")}>
+        <Button variant="subtle" component={Link} href="/boards/recurring">
           {t("dashboard.recurringTasks")}
         </Button>
-        <Button onClick={() => chrome?.openNewBoard()}>{t("dashboard.newBoard")}</Button>
         <Button variant="light" onClick={() => chrome?.openManageBoards()}>
           {t("dashboard.manageBoards")}
         </Button>
+        <Button onClick={() => chrome?.openNewBoard()}>{t("dashboard.newBoard")}</Button>
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 sm:px-6">
+        <div className="mx-auto max-w-[1480px] space-y-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {summaryQuery.isLoading ? (
             <div className="flex justify-center py-16">
               <Loader />
@@ -78,7 +78,7 @@ export function BoardsDashboardPage() {
   );
 }
 
-function DashboardBody({ data }: { data: DashboardSummary }) {
+export function DashboardBody({ data }: { data: DashboardSummary }) {
   return (
     <DashboardGrid label={t("dashboard.gridLabel")}>
       <DashboardPanel
@@ -161,9 +161,9 @@ function MetricTile({
         : "text-[var(--app-text)]";
 
   return (
-    <div className={`rounded-xl border px-3 py-2.5 ${accentClass}`}>
-      <p className="truncate text-xs font-medium text-[var(--app-text-muted)]">{label}</p>
-      <p className={`mt-1 font-display text-xl ${valueClass}`}>{value}</p>
+    <div className={`rounded-2xl border px-3.5 py-3 ${accentClass}`}>
+      <p className="truncate text-xs font-semibold uppercase tracking-[0.06em] text-[var(--app-text-muted)]">{label}</p>
+      <p className={`mt-1.5 font-display text-2xl font-semibold ${valueClass}`}>{value}</p>
     </div>
   );
 }

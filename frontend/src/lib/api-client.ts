@@ -360,6 +360,7 @@ export const apiClient = {
       color?: string;
       icon_name?: string | null;
       timezone?: string;
+      folder_id?: string | null;
     },
   ) =>
     request<import("@/features/board/types").BoardListItem>(`/api/v1/boards/${boardId}`, {
@@ -409,6 +410,23 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  listBoardFolders: () => request<import("@/features/board/types").BoardFolder[]>(`/api/v1/board-folders`),
+
+  createBoardFolder: (name: string) =>
+    request<import("@/features/board/types").BoardFolder>(`/api/v1/board-folders`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  renameBoardFolder: (folderId: string, name: string) =>
+    request<import("@/features/board/types").BoardFolder>(`/api/v1/board-folders/${folderId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteBoardFolder: (folderId: string) =>
+    request<void>(`/api/v1/board-folders/${folderId}`, { method: "DELETE" }),
 
   getDashboardTasks: (params: { state?: "open" | "done" | "all"; boardId?: string } = {}) => {
     const search = new URLSearchParams();
@@ -652,10 +670,10 @@ export const apiClient = {
   getBoardMembers: (boardId: string) =>
     request<import("@/features/board/types").BoardMembers>(`/api/v1/boards/${boardId}/members`),
 
-  inviteBoardMember: (boardId: string, email: string) =>
+  inviteBoardMember: (boardId: string, loginId: string) =>
     request<import("@/features/board/types").BoardInviteResult>(`/api/v1/boards/${boardId}/members`, {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ login_id: loginId }),
     }),
 
   /** Delete a status; tasks in an active status move to `moveToColumnId` first. */
@@ -669,6 +687,4 @@ export const apiClient = {
   removeBoardMember: (boardId: string, userId: string) =>
     request<void>(`/api/v1/boards/${boardId}/members/${userId}`, { method: "DELETE" }),
 
-  cancelBoardInvitation: (boardId: string, invitationId: string) =>
-    request<void>(`/api/v1/boards/${boardId}/invitations/${invitationId}`, { method: "DELETE" }),
 };

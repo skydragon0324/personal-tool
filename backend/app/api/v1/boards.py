@@ -148,7 +148,7 @@ def list_members(board_id: UUID, user: CurrentUser, db: Session = Depends(get_db
 def invite_member(
     board_id: UUID, payload: BoardInvite, user: CurrentUser, db: Session = Depends(get_db)
 ) -> BoardInviteResult:
-    return board_member_service.invite(db, user.id, board_id, payload.email)
+    return board_member_service.invite(db, user.id, board_id, payload.login_id)
 
 
 @router.delete("/{board_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -157,12 +157,4 @@ def remove_member(
 ) -> Response:
     """Owner removes a member, or a member leaves the board (their own id)."""
     board_member_service.remove_member(db, user.id, board_id, member_user_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.delete("/{board_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def cancel_invitation(
-    board_id: UUID, invitation_id: UUID, user: CurrentUser, db: Session = Depends(get_db)
-) -> Response:
-    board_member_service.cancel_invitation(db, user.id, board_id, invitation_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
