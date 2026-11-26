@@ -14,13 +14,6 @@ from app.models.task_assignee import TaskAssignee
 from app.models.task_attachment import TaskAttachment
 from app.models.task_history import TaskHistoryEntry
 from app.models.task_link import TaskLink
-from app.models.task_recurrence import (
-    TaskRecurrenceAttachmentRef,
-    TaskRecurrenceException,
-    TaskRecurrenceLinkTemplate,
-    TaskRecurrenceSeries,
-    TaskRecurrenceSubtaskTemplate,
-)
 from app.models.user import User
 from app.models.user_session import UserSession
 
@@ -44,11 +37,6 @@ __all__ = [
     "TaskLink",
     "TaskAttachment",
     "TaskHistoryEntry",
-    "TaskRecurrenceAttachmentRef",
-    "TaskRecurrenceException",
-    "TaskRecurrenceLinkTemplate",
-    "TaskRecurrenceSeries",
-    "TaskRecurrenceSubtaskTemplate",
     "User",
     "UserSession",
 ]

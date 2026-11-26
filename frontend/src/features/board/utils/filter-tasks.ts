@@ -1,6 +1,26 @@
-import type { BoardFilters, TasksByColumn } from "../types";
+import type { BoardFilters, Priority, TasksByColumn } from "../types";
 
 export const UNASSIGNED = "unassigned";
+
+/** OR across the selected priorities; no selection matches every priority. */
+export function matchesPriorities(priority: Priority, selected: readonly Priority[]): boolean {
+  return !selected.length || selected.includes(priority);
+}
+
+/** OR within the category filter; no selection shows every category. */
+export function matchesCategories(categoryId: string | undefined, selected: readonly string[]): boolean {
+  return !selected.length || Boolean(categoryId && selected.includes(categoryId));
+}
+
+/** OR within the assignee filter, including the synthetic unassigned choice. */
+export function matchesAssignees(
+  assignees: readonly { id: string }[],
+  selected: readonly string[],
+): boolean {
+  if (!selected.length) return true;
+  if (!assignees.length && selected.includes(UNASSIGNED)) return true;
+  return assignees.some((person) => selected.includes(person.id));
+}
 
 export function filterTasksByColumn(
   tasksByColumn: TasksByColumn,
@@ -11,19 +31,10 @@ export function filterTasksByColumn(
 
   for (const [columnId, tasks] of Object.entries(tasksByColumn)) {
     next[columnId] = tasks.filter((task) => {
-      if (filters.priority && task.priority !== filters.priority) return false;
-      if (filters.categoryId && task.category?.id !== filters.categoryId) {
-        return false;
-      }
+      if (!matchesPriorities(task.priority, filters.priorities)) return false;
+      if (!matchesCategories(task.category?.id, filters.categoryIds)) return false;
       const assignees = task.assignees ?? [];
-      if (filters.assigneeId === UNASSIGNED && assignees.length) return false;
-      if (
-        filters.assigneeId &&
-        filters.assigneeId !== UNASSIGNED &&
-        !assignees.some((person) => person.id === filters.assigneeId)
-      ) {
-        return false;
-      }
+      if (!matchesAssignees(assignees, filters.assigneeIds)) return false;
       if (query) {
         const haystack = `${task.title} ${task.content_preview}`.toLowerCase();
         if (!haystack.includes(query)) return false;

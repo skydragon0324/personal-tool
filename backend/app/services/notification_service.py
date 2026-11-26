@@ -265,12 +265,6 @@ def _digest_row(
     if exists is not None:
         return None
 
-    # Recurring tasks are generated on demand; make sure today's occurrences exist before counting.
-    from app.services.recurrence_service import fill_user_series
-
-    fill_user_series(db, user.id, start=today, end=today)
-    db.flush()
-
     open_task = (
         select(func.count(Task.id))
         .join(BoardColumn, BoardColumn.id == Task.column_id)

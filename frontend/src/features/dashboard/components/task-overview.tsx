@@ -267,7 +267,6 @@ function TaskRow({
         </p>
         <p className="truncate text-xs text-[var(--app-text-muted)]">
           {row.category_name}
-          {row.is_recurring ? t("dashboard.repeatsSuffix") : ""}
         </p>
       </Table.Td>
       <Table.Td>

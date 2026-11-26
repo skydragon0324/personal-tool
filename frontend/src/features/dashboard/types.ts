@@ -65,7 +65,6 @@ export interface DashboardTaskRow {
   assignees: Array<{ id: string; display_name: string }>;
   subtask_total: number;
   subtask_completed: number;
-  is_recurring: boolean;
 }
 
 export interface DashboardTaskList {

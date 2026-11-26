@@ -121,7 +121,6 @@ def get_task_for_user(
             selectinload(Task.category),
             selectinload(Task.subtasks),
             selectinload(Task.parent),
-            selectinload(Task.recurrence_series),
         )
     if for_update:
         query = query.with_for_update()

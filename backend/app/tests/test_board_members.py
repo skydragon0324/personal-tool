@@ -275,29 +275,3 @@ def test_task_with_several_assignees(team, db: Session) -> None:
     owner.delete(f"/api/v1/boards/{board_id}/members/{third_user['id']}")
     remaining = owner.get(f"/api/v1/tasks/{task['id']}").json()["assignees"]
     assert sorted(person["display_name"] for person in remaining) == ["Mate", "Test Owner"]
-
-
-def test_repeating_task_occurrences_keep_all_assignees(team) -> None:
-    owner, mate, mate_user = team
-    board_id, todo, _done, category = _board(owner)
-    _share(owner, board_id)
-    owner_id = owner.get("/api/v1/auth/me").json()["id"]
-    created = owner.post(
-        "/api/v1/tasks",
-        json={
-            "column_id": todo,
-            "category_id": category,
-            "title": "Weekly standup",
-            "start_date": DAY,
-            "due_date": DAY,
-            "recurrence": {"freq": "daily", "interval": 1},
-            "assignee_ids": [owner_id, mate_user["id"]],
-        },
-    )
-    assert created.status_code == 201, created.text
-    view = owner.get(f"/api/v1/boards/{board_id}/view", params={"unbounded": "true"}).json()
-    occurrences = [
-        task for column in view["columns"] for task in column["tasks"] if task["title"] == "Weekly standup"
-    ]
-    assert len(occurrences) > 1
-    assert all(len(task["assignees"]) == 2 for task in occurrences)

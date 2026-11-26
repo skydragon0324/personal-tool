@@ -9,8 +9,6 @@ export type AppSection =
   | "notepad"
   | "schedule";
 
-const BOARD_STATIC_SEGMENTS = new Set(["recurring"]);
-
 export function isBoardsPath(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname === "/boards" || pathname.startsWith("/boards/");
@@ -18,13 +16,11 @@ export function isBoardsPath(pathname: string | null): boolean {
 
 export function isBoardDetailPath(pathname: string | null): boolean {
   if (!pathname) return false;
-  const match = pathname.match(/^\/boards\/([^/]+)$/);
-  if (!match) return false;
-  return !BOARD_STATIC_SEGMENTS.has(match[1]);
+  return /^\/boards\/[^/]+$/.test(pathname);
 }
 
 export function isBoardsIndexPath(pathname: string | null): boolean {
-  return pathname === "/boards" || pathname === "/boards/recurring";
+  return pathname === "/boards";
 }
 
 export function sectionFromPath(pathname: string | null): AppSection {

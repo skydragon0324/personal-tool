@@ -1,8 +1,12 @@
 import {
   boardPreferencesKey,
+  defaultBoardPreferences,
+  migratePriorities,
+  migrateStringSelections,
   clearBoardPreferences,
   rangesFromPreferences,
   readBoardPreferences,
+  writeBoardPreferences,
 } from "./board-preferences";
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -75,5 +79,71 @@ describe("board preferences date migration", () => {
     });
     clearBoardPreferences(boardId, storage);
     expect(storage.getItem(key)).toBeNull();
+  });
+});
+
+describe("board preferences priority filter", () => {
+  const boardId = "board-1";
+  const key = boardPreferencesKey(boardId);
+
+  it("defaults to no selected priorities", () => {
+    expect(defaultBoardPreferences().priorities).toEqual([]);
+    expect(readBoardPreferences(boardId, memoryStorage()).priorities).toEqual([]);
+  });
+
+  it("migrates a stored single priority to a list", () => {
+    const storage = memoryStorage({ [key]: JSON.stringify({ priority: "high" }) });
+    expect(readBoardPreferences(boardId, storage).priorities).toEqual(["high"]);
+  });
+
+  it("migrates the old empty value to no selection", () => {
+    const storage = memoryStorage({ [key]: JSON.stringify({ priority: "" }) });
+    expect(readBoardPreferences(boardId, storage).priorities).toEqual([]);
+  });
+
+  it("reads stored lists, dropping unknown values and duplicates", () => {
+    const storage = memoryStorage({
+      [key]: JSON.stringify({ priorities: ["low", "urgent", "high", "low"], priority: "medium" }),
+    });
+    expect(readBoardPreferences(boardId, storage).priorities).toEqual(["high", "low"]);
+  });
+
+  it("persists the selected priorities", () => {
+    const storage = memoryStorage();
+    writeBoardPreferences(boardId, { ...defaultBoardPreferences(), priorities: ["medium", "low"] }, storage);
+    expect(JSON.parse(storage.store[key]).priorities).toEqual(["medium", "low"]);
+    expect(readBoardPreferences(boardId, storage).priorities).toEqual(["medium", "low"]);
+  });
+
+  it("migrates odd stored values safely", () => {
+    expect(migratePriorities(undefined, undefined)).toEqual([]);
+    expect(migratePriorities(null)).toEqual([]);
+    expect(migratePriorities("bogus")).toEqual([]);
+    expect(migratePriorities(undefined, "low")).toEqual(["low"]);
+  });
+});
+
+describe("board preferences category filters", () => {
+  const boardId = "board-1";
+  const key = boardPreferencesKey(boardId);
+
+  it("defaults to no selected categories", () => {
+    expect(defaultBoardPreferences().categoryIds).toEqual([]);
+  });
+
+  it("migrates the previous single category preference", () => {
+    const storage = memoryStorage({ [key]: JSON.stringify({ categoryId: "cat-work" }) });
+    expect(readBoardPreferences(boardId, storage).categoryIds).toEqual(["cat-work"]);
+  });
+
+  it("reads and persists multiple categories without duplicates", () => {
+    const storage = memoryStorage({ [key]: JSON.stringify({ categoryIds: ["cat-work", "cat-home", "cat-work"] }) });
+    expect(readBoardPreferences(boardId, storage).categoryIds).toEqual(["cat-work", "cat-home"]);
+    writeBoardPreferences(boardId, { ...defaultBoardPreferences(), categoryIds: ["cat-home", "cat-work"] }, storage);
+    expect(JSON.parse(storage.store[key]).categoryIds).toEqual(["cat-home", "cat-work"]);
+  });
+
+  it("drops empty and non-string selection values", () => {
+    expect(migrateStringSelections(["cat-work", "", null, "cat-work", 4])).toEqual(["cat-work"]);
   });
 });

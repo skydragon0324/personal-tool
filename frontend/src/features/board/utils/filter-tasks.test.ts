@@ -1,5 +1,5 @@
-import type { TaskSummary } from "../types";
-import { UNASSIGNED, filterTasksByColumn } from "./filter-tasks";
+import type { Priority, TaskSummary } from "../types";
+import { UNASSIGNED, filterTasksByColumn, matchesPriorities } from "./filter-tasks";
 
 const task = (
   overrides: Partial<TaskSummary> & Pick<TaskSummary, "id" | "title" | "category">,
@@ -33,20 +33,22 @@ describe("filterTasksByColumn", () => {
     ],
   };
 
-  it("filters by category id", () => {
+  it("filters by any selected category", () => {
     const filtered = filterTasksByColumn(tasks, {
-      priority: "",
+      priorities: [],
       query: "",
-      categoryId: personal.id,
+      categoryIds: [personal.id, "cat-missing"],
+      assigneeIds: [],
     });
     expect(filtered["col-1"].map((item) => item.id)).toEqual(["1"]);
   });
 
   it("combines category, priority, and search filters", () => {
     const filtered = filterTasksByColumn(tasks, {
-      priority: "high",
+      priorities: ["high"],
       query: "milk",
-      categoryId: personal.id,
+      categoryIds: [personal.id],
+      assigneeIds: [],
     });
     expect(filtered["col-1"]).toHaveLength(1);
     expect(filtered["col-1"][0].id).toBe("1");
@@ -54,9 +56,10 @@ describe("filterTasksByColumn", () => {
 
   it("shows all categories when the filter is empty", () => {
     const filtered = filterTasksByColumn(tasks, {
-      priority: "",
+      priorities: [],
       query: "",
-      categoryId: "",
+      categoryIds: [],
+      assigneeIds: [],
     });
     expect(filtered["col-1"]).toHaveLength(2);
   });
@@ -71,18 +74,66 @@ describe("assignee filter", () => {
       task({ id: "b", title: "Nobody's", category, assignees: [] }),
     ],
   };
-  const base = { priority: "" as const, query: "", categoryId: "" };
+  const base = { priorities: [], query: "", categoryIds: [], assigneeIds: [] };
 
   it("keeps everything by default", () => {
     expect(filterTasksByColumn(tasks, base)["col-1"].map((item) => item.id)).toEqual(["a", "b"]);
   });
 
-  it("filters by person or unassigned", () => {
+  it("filters by any selected person or unassigned", () => {
     expect(
-      filterTasksByColumn(tasks, { ...base, assigneeId: "user-ann" })["col-1"].map((item) => item.id),
+      filterTasksByColumn(tasks, { ...base, assigneeIds: ["user-ann"] })["col-1"].map((item) => item.id),
     ).toEqual(["a"]);
     expect(
-      filterTasksByColumn(tasks, { ...base, assigneeId: UNASSIGNED })["col-1"].map((item) => item.id),
+      filterTasksByColumn(tasks, { ...base, assigneeIds: [UNASSIGNED] })["col-1"].map((item) => item.id),
     ).toEqual(["b"]);
+    expect(
+      filterTasksByColumn(tasks, { ...base, assigneeIds: ["user-ann", UNASSIGNED] })["col-1"].map((item) => item.id),
+    ).toEqual(["a", "b"]);
+  });
+});
+
+describe("multi-select priority filter", () => {
+  const category = { id: "cat", name: "Work", color: "blue" };
+  const other = { id: "cat-other", name: "Home", color: "teal" };
+  const ann = { id: "user-ann", display_name: "Ann", login_id: "ann" };
+  const tasks = {
+    "col-1": [
+      task({ id: "h", title: "Ship release", category, priority: "high", assignees: [ann] }),
+      task({ id: "m", title: "Ship docs", category, priority: "medium" }),
+      task({ id: "l", title: "Tidy desk", category, priority: "low", assignees: [ann] }),
+      task({ id: "h2", title: "Ship groceries", category: other, priority: "high" }),
+    ],
+  };
+  const ids = (filters: Parameters<typeof filterTasksByColumn>[1]) =>
+    filterTasksByColumn(tasks, filters)["col-1"].map((item) => item.id);
+  const base = { priorities: [] as Priority[], query: "", categoryIds: [] as string[], assigneeIds: [] as string[] };
+
+  it("shows every priority when nothing is selected", () => {
+    expect(ids(base)).toEqual(["h", "m", "l", "h2"]);
+  });
+
+  it("shows only the selected priority", () => {
+    expect(ids({ ...base, priorities: ["low"] })).toEqual(["l"]);
+  });
+
+  it("shows tasks matching any selected priority", () => {
+    expect(ids({ ...base, priorities: ["high", "low"] })).toEqual(["h", "l", "h2"]);
+    expect(ids({ ...base, priorities: ["high", "medium", "low"] })).toEqual(["h", "m", "l", "h2"]);
+  });
+
+  it("combines with category, assignee and search filters", () => {
+    expect(ids({ ...base, priorities: ["high", "medium"], categoryIds: [category.id] })).toEqual(["h", "m"]);
+    expect(ids({ ...base, priorities: ["high", "low"], assigneeIds: [ann.id] })).toEqual(["h", "l"]);
+    expect(ids({ ...base, priorities: ["high", "medium"], query: "ship" })).toEqual(["h", "m", "h2"]);
+    expect(ids({ ...base, priorities: ["medium", "low"], query: "ship", assigneeIds: [UNASSIGNED] })).toEqual(["m"]);
+  });
+});
+
+describe("matchesPriorities", () => {
+  it("matches everything for an empty selection and uses OR otherwise", () => {
+    expect(matchesPriorities("low", [])).toBe(true);
+    expect(matchesPriorities("low", ["high", "low"])).toBe(true);
+    expect(matchesPriorities("medium", ["high", "low"])).toBe(false);
   });
 });

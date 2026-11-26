@@ -29,7 +29,6 @@ const TASK: TaskDetail = {
   attachments: [],
   subtasks: [],
   category: { id: "cat-1", name: "Work", color: "blue" },
-  recurrence: null,
 };
 
 let current: TaskDetail = TASK;

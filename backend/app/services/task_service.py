@@ -71,9 +71,6 @@ def set_assignees(
     validate_assignees(db, board_id, wanted)
     users = list(db.scalars(select(User).where(User.id.in_(wanted))).all()) if wanted else []
     task.assignees = sorted(users, key=lambda user: user.display_name.lower())
-    if task.recurrence_series is not None:
-        # New occurrences of the series go to the same people.
-        task.recurrence_series.assignee_ids = [user.id for user in task.assignees]
     added = wanted - current - {actor_id}
     if added:
         db.flush()
@@ -89,10 +86,6 @@ def _board_id(db: Session, task: Task) -> uuid.UUID:
 
 
 def create_task(db: Session, user_id: uuid.UUID, payload: TaskCreate) -> TaskDetailRead:
-    if payload.recurrence is not None:
-        from app.services.recurrence_service import create_recurring_task
-
-        return create_recurring_task(db, user_id, payload)
     column = get_column_or_404(db, user_id, payload.column_id)
     ensure_category_on_board(db, payload.category_id, column.board_id)
 
@@ -128,31 +121,7 @@ def get_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskDetailR
 
 def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: TaskUpdate) -> TaskDetailRead:
     task = get_task_for_user(db, user_id, task_id, for_update=True)
-    if task.parent_task_id is not None and payload.recurrence is not None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="A sub-task cannot repeat",
-        )
-    if task.recurrence_series_id is not None:
-        # Reminder and assignee are handled here rather than by the series edit-scope logic.
-        per_task = {"remind_at", "assignee_ids"} & payload.model_fields_set
-        if per_task:
-            if "remind_at" in per_task:
-                _set_remind_at(db, task, payload.remind_at)
-            if "assignee_ids" in per_task:
-                set_assignees(db, task, _board_id(db, task), payload.assignee_ids, user_id)
-            payload = TaskUpdate.model_validate(payload.model_dump(exclude_unset=True, exclude=per_task))
-            if not (payload.model_fields_set - {"edit_scope"}):
-                task.updated_at = datetime.now(UTC)
-                db.commit()
-                return to_detail(_load_task(db, user_id, task_id))
-        from app.services.recurrence_service import update_with_scope
-
-        return update_with_scope(db, user_id, task_id, payload)
-
     data = payload.model_dump(exclude_unset=True)
-    data.pop("edit_scope", None)
-    data.pop("recurrence", None)
     if "remind_at" in data:
         _set_remind_at(db, task, data.pop("remind_at"))
     if "assignee_ids" in data:
@@ -212,26 +181,8 @@ def update_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID, payload: Ta
     return to_detail(_load_task(db, user_id, task_id))
 
 
-def delete_task(
-    db: Session,
-    user_id: uuid.UUID,
-    task_id: uuid.UUID,
-    *,
-    delete_scope: str = "this",
-    confirm_completed: bool = False,
-) -> None:
+def delete_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> None:
     task = get_task_for_user(db, user_id, task_id, with_details=True)
-    if task.recurrence_series_id is not None:
-        from app.services.recurrence_service import delete_with_scope
-
-        delete_with_scope(
-            db,
-            user_id,
-            task_id,
-            delete_scope=delete_scope,
-            confirm_completed=confirm_completed,
-        )
-        return
     # Sub-tasks go with their parent; each also frees a slot in its own status column.
     removed = [task, *task.subtasks]
     column_ids = {item.column_id for item in removed}

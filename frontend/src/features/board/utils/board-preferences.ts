@@ -14,8 +14,10 @@ export interface BoardPreferences {
   viewMode: ViewMode;
   dateField: DateField;
   rangeMode: DateRangeMode;
-  categoryId: string;
-  priority: Priority | "";
+  /** Selected category filters; empty shows every category. */
+  categoryIds: string[];
+  /** Selected priority filter values; empty shows every priority. */
+  priorities: Priority[];
   customRange: DateRangeValue | null;
   anchorDate: string | null;
 }
@@ -29,15 +31,30 @@ export function defaultBoardPreferences(): BoardPreferences {
     viewMode: "board",
     dateField: DEFAULT_FILTERS.dateField,
     rangeMode: DEFAULT_FILTERS.rangeMode,
-    categoryId: DEFAULT_FILTERS.categoryId,
-    priority: DEFAULT_FILTERS.priority,
+    categoryIds: DEFAULT_FILTERS.categoryIds,
+    priorities: [],
     customRange: null,
     anchorDate: null,
   };
 }
 
-function isPriority(value: unknown): value is Priority | "" {
-  return value === "" || value === "low" || value === "medium" || value === "high";
+const PRIORITY_ORDER: Priority[] = ["high", "medium", "low"];
+
+/**
+ * The stored priority filter as a list. Older preferences saved a single `priority` value
+ * ("" for all priorities, or e.g. "high"); those become [] or ["high"]. Unknown values are dropped.
+ */
+export function migratePriorities(stored: unknown, legacy?: unknown): Priority[] {
+  const source = stored === undefined ? legacy : stored;
+  const values: unknown[] = Array.isArray(source) ? source : [source];
+  return PRIORITY_ORDER.filter((priority) => values.includes(priority));
+}
+
+/** A saved multi-select string list, with support for the previous single-value shape. */
+export function migrateStringSelections(stored: unknown, legacy?: unknown): string[] {
+  const source = stored === undefined ? legacy : stored;
+  const values = Array.isArray(source) ? source : [source];
+  return [...new Set(values.filter((value): value is string => typeof value === "string" && Boolean(value)))];
 }
 
 function isRangeTuple(value: unknown): value is DateRangeValue {
@@ -62,7 +79,11 @@ export function readBoardPreferences(
     return isViewMode(legacy) ? { ...defaults, viewMode: legacy } : defaults;
   }
   try {
-    const parsed = JSON.parse(raw) as Partial<BoardPreferences> & { preset?: unknown };
+    const parsed = JSON.parse(raw) as Partial<BoardPreferences> & {
+      preset?: unknown;
+      priority?: unknown;
+      categoryId?: unknown;
+    };
     const storedMode = parsed.viewMode ?? null;
     const legacyPreset = parsed.rangeMode ?? parsed.preset;
     const rangeMode = migrateDateRangeMode(legacyPreset);
@@ -80,8 +101,8 @@ export function readBoardPreferences(
       viewMode: isViewMode(storedMode) ? storedMode : defaults.viewMode,
       dateField: parsed.dateField === "created_at" ? "created_at" : "due_date",
       rangeMode,
-      categoryId: typeof parsed.categoryId === "string" ? parsed.categoryId : "",
-      priority: isPriority(parsed.priority) ? parsed.priority : "",
+      categoryIds: migrateStringSelections(parsed.categoryIds, parsed.categoryId),
+      priorities: migratePriorities(parsed.priorities, parsed.priority),
       customRange,
       anchorDate: typeof parsed.anchorDate === "string" ? parsed.anchorDate : null,
     };

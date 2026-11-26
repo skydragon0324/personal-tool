@@ -52,7 +52,6 @@ const TASK: TaskDetail = {
   attachments: [],
   subtasks: [],
   category: { id: "cat-1", name: "Work", color: "blue" },
-  recurrence: null,
 };
 
 describe("TaskForm", () => {
@@ -119,6 +118,34 @@ describe("TaskForm", () => {
     // Reminders are set from notifications ("Remind me"), so saving the form must not clear them.
     expect(payload).not.toHaveProperty("remind_at");
     expect(payload.assignee_ids).toEqual(["user-1"]);
+  });
+
+  it("starts a new task on the date it was opened for (e.g. a day picked in the calendar)", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onSubmit = jest.fn().mockResolvedValue(TASK);
+    const onDirtyChange = jest.fn();
+    render(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(
+          MantineProvider,
+          { env: "test" },
+          createElement(TaskForm, {
+            boardId: "board-1",
+            columnId: "col-todo",
+            dueDate: "2026-10-05",
+            onSubmit,
+            onDirtyChange,
+          }),
+        ),
+      ),
+    );
+    // Both the start and the due date show the given day...
+    expect(await screen.findAllByText(/Oct(ober)? 5, 2026/)).toHaveLength(2);
+    // ...and it is the starting point, not an unsaved edit.
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("reports unsaved edits only after the user changes something", async () => {

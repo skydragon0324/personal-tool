@@ -132,9 +132,8 @@ export function migrateDateRangeMode(value: unknown): DateRangeMode {
 }
 
 export const DEFAULT_FILTERS = {
-  priority: "" as const,
   query: "",
-  categoryId: "",
+  categoryIds: [] as string[],
   dateField: "due_date" as DateField,
   rangeMode: "month" as DateRangeMode,
 };

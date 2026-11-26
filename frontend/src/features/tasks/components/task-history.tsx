@@ -17,7 +17,6 @@ const FIELD_LABELS: Record<TaskChange["field"], MessageKey> = {
   start_date: "history.fieldStartDate",
   due_date: "history.fieldDueDate",
   reminder: "history.fieldReminder",
-  repeat: "history.fieldRepeat",
   assignees: "history.fieldAssignees",
   subtasks: "history.fieldSubtasks",
   links: "history.fieldLinks",
@@ -32,9 +31,8 @@ const PRIORITY_LABELS: Record<string, MessageKey> = {
 };
 
 /** A value from the history in the user's language. */
-export function historyValue(field: TaskValueChange["field"], value: string | boolean | null): string {
-  if (field === "repeat") return value ? t("history.repeatOn") : t("history.repeatOff");
-  if (value === null || value === "" || typeof value === "boolean") return t("history.emptyValue");
+export function historyValue(field: TaskValueChange["field"], value: string | null): string {
+  if (value === null || value === "") return t("history.emptyValue");
   if (field === "priority") return PRIORITY_LABELS[value] ? t(PRIORITY_LABELS[value]) : value;
   if (field === "start_date" || field === "due_date") return formatDisplayDate(value);
   if (field === "reminder") return formatDateTime(value);

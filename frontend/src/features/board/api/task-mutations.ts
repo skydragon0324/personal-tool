@@ -6,9 +6,5 @@ export const taskMutations = {
   update: (taskId: string, payload: TaskUpdate) =>
     apiClient.updateTask(taskId, payload),
   move: (taskId: string, payload: TaskMove) => apiClient.moveTask(taskId, payload),
-  remove: (
-    taskId: string,
-    options?: { deleteScope?: string; confirmCompleted?: boolean },
-  ) => apiClient.deleteTask(taskId, options),
-  stopRecurrence: (seriesId: string) => apiClient.stopRecurrence(seriesId),
+  remove: (taskId: string) => apiClient.deleteTask(taskId),
 };

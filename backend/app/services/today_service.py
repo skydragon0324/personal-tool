@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -110,9 +110,6 @@ def _sort_overdue(tasks: list[TodayTaskRead]) -> list[TodayTaskRead]:
 
 def get_today(db: Session, user_id: uuid.UUID, selected: date) -> TodayRead:
     prune_old_occurrence_states(db, user_id, selected)
-    from app.services.recurrence_service import fill_user_series
-
-    fill_user_series(db, user_id, start=selected, end=selected + timedelta(days=62))
     db.commit()
 
     active_rows = _load_task_rows(

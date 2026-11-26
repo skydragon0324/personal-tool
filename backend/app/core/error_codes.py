@@ -38,7 +38,6 @@ ERROR_MESSAGES: dict[str, str] = {
     "inbox_title_required": "Inbox title is required",
     "notification_not_found": "Notification not found",
     "schedule_entry_not_found": "Schedule entry not found",
-    "recurrence_series_not_found": "Recurrence series not found",
     "member_not_found": "Member not found",
     "login_id_not_found": "No account with that login ID",
     "plan_not_found": "Plan not found",
@@ -92,7 +91,6 @@ ERROR_MESSAGES: dict[str, str] = {
     "target_board_no_statuses": "The target board has no statuses yet",
     "choose_target_status": "Choose an active status on the target board",
     "no_completed_status": "This board has no completed status to move the task to",
-    "subtask_cannot_repeat": "A sub-task cannot repeat",
     "subtask_no_nesting": "A sub-task cannot have its own sub-tasks",
     "subtask_title_required": "Subtask title is required",
     "move_parent_instead": "Move the parent task to move its sub-tasks",
@@ -104,43 +102,6 @@ ERROR_MESSAGES: dict[str, str] = {
     "end_before_start": "end_date must be on or after start_date",
     "date_range_too_long": "Date range cannot exceed {days} days",
     "invalid_date_field": "date_field must be due_date or created_at",
-    # Repeating tasks
-    "invalid_edit_scope": "Invalid edit_scope",
-    "invalid_delete_scope": "Invalid delete_scope",
-    "confirm_completed_delete": "Deleting a completed repeating task requires confirm_completed=true",
-    "rule_change_needs_scope": (
-        "Changing the repeat rule requires This and following tasks or All tasks in the series"
-    ),
-    "yearly_month_series": (
-        "Yearly month cannot be changed for the entire series because it is stored as the series "
-        "start date. Use This and following tasks to start a new yearly series."
-    ),
-    "series_version_stale": "Recurrence series version is stale; refresh and try again",
-    "no_occurrence_date": "Recurrence rule has no available occurrence date for this task",
-    "until_before_first": "until_date must be on or after the first occurrence",
-    "until_or_limit": "Use either until_date or occurrence_limit, not both",
-    "weekly_needs_weekday": "Weekly recurrence requires at least one weekday",
-    "weekdays_range": "Weekdays must be values from 0 (Monday) to 6 (Sunday)",
-    "weekdays_unique": "Weekdays must be unique values from 0 (Monday) to 6 (Sunday)",
-    "dtstart_required": "dtstart is required",
-    "duration_days_required": "duration_days is required",
-    "unsupported_frequency": "Unsupported recurrence frequency: {freq}",
-    "use_stop_endpoint": "Use the stop endpoint to pause a recurring series",
-    "generate_end_before_start": "Generate end date must be on or after start date",
-    "resume_no_status": "Recurrence cannot resume because the starting status is unavailable",
-    "resume_no_occurrence": "Recurrence cannot resume because there is no remaining occurrence",
-    "resume_category_missing": "Recurrence cannot resume because the category is not on this board",
-    "resume_board_unavailable": "Recurrence cannot resume because the board is archived or unavailable",
-    "generate_unavailable": (
-        "Recurrence cannot generate because the board or starting status is unavailable"
-    ),
-    "archived_board_recurring": "Recurring tasks on an archived board cannot be edited",
-    "archived_series_stop": "Archived recurrence series cannot be stopped",
-    "archived_series_resume": "Archived recurrence series cannot be resumed",
-    "archived_series_edit": "Archived recurrence series cannot be edited",
-    "start_status_other_board": "Starting status does not belong to this board",
-    "start_status_archived": "Cannot use an archived status as the starting status",
-    "start_status_completed": "Cannot use a completed status as the starting status",
     # Schedule and plans
     "end_time_after_start": "end_time must be later than start_time",
     "week_start_required": "week_start is required for this-week entries",

@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { dashboardKeys } from "@/features/dashboard/hooks/use-dashboard";
 import { notificationKeys } from "@/features/notifications/api/notification-queries";
-import { recurrenceKeys } from "@/features/recurrence/api/recurrence-queries";
 import { todayKeys } from "@/features/today/api/today-queries";
 import { applyDetailToView, boardKeys, taskKeys } from "../api/board-queries";
 import { taskMutations } from "../api/task-mutations";
@@ -21,7 +20,6 @@ export function useTaskMutations(
     void queryClient.invalidateQueries({ queryKey: todayKeys.all });
     void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     void queryClient.invalidateQueries({ queryKey: boardKeys.views(params.boardId) });
-    void queryClient.invalidateQueries({ queryKey: recurrenceKeys.all });
     void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
   }
 
@@ -61,26 +59,11 @@ export function useTaskMutations(
   });
 
   const remove = useMutation({
-    mutationFn: ({
-      taskId,
-      deleteScope,
-      confirmCompleted,
-    }: {
-      taskId: string;
-      deleteScope?: string;
-      confirmCompleted?: boolean;
-    }) => taskMutations.remove(taskId, { deleteScope, confirmCompleted }),
+    mutationFn: ({ taskId }: { taskId: string }) => taskMutations.remove(taskId),
     onSuccess: async () => {
       invalidateRelated();
       // A deleted sub-task disappears from its parent's list.
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
-    },
-  });
-
-  const stopRecurrence = useMutation({
-    mutationFn: (seriesId: string) => taskMutations.stopRecurrence(seriesId),
-    onSuccess: () => {
-      invalidateRelated();
     },
   });
 
@@ -132,7 +115,6 @@ export function useTaskMutations(
     create,
     update,
     remove,
-    stopRecurrence,
     uploadAttachment,
     deleteAttachment,
     duplicate,

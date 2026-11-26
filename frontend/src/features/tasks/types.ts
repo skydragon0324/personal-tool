@@ -1,8 +1,8 @@
 /** One change to a value, e.g. a new status or due date (dates and times as ISO strings). */
 export interface TaskValueChange {
-  field: "title" | "board" | "status" | "category" | "priority" | "start_date" | "due_date" | "reminder" | "repeat";
-  from: string | boolean | null;
-  to: string | boolean | null;
+  field: "title" | "board" | "status" | "category" | "priority" | "start_date" | "due_date" | "reminder";
+  from: string | null;
+  to: string | null;
 }
 
 /** Items added to or removed from a list on the task. */

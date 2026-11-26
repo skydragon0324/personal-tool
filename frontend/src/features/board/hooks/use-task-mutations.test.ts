@@ -2,21 +2,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 
-import { recurrenceKeys } from "@/features/recurrence/api/recurrence-queries";
+import { todayKeys } from "@/features/today/api/today-queries";
 import type { BoardQueryParams, TaskDetail } from "../types";
 import { useTaskMutations } from "./use-task-mutations";
 
 const create = jest.fn();
 const update = jest.fn();
 const remove = jest.fn();
-const stopRecurrence = jest.fn();
 
 jest.mock("../api/task-mutations", () => ({
   taskMutations: {
     create: (...args: unknown[]) => create(...args),
     update: (...args: unknown[]) => update(...args),
     remove: (...args: unknown[]) => remove(...args),
-    stopRecurrence: (...args: unknown[]) => stopRecurrence(...args),
   },
 }));
 
@@ -43,21 +41,19 @@ function wrapper(client: QueryClient) {
   };
 }
 
-describe("useTaskMutations recurrence invalidation", () => {
+describe("useTaskMutations invalidation", () => {
   beforeEach(() => {
     create.mockReset();
     update.mockReset();
     remove.mockReset();
-    stopRecurrence.mockReset();
   });
 
-  it("invalidates recurrence queries after create, edit, delete, and stop", async () => {
+  it("refreshes related views after create, edit, and delete", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidate = jest.spyOn(client, "invalidateQueries");
     create.mockResolvedValue(task);
     update.mockResolvedValue(task);
     remove.mockResolvedValue(undefined);
-    stopRecurrence.mockResolvedValue({ id: "series-1", status: "stopped" });
     const { result } = renderHook(() => useTaskMutations(params), { wrapper: wrapper(client) });
 
     await act(async () => {
@@ -78,17 +74,15 @@ describe("useTaskMutations recurrence invalidation", () => {
     await act(async () => {
       await result.current.remove.mutateAsync({ taskId: "task-1" });
     });
-    await act(async () => {
-      await result.current.stopRecurrence.mutateAsync("series-1");
-    });
 
-    const recurrenceCalls = invalidate.mock.calls.filter(
+    expect(remove).toHaveBeenCalledWith("task-1");
+    const todayCalls = invalidate.mock.calls.filter(
       ([options]) =>
         options &&
         typeof options === "object" &&
         "queryKey" in options &&
-        options.queryKey === recurrenceKeys.all,
+        options.queryKey === todayKeys.all,
     );
-    expect(recurrenceCalls).toHaveLength(4);
+    expect(todayCalls).toHaveLength(3);
   });
 });

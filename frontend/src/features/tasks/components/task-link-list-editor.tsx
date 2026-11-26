@@ -1,6 +1,6 @@
 import { Button, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from "@mantine/core";
 
-import type { RecurrenceSeriesLinkInput } from "@/features/recurrence/types";
+import type { TaskLinkInput } from "@/features/board/types";
 import { t } from "@/i18n";
 
 export function TaskLinkListEditor({
@@ -9,8 +9,8 @@ export function TaskLinkListEditor({
   disabled,
   errors,
 }: {
-  links: RecurrenceSeriesLinkInput[];
-  onChange: (links: RecurrenceSeriesLinkInput[]) => void;
+  links: TaskLinkInput[];
+  onChange: (links: TaskLinkInput[]) => void;
   disabled?: boolean;
   errors?: Record<string, string>;
 }) {

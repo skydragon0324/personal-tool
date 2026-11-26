@@ -2,8 +2,8 @@
 
 Every API call that changes a task runs inside ``track_changes``: it takes a snapshot of the task
 before and after and stores the difference as one history entry. Doing it around the call (not
-inside each service) covers every way a task changes: the edit form, drag and drop, repeating-task
-scopes, moving to another board, files and sub-tasks.
+inside each service) covers every way a task changes: the edit form, drag and drop, moving to
+another board, files and sub-tasks.
 
 Values are stored as display text (status, category, board and people's names), so an entry still
 reads correctly after something is renamed or deleted.
@@ -38,7 +38,9 @@ from app.services.ownership import get_task_for_user
 logger = logging.getLogger(__name__)
 
 # Fields compared as single values, in the order they are listed in an entry.
-SCALAR_FIELDS = ("title", "board", "status", "category", "priority", "start_date", "due_date", "reminder", "repeat")
+SCALAR_FIELDS = ("title", "board", "status", "category", "priority", "start_date", "due_date", "reminder")
+# Fields recorded by earlier versions that the app no longer has; hidden when history is read.
+RETIRED_FIELDS = frozenset({"repeat"})
 # Fields compared as lists: an entry lists what was added and what was removed.
 LIST_FIELDS = ("assignees", "subtasks", "links", "files")
 # Compared but not stored (too long to show): the entry just says it changed.
@@ -79,7 +81,6 @@ def snapshot(db: Session, task_id: uuid.UUID) -> Snapshot | None:
         "start_date": task.start_date.isoformat(),
         "due_date": task.due_date.isoformat(),
         "reminder": task.remind_at.isoformat() if task.remind_at else None,
-        "repeat": task.recurrence_series_id is not None,
         "assignees": list(assignees),
         "subtasks": list(subtasks),
         "links": [link.label or link.url for link in links],
@@ -181,14 +182,20 @@ def list_history(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> list[Ta
         .where(TaskHistoryEntry.task_id == task_id)
         .order_by(TaskHistoryEntry.created_at.desc(), TaskHistoryEntry.id)
     ).all()
-    return [
-        TaskHistoryRead(
-            id=entry.id,
-            created_at=entry.created_at,
-            actor_id=entry.actor_id,
-            actor_name=current_name or entry.actor_name,
-            action=entry.action,
-            changes=entry.changes,
+    history: list[TaskHistoryRead] = []
+    for entry, current_name in rows:
+        changes = [change for change in entry.changes or [] if change.get("field") not in RETIRED_FIELDS]
+        if entry.changes and not changes:
+            # Only retired fields changed (for example the old repeat setting): nothing left to show.
+            continue
+        history.append(
+            TaskHistoryRead(
+                id=entry.id,
+                created_at=entry.created_at,
+                actor_id=entry.actor_id,
+                actor_name=current_name or entry.actor_name,
+                action=entry.action,
+                changes=changes,
+            )
         )
-        for entry, current_name in rows
-    ]
+    return history

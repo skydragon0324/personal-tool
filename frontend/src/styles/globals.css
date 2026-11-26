@@ -250,3 +250,16 @@ body {
 .task-content-editor .ProseMirror img.ProseMirror-selectednode {
   box-shadow: 0 0 0 2px var(--app-primary);
 }
+
+/* Calendar: the change-date button on a task chip shows on hover or focus where the device can
+   hover; on touch screens it stays visible so it can be tapped. */
+@media (hover: hover) {
+  .calendar-chip-action {
+    opacity: 0;
+  }
+
+  .calendar-chip:hover .calendar-chip-action,
+  .calendar-chip:focus-within .calendar-chip-action {
+    opacity: 1;
+  }
+}

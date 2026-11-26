@@ -26,7 +26,6 @@ import {
 import type { Editor } from "@tiptap/react";
 
 import type {
-  EditScope,
   Priority,
   TaskCreate,
   TaskDetail,
@@ -38,16 +37,6 @@ import { useBoardMembers } from "@/features/board/hooks/use-board-members";
 import { useCategories, useCreateCategory } from "@/features/board/hooks/use-categories";
 import { todayISO } from "@/lib/dates";
 import { CategoryCombobox } from "./category-combobox";
-import {
-  RecurrenceFields,
-  buildRecurrenceInput,
-  presetFromRecurrence,
-  repeatUnitFromRecurrence,
-  type RepeatEnd,
-  type RepeatPreset,
-  type RepeatUnit,
-} from "./recurrence-fields";
-import { RecurrenceScopeDialog } from "./recurrence-scope-dialog";
 import { descriptionToDoc } from "../utils/description-to-doc";
 import {
   createPendingImageId,
@@ -77,37 +66,22 @@ interface FormValues {
   content: TiptapJSON | null;
   links: TaskLinkInput[];
   assigneeIds: string[];
-  repeatPreset: RepeatPreset;
-  customInterval: number;
-  customUnit: RepeatUnit;
-  customWeekdays: number[];
-  repeatEnd: RepeatEnd;
-  untilDate: string | null;
-  occurrenceCount: number;
 }
 
-/** What the form shows for a task (or a blank new one) before any edits. */
-function formValuesFrom(initial: TaskDetail | null | undefined): FormValues {
+/** What the form shows for a task (or a blank new one, starting and due on `newDueDate`) before any edits. */
+function formValuesFrom(initial: TaskDetail | null | undefined, newDueDate?: string): FormValues {
   if (!initial) {
     return {
       title: "",
       priority: "medium",
-      startDate: todayISO(),
-      dueDate: todayISO(),
+      startDate: newDueDate || todayISO(),
+      dueDate: newDueDate || todayISO(),
       categoryId: null,
       content: null,
       links: [],
       assigneeIds: [],
-      repeatPreset: "none",
-      customInterval: 1,
-      customUnit: "weeks",
-      customWeekdays: [0, 1, 2, 3, 4],
-      repeatEnd: "never",
-      untilDate: null,
-      occurrenceCount: 10,
     };
   }
-  const recurrence = initial.recurrence;
   return {
     title: initial.title,
     priority: initial.priority,
@@ -122,13 +96,6 @@ function formValuesFrom(initial: TaskDetail | null | undefined): FormValues {
       position: link.position,
     })),
     assigneeIds: (initial.assignees ?? []).map((person) => person.id),
-    repeatPreset: presetFromRecurrence(recurrence),
-    customInterval: recurrence?.interval ?? 1,
-    customUnit: repeatUnitFromRecurrence(recurrence),
-    customWeekdays: recurrence?.weekdays?.length ? recurrence.weekdays : [0, 1, 2, 3, 4],
-    repeatEnd: recurrence?.until_date ? "date" : recurrence?.occurrence_limit ? "count" : "never",
-    untilDate: recurrence?.until_date ?? null,
-    occurrenceCount: recurrence?.occurrence_limit ?? 10,
   };
 }
 
@@ -167,17 +134,8 @@ export function TaskForm({
 }: TaskFormProps) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
-  const [repeatPreset, setRepeatPreset] = useState<RepeatPreset>("none");
-  const [customInterval, setCustomInterval] = useState(1);
-  const [customUnit, setCustomUnit] = useState<RepeatUnit>("weeks");
-  const [customWeekdays, setCustomWeekdays] = useState<number[]>([0, 1, 2, 3, 4]);
-  const [repeatEnd, setRepeatEnd] = useState<RepeatEnd>("never");
-  const [untilDate, setUntilDate] = useState<string | null>(null);
-  const [occurrenceCount, setOccurrenceCount] = useState(10);
-  const [pendingScopePayload, setPendingScopePayload] = useState<TaskCreate | null>(null);
-  const [pendingStopPayload, setPendingStopPayload] = useState<TaskCreate | null>(null);
-  const [taskStartDate, setTaskStartDate] = useState(initial?.start_date ?? todayISO());
-  const [taskDueDate, setTaskDueDate] = useState(initial?.due_date ?? todayISO());
+  const [taskStartDate, setTaskStartDate] = useState(initial?.start_date ?? (dueDate || todayISO()));
+  const [taskDueDate, setTaskDueDate] = useState(initial?.due_date ?? (dueDate || todayISO()));
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [content, setContent] = useState<TiptapJSON | null>(null);
   const [links, setLinks] = useState<TaskLinkInput[]>([]);
@@ -216,10 +174,10 @@ export function TaskForm({
   const initialId = initial?.id ?? null;
 
   // The form as last reset; anything different from it is an unsaved edit.
-  const [baseline, setBaseline] = useState(() => JSON.stringify(formValuesFrom(initial)));
+  const [baseline, setBaseline] = useState(() => JSON.stringify(formValuesFrom(initial, dueDate)));
 
   useEffect(() => {
-    const values = formValuesFrom(initialRef.current);
+    const values = formValuesFrom(initialRef.current, dueDate);
     setBaseline(JSON.stringify(values));
     setTitle(values.title);
     setPriority(values.priority);
@@ -230,13 +188,6 @@ export function TaskForm({
     setLinks(values.links);
     setSavedTaskId(initialRef.current?.id ?? null);
     setAssigneeIds(values.assigneeIds);
-    setRepeatPreset(values.repeatPreset);
-    setCustomInterval(values.customInterval);
-    setCustomUnit(values.customUnit);
-    setCustomWeekdays(values.customWeekdays);
-    setRepeatEnd(values.repeatEnd);
-    setUntilDate(values.untilDate);
-    setOccurrenceCount(values.occurrenceCount);
     setPendingFiles([]);
     setPendingImages([]);
     setError(null);
@@ -252,13 +203,6 @@ export function TaskForm({
     content,
     links,
     assigneeIds,
-    repeatPreset,
-    customInterval,
-    customUnit,
-    customWeekdays,
-    repeatEnd,
-    untilDate,
-    occurrenceCount,
   };
   const dirty = JSON.stringify(currentValues) !== baseline || pendingFiles.length > 0 || pendingImages.length > 0;
   useEffect(() => {
@@ -498,16 +442,6 @@ export function TaskForm({
     }
     try {
       const persistableContent = sanitizeContentForPersist(content);
-      const recurrence = buildRecurrenceInput({
-        preset: repeatPreset,
-        startDate: taskStartDate,
-        customInterval,
-        customUnit,
-        customWeekdays,
-        end: repeatEnd,
-        untilDate,
-        occurrenceCount,
-      });
       const payload: TaskCreate = {
         column_id: initial?.column_id ?? columnId,
         category_id: categoryId,
@@ -521,17 +455,8 @@ export function TaskForm({
           ...link,
           position: index,
         })),
-        recurrence,
         assignee_ids: assigneeIds,
       };
-      if (initial?.recurrence?.series_id) {
-        if (recurrence === null) {
-          setPendingStopPayload(payload);
-          return;
-        }
-        setPendingScopePayload(payload);
-        return;
-      }
       await submitPayload(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("taskForm.couldNotSave"));
@@ -621,13 +546,7 @@ export function TaskForm({
           </SimpleGrid>
           <MultiSelect
             label={t("task.assignTo")}
-            description={
-              initial?.recurrence?.series_id
-                ? t("taskForm.assignHintRepeating")
-                : shared
-                  ? t("taskForm.assignHintShared")
-                  : t("taskForm.assignHintSolo")
-            }
+            description={shared ? t("taskForm.assignHintShared") : t("taskForm.assignHintSolo")}
             placeholder={assigneeIds.length ? undefined : t("filters.unassigned")}
             data={assigneeOptions}
             value={assigneeIds}
@@ -637,24 +556,6 @@ export function TaskForm({
             hidePickedOptions
             maw={520}
           />
-          {initial?.parent ? null : (
-            <RecurrenceFields
-              preset={repeatPreset}
-              onPresetChange={setRepeatPreset}
-              customInterval={customInterval}
-              onCustomIntervalChange={setCustomInterval}
-              customUnit={customUnit}
-              onCustomUnitChange={setCustomUnit}
-              customWeekdays={customWeekdays}
-              onCustomWeekdaysChange={setCustomWeekdays}
-              end={repeatEnd}
-              onEndChange={setRepeatEnd}
-              untilDate={untilDate}
-              onUntilDateChange={setUntilDate}
-              occurrenceCount={occurrenceCount}
-              onOccurrenceCountChange={setOccurrenceCount}
-            />
-          )}
           <Select
               label={t("task.priority")}
               data={[
@@ -979,56 +880,6 @@ export function TaskForm({
         onCancel={() => setAnnotating(null)}
         onDone={finishAnnotation}
       />
-      <RecurrenceScopeDialog
-        open={pendingScopePayload !== null}
-        mode="edit"
-        taskTitle={title}
-        submitting={submitting}
-        onClose={() => setPendingScopePayload(null)}
-        onConfirm={(scope) => {
-          if (!pendingScopePayload) return;
-          const next: TaskCreate = {
-            ...pendingScopePayload,
-            edit_scope: scope as EditScope,
-            recurrence: scope === "this" ? undefined : pendingScopePayload.recurrence,
-          };
-          setPendingScopePayload(null);
-          void submitPayload(next);
-        }}
-      />
-      <Modal
-        opened={pendingStopPayload !== null}
-        onClose={() => setPendingStopPayload(null)}
-        title={t("taskForm.stopRepeatingTitle")}
-        size="sm"
-      >
-        <Stack>
-          <Text size="sm">
-            {t("taskForm.stopRepeatingBody")}
-          </Text>
-          <Group justify="flex-end">
-            <Button variant="default" type="button" onClick={() => setPendingStopPayload(null)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              type="button"
-              loading={submitting}
-              onClick={() => {
-                if (!pendingStopPayload) return;
-                const next: TaskCreate = {
-                  ...pendingStopPayload,
-                  recurrence: null,
-                };
-                delete next.edit_scope;
-                setPendingStopPayload(null);
-                void submitPayload(next);
-              }}
-            >
-              {t("taskForm.stopRepeating")}
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
     </form>
   );
 }

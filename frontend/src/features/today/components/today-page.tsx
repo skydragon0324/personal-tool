@@ -57,7 +57,7 @@ export function TodayPage() {
       </PageHeader>
       {/* On desktop the four panels share the screen and each scrolls inside itself. */}
       <div className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
-        <div className="mx-auto h-full max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto h-full w-full max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8">
           {todayQuery.isLoading ? (
             <div className="flex justify-center py-16">
               <Loader />

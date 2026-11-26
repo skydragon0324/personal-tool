@@ -23,7 +23,7 @@ export function MyTasksPage() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={t("shell.myTasks")} description={t("workspace.myTasksHint")} />
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1480px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        <div className="mx-auto w-full max-w-[1480px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           <TaskOverview mineOnly />
         </div>
       </div>
@@ -38,7 +38,7 @@ export function ReportsPage() {
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={t("shell.reports")} description={t("workspace.reportsHint")} />
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1480px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        <div className="mx-auto w-full max-w-[1480px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {summary.isLoading ? (
             <div className="flex justify-center py-16">
               <Loader />

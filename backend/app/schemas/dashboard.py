@@ -84,7 +84,6 @@ class DashboardTaskRow(BaseModel):
     assignees: list[DashboardPerson]
     subtask_total: int
     subtask_completed: int
-    is_recurring: bool
 
 
 class DashboardTaskList(BaseModel):

@@ -144,37 +144,6 @@ def test_remind_at_requires_timezone_offset(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-def test_reminder_on_recurring_task_stays_on_that_task(client: TestClient, db: Session) -> None:
-    _board_id, todo, _done, category = _board(client)
-    created = client.post(
-        "/api/v1/tasks",
-        json={
-            "column_id": todo,
-            "category_id": category,
-            "title": "Weekly review",
-            "start_date": DAY.isoformat(),
-            "due_date": DAY.isoformat(),
-            "recurrence": {"freq": "weekly", "weekdays": [2]},
-            "remind_at": _at(9).isoformat(),
-        },
-    )
-    assert created.status_code == 201, created.text
-    first = created.json()
-    assert first["remind_at"] is not None
-    series_id = first["recurrence"]["series_id"]
-    before = client.get(f"/api/v1/task-recurrence/{series_id}").json()
-
-    patched = client.patch(
-        f"/api/v1/tasks/{first['id']}",
-        json={"remind_at": _at(10).isoformat(), "edit_scope": "series"},
-    )
-    assert patched.status_code == 200, patched.text
-    assert patched.json()["remind_at"].startswith("2026-09-23T10:00")
-    after = client.get(f"/api/v1/task-recurrence/{series_id}").json()
-    assert after["version"] == before["version"]
-    assert after["title"] == "Weekly review"
-
-
 def test_schedule_start_notification_uses_lead_time(client: TestClient, db: Session) -> None:
     user = _user(db)
     _quiet_digest(db, user)

@@ -51,7 +51,7 @@ export function InboxPage() {
         </Button>
       </PageHeader>
       <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)]">
+        <div className="mx-auto flex min-h-0 w-full max-w-[1480px] flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)]">
           {feed.isLoading ? (
             <div className="flex flex-1 items-center justify-center">
               <Loader size="sm" />

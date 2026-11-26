@@ -24,7 +24,6 @@ import { SubtaskList } from "./subtask-list";
 import { TaskContentViewer } from "./task-content-viewer";
 import { TaskForm } from "./task-form";
 import { TaskHistory } from "./task-history";
-import { recurrenceLabel } from "./recurrence-fields";
 
 interface TaskDetailModalProps {
   taskId: string | null;
@@ -44,9 +43,8 @@ interface TaskDetailModalProps {
   onDelete: (
     taskId: string,
     title: string,
-    meta?: { repeating?: boolean; completed?: boolean; parentId?: string | null },
+    meta?: { parentId?: string | null },
   ) => void;
-  onStopRepeat?: (seriesId: string) => Promise<void> | void;
   onDuplicate?: (task: TaskDetail) => void;
   onMoveToBoard?: (task: TaskDetail) => void;
 }
@@ -66,7 +64,6 @@ export function TaskDetailModal({
   onPatchContent,
   onDeleteAttachment,
   onDelete,
-  onStopRepeat,
   onDuplicate,
   onMoveToBoard,
 }: TaskDetailModalProps) {
@@ -234,7 +231,6 @@ export function TaskDetailModal({
                         onOpen={openTask}
                         onDelete={(subtask) =>
                           onDelete(subtask.id, subtask.title, {
-                            completed: subtask.is_completed,
                             parentId: task.id,
                           })
                         }
@@ -264,11 +260,6 @@ export function TaskDetailModal({
                       <Property label={t("task.dates")}>
                         {formatTaskPeriod(task.start_date, task.due_date)}
                       </Property>
-                      {isSubtask ? null : (
-                        <Property label={t("tasks.repeat")}>
-                          {task.recurrence ? recurrenceLabel(task.recurrence) : t("tasks.doesNotRepeat")}
-                        </Property>
-                      )}
                       <Property label={t("tasks.assignees")}>
                         {task.assignees?.length ? (
                           <AssigneeAvatars people={task.assignees} size={26} max={6} />
@@ -374,15 +365,6 @@ export function TaskDetailModal({
                   <Button variant="default">{t("common.more")}</Button>
                 </Menu.Target>
                 <Menu.Dropdown>
-                  {task.recurrence?.status === "active" && onStopRepeat ? (
-                    <Menu.Item
-                      onClick={() => {
-                        void onStopRepeat(task.recurrence!.series_id);
-                      }}
-                    >
-                      {t("taskForm.stopRepeating")}
-                    </Menu.Item>
-                  ) : null}
                   {onDuplicate ? (
                     <Menu.Item onClick={() => onDuplicate(task)}>{t("task.duplicate")}</Menu.Item>
                   ) : null}
@@ -393,8 +375,6 @@ export function TaskDetailModal({
                     color="red"
                     onClick={() =>
                       onDelete(task.id, task.title, {
-                        repeating: Boolean(task.recurrence?.series_id),
-                        completed: Boolean(task.completed_at),
                         parentId: task.parent?.id ?? null,
                       })
                     }

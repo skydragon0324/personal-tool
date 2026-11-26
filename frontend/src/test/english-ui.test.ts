@@ -65,7 +65,6 @@ describe("English UI copy", () => {
     expect(sidebar).toContain("Inbox");
     expect(sidebar).toContain("New board");
     expect(sidebar).not.toContain("Manage boards");
-    expect(sidebar).not.toContain("Recurring tasks");
     expect(sidebar).toContain("Boards");
     expect(sidebar).toContain("Notepad");
     expect(sidebar).toContain("Schedule");
@@ -160,47 +159,9 @@ describe("English UI copy", () => {
     expect(dashboard).toContain("Active boards");
     expect(dashboard).toContain("New board");
     expect(dashboard).toContain("Manage boards");
-    expect(dashboard).toContain("Recurring tasks");
     expect(dashboard).toContain("DashboardGrid");
     expect(dashboard).toContain("Due today");
     expect(dashboard).toContain("Overdue");
-    const recurring = readUi(
-      join(SRC_ROOT, "features/recurrence/components/recurring-tasks-page.tsx"),
-    );
-    expect(recurring).toContain("Recurring tasks");
-    expect(recurring).toContain("Manage repeating work across your boards.");
-    expect(recurring).toContain("Back to boards");
-    expect(recurring).toContain("No future occurrence");
-    expect(recurring).toContain("Customized");
-    expect(recurring).toContain("Reset filters");
-    expect(recurring).toContain("No recurring tasks yet");
-    expect(recurring).toContain("Actions");
-    expect(recurring).toContain("Pause");
-    expect(recurring).toContain("Resume");
-    expect(recurring).toContain("Pausing…");
-    expect(recurring).toContain("Resuming…");
-    expect(recurring).toContain("Restore the board before resuming this recurring task.");
-    expect(recurring).toContain("Restore the board before editing this recurring task.");
-    expect(recurring).toContain("Edit");
-    expect(recurring).not.toContain("Delete");
-    const pauseDialog = readUi(
-      join(SRC_ROOT, "features/recurrence/components/pause-recurrence-dialog.tsx"),
-    );
-    expect(pauseDialog).toContain("Pause recurring task?");
-    expect(pauseDialog).toContain(
-      "Future occurrences will stop generating. Existing tasks and completed history will stay.",
-    );
-    const actionsHook = readUi(
-      join(SRC_ROOT, "features/recurrence/hooks/use-recurrence-series-actions.ts"),
-    );
-    expect(actionsHook).toContain("Recurring task paused");
-    expect(actionsHook).toContain("Recurring task resumed");
-    expect(actionsHook).toContain("Could not pause recurring task");
-    expect(actionsHook).toContain("Could not resume recurring task");
-    const updateHook = readUi(
-      join(SRC_ROOT, "features/recurrence/hooks/use-update-recurrence-series.ts"),
-    );
-    expect(updateHook).toContain("Recurring task updated");
     expect(header).toContain("Create a status first");
     const newBoard = readUi(
       join(SRC_ROOT, "features/board/components/new-board-modal.tsx"),
@@ -265,53 +226,5 @@ describe("English UI copy", () => {
     );
     expect(subtasks).toContain("Add a subtask");
     expect(subtasks).toContain("void handleCreate()");
-    const recurrence = readUi(
-      join(SRC_ROOT, "features/tasks/components/recurrence-fields.tsx"),
-    );
-    expect(recurrence).toContain("Does not repeat");
-    expect(recurrence).toContain("allowNone");
-    expect(recurrence).toContain("years");
-    const seriesEdit = readUi(
-      join(SRC_ROOT, "features/recurrence/components/recurring-series-edit-form.tsx"),
-    );
-    expect(seriesEdit).toContain("Pause or resume this series from the recurring tasks list.");
-    expect(seriesEdit).toContain("This status is used for newly generated tasks. Existing tasks will not move.");
-    expect(seriesEdit).toContain("Each occurrence is due this many days after it starts.");
-    expect(seriesEdit).toContain("Automatic — first available status");
-    expect(seriesEdit).toContain("No changes to save.");
-    expect(seriesEdit).toContain("This recurring task changed elsewhere.");
-    expect(seriesEdit).toContain("Reload latest");
-    expect(seriesEdit).not.toContain("Does not repeat");
-    expect(seriesEdit).not.toContain("Delete series");
-    const seriesModal = readUi(
-      join(SRC_ROOT, "features/recurrence/components/recurring-series-edit-modal.tsx"),
-    );
-    expect(seriesModal).toContain("Edit recurring task");
-    expect(seriesModal).toContain("Could not load recurring task.");
-    expect(recurrence).toContain("Weekdays");
-    expect(recurrence).toContain("If a month has fewer days, that month is skipped.");
-    expect(recurrence).toContain("February 29 is skipped in non-leap years.");
-    const scope = readUi(
-      join(SRC_ROOT, "features/tasks/components/recurrence-scope-dialog.tsx"),
-    );
-    expect(scope).toContain("This is a repeating task.");
-    expect(scope).toContain("This task only");
-    expect(scope).toContain("This and following tasks");
-    expect(scope).toContain("All unfinished tasks in the series");
-    expect(scope).toContain("All tasks in the series");
-    expect(scope).toContain("Completed and individually customized tasks are kept.");
-    expect(scope).toContain("This completed task will be permanently removed. Other repeats are kept.");
-    const detail = readUi(
-      join(SRC_ROOT, "features/tasks/components/task-detail-modal.tsx"),
-    );
-    expect(detail).toContain("Stop repeating");
-    const taskForm = readUi(
-      join(SRC_ROOT, "features/tasks/components/task-form.tsx"),
-    );
-    expect(taskForm).toContain("Stop repeating?");
-    expect(taskForm).toContain("This series will stop repeating. Existing tasks are kept.");
-    expect(taskForm).toContain("if (recurrence === null)");
-    expect(taskForm).not.toContain("allowNone={false}");
-    expect(seriesEdit).toContain("allowNone={false}");
   });
 });

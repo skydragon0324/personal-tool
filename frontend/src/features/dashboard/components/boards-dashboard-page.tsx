@@ -34,9 +34,6 @@ export function BoardsDashboardPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader title={t("shell.boards")} description={t("dashboard.overviewHint")}>
-        <Button variant="subtle" component={Link} href="/boards/recurring">
-          {t("dashboard.recurringTasks")}
-        </Button>
         <Button variant="light" onClick={() => chrome?.openManageBoards()}>
           {t("dashboard.manageBoards")}
         </Button>

@@ -23,7 +23,6 @@ function row(overrides: Partial<DashboardTaskRow>): DashboardTaskRow {
     assignees: [],
     subtask_total: 0,
     subtask_completed: 0,
-    is_recurring: false,
     ...overrides,
   };
 }

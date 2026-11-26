@@ -1,9 +1,14 @@
 import { Button, Group, Loader, SegmentedControl, Select, Text, TextInput } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/features/shell/components/page-header";
+import { apiClient } from "@/lib/api-client";
+import { useRouter } from "@/lib/navigation";
 import { notifyApiError } from "@/lib/notify";
+
+import { noteKeys } from "../api/note-queries";
 
 import { useNoteMutations, useNotes } from "../hooks/use-notes";
 import type { Note, NoteCreate, NotePriority, NoteUpdate } from "../types";
@@ -32,6 +37,31 @@ export function NotepadPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Note | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const noteParam = typeof router.query.note === "string" ? router.query.note : null;
+  const newParam = router.query.new === "1";
+
+  // Links such as search results open a note (`?note=<id>`); `?new=1` starts a new one.
+  // The query is cleared afterwards so closing the note does not reopen it.
+  useEffect(() => {
+    if (!router.isReady || (!noteParam && !newParam)) return;
+    void router.replace("/notepad", undefined, { shallow: true });
+    if (newParam) {
+      setEditing(null);
+      setEditorOpen(true);
+      return;
+    }
+    if (!noteParam) return;
+    queryClient
+      .fetchQuery({ queryKey: noteKeys.detail(noteParam), queryFn: () => apiClient.getNote(noteParam) })
+      .then((note) => {
+        setEditing(note);
+        setEditorOpen(true);
+      })
+      .catch((error: unknown) => notifyApiError(error, t("notes.couldNotLoad")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per link, not when router changes identity
+  }, [router.isReady, noteParam, newParam]);
 
   useEffect(() => {
     document.title = "Notepad · Task Management";

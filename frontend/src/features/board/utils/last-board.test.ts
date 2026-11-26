@@ -29,7 +29,7 @@ describe("board preferences", () => {
         store.set(key, value);
       },
     };
-    const prefs = { ...defaultBoardPreferences(), viewMode: "table" as const, categoryId: "cat-1" };
+    const prefs = { ...defaultBoardPreferences(), viewMode: "table" as const, categoryIds: ["cat-1"] };
     writeBoardPreferences("board-1", prefs, storage);
     expect(store.get(boardPreferencesKey("board-1"))).toContain("table");
     expect(readBoardPreferences("board-1", storage).viewMode).toBe("table");

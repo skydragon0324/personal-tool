@@ -58,6 +58,8 @@ export const SearchIcon = (props: IconProps) => <Icon {...props}><circle cx="11"
 export const ResetIcon = (props: IconProps) => <Icon {...props}><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" /></Icon>;
 export const ChevronLeftIcon = (props: IconProps) => <Icon {...props}><path d="m15 6-6 6 6 6" /></Icon>;
 export const ChevronRightIcon = (props: IconProps) => <Icon {...props}><path d="m9 6 6 6-6 6" /></Icon>;
+export const ChevronUpIcon = (props: IconProps) => <Icon {...props}><path d="m6 15 6-6 6 6" /></Icon>;
+export const ChevronDownIcon = (props: IconProps) => <Icon {...props}><path d="m6 9 6 6 6-6" /></Icon>;
 export const LayersIcon = (props: IconProps) => (
   <Icon {...props}><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5" /></Icon>
 );

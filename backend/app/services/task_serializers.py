@@ -6,7 +6,6 @@ from typing import Any
 from app.core.config import get_settings
 from app.models import Task, TaskAttachment
 from app.schemas.category import CategorySummary
-from app.schemas.recurrence import RecurrenceRead
 from app.schemas.task import (
     TaskAssigneeRead,
     TaskAttachmentRead,
@@ -46,26 +45,6 @@ def with_current_attachment_urls(content: Any) -> Any:
         return result
 
     return visit(content) if content is not None else None
-
-
-def recurrence_from_task(task: Task) -> RecurrenceRead | None:
-    series = getattr(task, "recurrence_series", None)
-    if series is None or task.recurrence_series_id is None:
-        return None
-    return RecurrenceRead(
-        series_id=series.id,
-        status=series.status,  # type: ignore[arg-type]
-        freq=series.freq,  # type: ignore[arg-type]
-        interval=series.interval,
-        weekdays=list(series.weekdays or []),
-        month_day=series.month_day,
-        until_date=series.until_date,
-        occurrence_limit=series.occurrence_limit,
-        occurrence_date=task.occurrence_date,
-        original_occurrence_date=task.original_occurrence_date,
-        is_detached=bool(task.is_detached),
-        occurrence_index=task.occurrence_index,
-    )
 
 
 def assignees_from_task(task: Task) -> list[TaskAssigneeRead]:
@@ -121,7 +100,6 @@ def to_summary(task: Task) -> TaskSummaryRead:
         subtask_completed=subtask_completed,
         subtask_total=subtask_total,
         category=CategorySummary.model_validate(task.category),
-        recurrence=recurrence_from_task(task),
         assignees=assignees_from_task(task),
     )
 
@@ -168,5 +146,4 @@ def to_detail(task: Task) -> TaskDetailRead:
         ],
         parent=TaskParentRead(id=task.parent.id, title=task.parent.title) if task.parent else None,
         category=CategorySummary.model_validate(task.category),
-        recurrence=recurrence_from_task(task),
     )

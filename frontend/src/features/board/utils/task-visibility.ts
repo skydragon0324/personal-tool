@@ -1,5 +1,6 @@
 import type { BoardFilters, TaskDetail, TaskSummary } from "../types";
 import { createdAtDate, dateInRange, type DateField } from "./date-presets";
+import { matchesAssignees, matchesCategories, matchesPriorities } from "./filter-tasks";
 import { t } from "@/i18n";
 
 export interface DateViewState {
@@ -29,11 +30,12 @@ export function isTaskInDateView(
 }
 
 export function isTaskHiddenByFilters(
-  task: Pick<TaskSummary, "title" | "content_preview" | "priority" | "category">,
+  task: Pick<TaskSummary, "title" | "content_preview" | "priority" | "category" | "assignees">,
   filters: BoardFilters,
 ): boolean {
-  if (filters.priority && task.priority !== filters.priority) return true;
-  if (filters.categoryId && task.category?.id !== filters.categoryId) return true;
+  if (!matchesPriorities(task.priority, filters.priorities)) return true;
+  if (!matchesCategories(task.category?.id, filters.categoryIds)) return true;
+  if (!matchesAssignees(task.assignees ?? [], filters.assigneeIds)) return true;
   const query = filters.query.trim().toLowerCase();
   if (query) {
     const haystack = `${task.title} ${task.content_preview ?? ""}`.toLowerCase();
@@ -62,6 +64,7 @@ export function createSaveNotice(
         content_preview: task.content_text || task.description || "",
         priority: task.priority,
         category: task.category,
+        assignees: task.assignees,
       },
       filters,
     ),

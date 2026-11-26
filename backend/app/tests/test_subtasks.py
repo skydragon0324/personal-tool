@@ -117,12 +117,7 @@ def test_subtask_is_a_full_task_hidden_from_lists(
     assert detail["links"][0]["label"] == "Spec"
     assert detail["parent"] == {"id": str(parent.id), "title": parent.title}
 
-    # A sub-task cannot repeat or have its own sub-tasks.
-    repeat = client.patch(
-        f"/api/v1/tasks/{child['id']}",
-        json={"recurrence": {"freq": "daily", "interval": 1}},
-    )
-    assert repeat.status_code == 422
+    # A sub-task cannot have its own sub-tasks.
     nested = client.post(f"/api/v1/tasks/{child['id']}/subtasks", json={"title": "Too deep"})
     assert nested.status_code == 422
 
@@ -223,7 +218,7 @@ def test_subtask_cannot_move_to_another_board_on_its_own(
     assert "parent" in moved.json()["detail"]
 
 
-def test_deleting_a_repeating_task_series_removes_occurrence_subtasks(
+def test_deleting_a_task_removes_its_subtasks(
     client: TestClient,
     db: Session,
     seed_tasks: list[Task],
@@ -237,16 +232,15 @@ def test_deleting_a_repeating_task_series_removes_occurrence_subtasks(
             "title": "Water plants",
             "start_date": today.isoformat(),
             "due_date": today.isoformat(),
-            "recurrence": {"freq": "daily", "interval": 1},
         },
     )
     assert created.status_code == 201, created.text
-    occurrence = created.json()
+    task = created.json()
     child_id = client.post(
-        f"/api/v1/tasks/{occurrence['id']}/subtasks", json={"title": "Fill the can"}
+        f"/api/v1/tasks/{task['id']}/subtasks", json={"title": "Fill the can"}
     ).json()["id"]
 
-    deleted = client.delete(f"/api/v1/tasks/{occurrence['id']}", params={"delete_scope": "series"})
+    deleted = client.delete(f"/api/v1/tasks/{task['id']}")
     assert deleted.status_code == 204, deleted.text
     db.expire_all()
     assert db.get(Task, child_id) is None

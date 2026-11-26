@@ -273,7 +273,6 @@ def list_tasks(
             ],
             subtask_total=int(total or 0),
             subtask_completed=int(done or 0),
-            is_recurring=task.recurrence_series_id is not None,
         )
         for task, board, column, category, total, done in rows[:TASK_LIST_LIMIT]
     ]

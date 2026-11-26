@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/components/auth-provider";
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
-import { RecurrenceScopeDialog } from "@/features/tasks/components/recurrence-scope-dialog";
 import { TaskDetailModal } from "@/features/tasks/components/task-detail-modal";
 import { TaskDialog } from "@/features/tasks/components/task-dialog";
 import { ApiError } from "@/lib/api-client";
@@ -68,10 +67,10 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   const [dateField, setDateField] = useState<DateField>(prefs.dateField);
   const [customError, setCustomError] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilters>({
-    priority: prefs.priority,
+    priorities: prefs.priorities,
     query: DEFAULT_FILTERS.query,
-    categoryId: prefs.categoryId,
-    assigneeId: "",
+    categoryIds: prefs.categoryIds,
+    assigneeIds: [],
   });
 
   useEffect(() => {
@@ -83,10 +82,10 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     setDateField(loaded.dateField);
     setCustomError(null);
     setFilters({
-      priority: loaded.priority,
+      priorities: loaded.priorities,
       query: "",
-      categoryId: loaded.categoryId,
-      assigneeId: "",
+      categoryIds: loaded.categoryIds,
+      assigneeIds: [],
     });
     writeLastBoardId(boardId, window.localStorage);
   }, [boardId]);
@@ -119,7 +118,6 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     create,
     update,
     remove,
-    stopRecurrence,
     uploadAttachment,
     deleteAttachment,
     duplicate,
@@ -143,8 +141,6 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
   const [deleting, setDeleting] = useState<{
     id: string;
     title: string;
-    repeating?: boolean;
-    completed?: boolean;
     // Set when deleting a sub-task: the modal goes back to its parent.
     parentId?: string | null;
   } | null>(null);
@@ -207,16 +203,16 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     setAppliedRange(range);
     setCustomError(null);
     setFilters({
-      priority: "",
+      priorities: [],
       query: "",
-      categoryId: "",
-      assigneeId: "",
+      categoryIds: [],
+      assigneeIds: [],
     });
     updatePrefs({
       rangeMode: "month",
       dateField: "due_date",
-      priority: "",
-      categoryId: "",
+      priorities: [],
+      categoryIds: [],
       customRange: null,
       anchorDate: range[0],
     });
@@ -267,8 +263,6 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           priority: payload.priority,
           category_id: payload.category_id,
           links: payload.links,
-          edit_scope: payload.edit_scope,
-          recurrence: payload.recurrence,
           remind_at: payload.remind_at,
           assignee_ids: payload.assignee_ids,
         },
@@ -300,8 +294,6 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
       priority: payload.priority,
       category_id: payload.category_id,
       links: payload.links,
-      edit_scope: payload.edit_scope,
-      recurrence: payload.recurrence,
       remind_at: payload.remind_at,
       assignee_ids: payload.assignee_ids,
     };
@@ -314,17 +306,10 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     return updated;
   }
 
-  async function handleDelete(
-    scope: "this" | "this_and_future" | "series" = "this",
-    confirmCompleted = false,
-  ) {
+  async function handleDelete() {
     if (!deleting) return;
     try {
-      await remove.mutateAsync({
-        taskId: deleting.id,
-        deleteScope: deleting.repeating ? scope : "this",
-        confirmCompleted,
-      });
+      await remove.mutateAsync({ taskId: deleting.id });
     } catch (err) {
       notifyApiError(err, t("boardPage.couldNotDelete"));
       return;
@@ -347,13 +332,11 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
     id: string;
     title: string;
     assignees?: MovableTask["assignees"];
-    recurrence?: { series_id: string } | null;
   }) {
     setMoving({
       id: task.id,
       title: task.title,
       assignees: task.assignees ?? [],
-      repeating: Boolean(task.recurrence?.series_id),
     });
   }
 
@@ -473,7 +456,7 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         filters={filters}
         onFiltersChange={(next) => {
           setFilters(next);
-          updatePrefs({ priority: next.priority, categoryId: next.categoryId });
+          updatePrefs({ priorities: next.priorities, categoryIds: next.categoryIds });
         }}
         categories={categoriesQuery.data ?? []}
         people={people}
@@ -572,8 +555,6 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
             setDeleting({
               id: task.id,
               title: task.title,
-              repeating: Boolean(task.recurrence?.series_id),
-              completed: Boolean(task.completed_at),
             })
           }
           canManageStatuses={isOwner}
@@ -647,18 +628,9 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
           setDeleting({
             id: taskId,
             title,
-            repeating: Boolean(meta?.repeating),
-            completed: Boolean(meta?.completed),
             parentId: meta?.parentId ?? null,
           });
         }}
-        onStopRepeat={
-          viewingId
-            ? async (seriesId) => {
-                await stopRecurrence.mutateAsync(seriesId);
-              }
-            : undefined
-        }
         onDuplicate={(task) => void handleDuplicate(task.id)}
         onMoveToBoard={startMove}
       />
@@ -671,27 +643,13 @@ export function BoardPage({ boardId, initialDate }: BoardPageProps) {
         onMove={(target, columnId) => void handleMoveToBoard(target, columnId)}
       />
 
-      {deleting?.repeating ? (
-        <RecurrenceScopeDialog
-          open
-          mode="delete"
-          taskTitle={deleting.title}
-          completed={Boolean(deleting.completed)}
-          submitting={remove.isPending}
-          onClose={() => setDeleting(null)}
-          onConfirm={(scope, confirmCompleted) =>
-            void handleDelete(scope, Boolean(confirmCompleted || deleting.completed))
-          }
-        />
-      ) : (
-        <DeleteTaskDialog
-          open={deleting !== null}
-          taskTitle={deleting?.title ?? ""}
-          submitting={remove.isPending}
-          onClose={() => setDeleting(null)}
-          onConfirm={() => void handleDelete()}
-        />
-      )}
+      <DeleteTaskDialog
+        open={deleting !== null}
+        taskTitle={deleting?.title ?? ""}
+        submitting={remove.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => void handleDelete()}
+      />
 
       {isOwner ? (
         <StatusManagerModal

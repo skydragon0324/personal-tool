@@ -5,7 +5,6 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -28,7 +27,6 @@ if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.task_attachment import TaskAttachment
     from app.models.task_link import TaskLink
-    from app.models.task_recurrence import TaskRecurrenceSeries
     from app.models.user import User
 
 
@@ -48,15 +46,7 @@ class Task(Base):
         Index("ix_tasks_due_priority", "due_date", "priority"),
         Index("ix_tasks_start_due", "start_date", "due_date"),
         Index("ix_tasks_content_text", "content_text"),
-        Index("ix_tasks_series_occurrence_date", "recurrence_series_id", "occurrence_date"),
         Index("ix_tasks_remind_at", "remind_at", postgresql_where=text("remind_at IS NOT NULL")),
-        Index(
-            "uq_tasks_series_original_occurrence",
-            "recurrence_series_id",
-            "original_occurrence_date",
-            unique=True,
-            postgresql_where=text("recurrence_series_id IS NOT NULL"),
-        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -83,18 +73,6 @@ class Task(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     remind_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    recurrence_series_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("task_recurrence_series.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    occurrence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    original_occurrence_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    occurrence_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    is_detached: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("false")
-    )
     parent_task_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tasks.id", ondelete="CASCADE"),
@@ -115,9 +93,6 @@ class Task(Base):
     # Everyone assigned to the task, via task_assignees.
     assignees: Mapped[list[User]] = relationship(
         "User", secondary="task_assignees", lazy="selectin", order_by="User.display_name"
-    )
-    recurrence_series: Mapped[TaskRecurrenceSeries | None] = relationship(
-        "TaskRecurrenceSeries", back_populates="occurrences"
     )
     links: Mapped[list[TaskLink]] = relationship(
         "TaskLink",

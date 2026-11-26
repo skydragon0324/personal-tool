@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { TaskDetailModal } from "@/features/tasks/components/task-detail-modal";
 import { DeleteTaskDialog } from "@/features/tasks/components/delete-task-dialog";
-import { RecurrenceScopeDialog } from "@/features/tasks/components/recurrence-scope-dialog";
 import { useColumns } from "@/features/board/hooks/use-columns";
 import { useTaskMutations } from "@/features/board/hooks/use-task-mutations";
 import type { BoardColumn, BoardQueryParams, TaskCreate, TaskDetail } from "@/features/board/types";
@@ -40,15 +39,13 @@ export function TodayTaskModal({
     unbounded: true,
   };
   const columnsQuery = useColumns(boardId ?? "", false);
-  const { update, remove, stopRecurrence, uploadAttachment, deleteAttachment } = useTaskMutations(query);
+  const { update, remove, uploadAttachment, deleteAttachment } = useTaskMutations(query);
   // The task on screen: the one Today opened, or one of its sub-tasks (or back to the parent).
   const [openId, setOpenId] = useState(taskId);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [deleting, setDeleting] = useState<{
     id: string;
     title: string;
-    repeating?: boolean;
-    completed?: boolean;
     parentId?: string | null;
   } | null>(null);
 
@@ -86,8 +83,6 @@ export function TodayTaskModal({
         priority: payload.priority,
         category_id: payload.category_id,
         links: payload.links,
-        edit_scope: payload.edit_scope,
-        recurrence: payload.recurrence,
         remind_at: payload.remind_at,
         assignee_ids: payload.assignee_ids,
       },
@@ -126,55 +121,26 @@ export function TodayTaskModal({
           setDeleting({
             id,
             title,
-            repeating: Boolean(meta?.repeating),
-            completed: Boolean(meta?.completed),
             parentId: meta?.parentId ?? null,
           })
         }
-        onStopRepeat={async (seriesId) => {
-          await stopRecurrence.mutateAsync(seriesId);
+      />
+      <DeleteTaskDialog
+        open={deleting !== null}
+        taskTitle={deleting?.title ?? ""}
+        submitting={remove.isPending}
+        onClose={() => setDeleting(null)}
+        onConfirm={async () => {
+          if (!deleting) return;
+          try {
+            await remove.mutateAsync({ taskId: deleting.id });
+          } catch (error) {
+            notifyApiError(error, t("boardPage.couldNotDelete"));
+            return;
+          }
+          finishDelete(deleting.parentId);
         }}
       />
-      {deleting?.repeating ? (
-        <RecurrenceScopeDialog
-          open
-          mode="delete"
-          taskTitle={deleting.title}
-          completed={Boolean(deleting.completed)}
-          submitting={remove.isPending}
-          onClose={() => setDeleting(null)}
-          onConfirm={async (scope, confirmCompleted) => {
-            try {
-              await remove.mutateAsync({
-                taskId: deleting.id,
-                deleteScope: scope,
-                confirmCompleted: Boolean(confirmCompleted || deleting.completed),
-              });
-            } catch (error) {
-              notifyApiError(error, t("boardPage.couldNotDelete"));
-              return;
-            }
-            finishDelete(deleting.parentId);
-          }}
-        />
-      ) : (
-        <DeleteTaskDialog
-          open={deleting !== null}
-          taskTitle={deleting?.title ?? ""}
-          submitting={remove.isPending}
-          onClose={() => setDeleting(null)}
-          onConfirm={async () => {
-            if (!deleting) return;
-            try {
-              await remove.mutateAsync({ taskId: deleting.id });
-            } catch (error) {
-              notifyApiError(error, t("boardPage.couldNotDelete"));
-              return;
-            }
-            finishDelete(deleting.parentId);
-          }}
-        />
-      )}
     </>
   );
 }

@@ -1,7 +1,9 @@
+import { PointerActivationConstraints } from "@dnd-kit/dom";
+import { DragDropProvider, KeyboardSensor, PointerSensor, useDraggable, useDroppable } from "@dnd-kit/react";
 import { ActionIcon, Button, Group, Menu, Modal, ScrollArea, Text, TextInput } from "@mantine/core";
 import Link from "next/link";
 import { usePathname } from "@/lib/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AccountSettingsModal } from "@/features/auth/components/account-settings-modal";
 import { useAuth } from "@/features/auth/components/auth-provider";
@@ -12,18 +14,40 @@ import { boardsInFolder, useBoardFolderMutations, useBoardFolders } from "@/feat
 import { useBoards, activeBoards } from "@/features/board/hooks/use-boards";
 import type { BoardFolder, BoardListItem } from "@/features/board/types";
 import { BoardGlyph, boardColorClass } from "@/features/board/utils/board-icons";
+import { POINTER_ACTIVATION_DISTANCE } from "@/features/board/utils/pointer-activation";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { SearchField } from "@/features/search/components/search-field";
 import { notifyApiError, notifySuccess } from "@/lib/notify";
 
 import { useSidebarCounts } from "../hooks/use-sidebar-counts";
+import {
+  SIDEBAR_BOARD_DRAG_TYPE,
+  canMoveBoardToFolder,
+  folderDropId,
+  folderMoveFromDrop,
+  type BoardDragData,
+  type FolderDropData,
+} from "../utils/board-folder-drop";
 import { boardsGroupExpanded, readBoardsNavCollapsed, writeBoardsNavCollapsed } from "../utils/boards-nav";
 import { boardIdFromPath, isBoardsIndexPath, sectionFromPath, type AppSection } from "../utils/navigation";
 import { NavIcon, type NavIconName } from "./nav-icons";
+import { SidebarToggle } from "./sidebar-toggle";
 import { useWorkspaceChrome } from "./workspace-chrome";
 import { t } from "@/i18n";
 
 const COLLAPSED_FOLDERS_KEY = "life-management:collapsed-folders";
 let savedBoardListScrollTop = 0;
+
+// A short pointer move still counts as a click, so board links keep navigating. Enter keeps
+// following the link; Space picks a board up for keyboard dragging.
+const BOARD_DRAG_SENSORS = [
+  PointerSensor.configure({
+    activationConstraints: [new PointerActivationConstraints.Distance({ value: POINTER_ACTIVATION_DISTANCE })],
+  }),
+  KeyboardSensor.configure({
+    keyboardCodes: { ...KeyboardSensor.defaults.keyboardCodes, start: ["Space"] },
+  }),
+];
 
 type FolderDialog = { mode: "create" } | { mode: "rename"; folder: BoardFolder } | { mode: "delete"; folder: BoardFolder };
 
@@ -59,8 +83,9 @@ export function AppSidebar() {
 
   return (
     <div className="flex h-full flex-col border-r border-[var(--app-border)] bg-[var(--app-surface)]">
-      <div className="flex items-center justify-between gap-1 border-b border-[var(--app-border)] py-4 pl-3 pr-2">
+      <div className="flex items-center justify-between gap-1 border-b border-[var(--app-border)] py-4 pl-2 pr-2">
         <div className="flex min-w-0 items-center gap-2">
+          <SidebarToggle />
           <LeafIcon size={28} className="shrink-0 text-[var(--app-primary)]" />
           <div className="min-w-0">
             <p className="truncate font-display text-base font-semibold leading-tight text-[var(--app-text)]">
@@ -72,10 +97,13 @@ export function AppSidebar() {
         <NotificationBell />
       </div>
       <nav aria-label={t("shell.navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-3">
+        <div className="mb-2 shrink-0">
+          <SearchField onNavigate={close} />
+        </div>
         <NavLink href="/today" icon="home" label={t("shell.home")} section="today" current={section} onClick={close} />
+        <NavLink href="/inbox" icon="inbox" label={t("shell.inbox")} section="inbox" current={section} count={counts.inbox} onClick={close} />
         <NavLink href="/my-tasks" icon="myTasks" label={t("shell.myTasks")} section="myTasks" current={section} count={counts.myTasks} onClick={close} />
         <NavLink href="/calendar" icon="calendar" label={t("shell.calendar")} section="calendar" current={section} onClick={close} />
-        <NavLink href="/inbox" icon="inbox" label={t("shell.inbox")} section="inbox" current={section} count={counts.inbox} onClick={close} />
         <NavLink href="/reports" icon="reports" label={t("shell.reports")} section="reports" current={section} onClick={close} />
         <div className="my-2 h-px shrink-0 bg-[var(--app-border)]" />
         <div className="flex shrink-0 items-center gap-0.5">
@@ -122,7 +150,6 @@ export function AppSidebar() {
             onFolderDialog={setFolderDialog}
           />
         ) : null}
-        <div className="my-2 h-px shrink-0 bg-[var(--app-border)]" />
         <NavLink href="/plans" icon="plans" label={t("shell.plans")} section="plans" current={section} onClick={close} />
         <NavLink href="/notepad" icon="notepad" label={t("shell.notepad")} section="notepad" current={section} onClick={close} />
         <NavLink href="/schedule" icon="schedule" label={t("shell.schedule")} section="schedule" current={section} onClick={close} />
@@ -208,9 +235,11 @@ function BoardTree({
   onFolderDialog: (dialog: FolderDialog) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const currentRef = useRef<HTMLAnchorElement>(null);
+  const currentRef = useRef<HTMLAnchorElement | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<string[]>([]);
+  const [dragSource, setDragSource] = useState<BoardDragData | null>(null);
   const folderIds = useMemo(() => new Set(folders.map((folder) => folder.id)), [folders]);
+  const { moveBoard } = useBoardFolderMutations();
 
   useEffect(() => {
     try {
@@ -255,39 +284,57 @@ function BoardTree({
 
   const renderBoard = (board: BoardListItem) => {
     const current = board.id === currentBoardId;
+    const folderId = board.folder_id && folderIds.has(board.folder_id) ? board.folder_id : null;
     return (
-      <div key={board.id} className="group/board relative flex items-center">
-        <Link
-          href={`/boards/${board.id}`}
-          ref={current ? currentRef : undefined}
-          onClick={onNavigate}
-          aria-current={current ? "page" : undefined}
-          className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 pl-2 pr-7 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)] ${
-            current
-              ? "bg-[var(--app-primary-soft)] text-[var(--app-text)]"
-              : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)]"
-          }`}
-        >
-          <span className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-white ${boardColorClass(board.color)}`}>
-            <BoardGlyph name={board.icon_name} size={12} />
-          </span>
-          <span className="min-w-0 flex-1 truncate">{board.name}</span>
-          {board.role === "member" ? (
-            <span
-              className="shrink-0 text-[var(--app-text-muted)]"
-              title={board.owner_name ? t("shell.sharedBy", { name: board.owner_name }) : t("shell.sharedWithYou")}
-              aria-label={t("shell.sharedWithYou")}
+      <DraggableBoard
+        key={board.id}
+        boardId={board.id}
+        folderId={folderId}
+        disabled={!canMoveBoardToFolder(board) || !folders.length}
+      >
+        {(dragRef) => (
+          <>
+            <Link
+              href={`/boards/${board.id}`}
+              ref={(element: HTMLAnchorElement | null) => {
+                dragRef(element);
+                if (current) currentRef.current = element;
+                else if (currentRef.current === element) currentRef.current = null;
+              }}
+              // The board is dragged with dnd-kit; the browser's own link dragging would compete with it.
+              draggable={false}
+              onClick={onNavigate}
+              aria-current={current ? "page" : undefined}
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 pl-2 pr-7 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)] ${
+                current
+                  ? "bg-[var(--app-primary-soft)] text-[var(--app-text)]"
+                  : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-text)]"
+              }`}
             >
-              <SharedIcon />
-            </span>
-          ) : null}
-        </Link>
-        {board.role !== "member" && folders.length ? <BoardFolderMenu board={board} folders={folders} /> : null}
-      </div>
+              <span className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-white ${boardColorClass(board.color)}`}>
+                <BoardGlyph name={board.icon_name} size={12} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{board.name}</span>
+              {board.role === "member" ? (
+                <span
+                  className="shrink-0 text-[var(--app-text-muted)]"
+                  title={board.owner_name ? t("shell.sharedBy", { name: board.owner_name }) : t("shell.sharedWithYou")}
+                  aria-label={t("shell.sharedWithYou")}
+                >
+                  <SharedIcon />
+                </span>
+              ) : null}
+            </Link>
+            {board.role !== "member" && folders.length ? <BoardFolderMenu board={board} folders={folders} /> : null}
+          </>
+        )}
+      </DraggableBoard>
     );
   };
 
   const ungrouped = boardsInFolder(boards, folderIds, null);
+  // Dropping a board where it already is changes nothing, so that target is not highlighted.
+  const isValidTarget = (folderId: string | null) => dragSource !== null && dragSource.folderId !== folderId;
 
   return (
     <div
@@ -295,70 +342,153 @@ function BoardTree({
       className="mt-1 ml-3 max-h-[min(40vh,320px)] shrink-0 overflow-hidden border-l border-[var(--app-border)] pl-2"
     >
       <ScrollArea.Autosize mah="min(40vh, 320px)" type="auto" viewportRef={viewportRef}>
-        <div className="flex flex-col gap-0.5 py-1 pr-1">
-          {folders.map((folder) => {
-            const open = !collapsedFolders.includes(folder.id);
-            const inside = boardsInFolder(boards, folderIds, folder.id);
-            return (
-              <div key={folder.id}>
-                <div className="group/folder flex items-center rounded-lg hover:bg-[var(--app-surface-muted)]">
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    aria-label={t("shell.toggleFolder", { name: folder.name })}
-                    onClick={() => toggleFolder(folder.id)}
-                    className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg py-1.5 pl-1 text-left text-xs font-semibold text-[var(--app-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
-                  >
-                    <ChevronIcon expanded={open} size={13} />
-                    <FolderIcon />
-                    <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                  </button>
-                  <div className="flex shrink-0 items-center opacity-100 sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover/folder:opacity-100">
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      size="sm"
-                      aria-label={t("shell.newBoardInFolder", { name: folder.name })}
-                      onClick={() => onNewBoard(folder.id)}
+        <DragDropProvider
+          sensors={BOARD_DRAG_SENSORS}
+          onDragStart={(event) => setDragSource((event.operation.source?.data as BoardDragData | undefined) ?? null)}
+          onDragEnd={(event) => {
+            setDragSource(null);
+            const move = folderMoveFromDrop(event.operation.source?.data, event.operation.target?.data, event.canceled);
+            if (!move) return;
+            moveBoard.mutate(move, { onError: (error) => notifyApiError(error, t("workspace.couldNotSave")) });
+          }}
+        >
+          <div className="flex flex-col gap-0.5 py-1 pr-1">
+            {folders.map((folder) => {
+              const open = !collapsedFolders.includes(folder.id);
+              const inside = boardsInFolder(boards, folderIds, folder.id);
+              return (
+                <FolderDropZone key={folder.id} folderId={folder.id} name={folder.name} valid={isValidTarget(folder.id)}>
+                  <div className="group/folder flex items-center rounded-lg hover:bg-[var(--app-surface-muted)]">
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-label={t("shell.toggleFolder", { name: folder.name })}
+                      onClick={() => toggleFolder(folder.id)}
+                      className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg py-1.5 pl-1 text-left text-xs font-semibold text-[var(--app-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
                     >
-                      <PlusIcon size={13} />
-                    </ActionIcon>
-                    <Menu shadow="md" position="bottom-end" withinPortal>
-                      <Menu.Target>
-                        <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t("shell.folderMenu", { name: folder.name })}>
-                          <DotsIcon size={14} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item onClick={() => onFolderDialog({ mode: "rename", folder })}>{t("shell.renameFolder")}</Menu.Item>
-                        <Menu.Item color="red" onClick={() => onFolderDialog({ mode: "delete", folder })}>
-                          {t("shell.deleteFolder")}
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
+                      <ChevronIcon expanded={open} size={13} />
+                      <FolderIcon />
+                      <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                    </button>
+                    <div className="flex shrink-0 items-center opacity-100 sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover/folder:opacity-100">
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="sm"
+                        aria-label={t("shell.newBoardInFolder", { name: folder.name })}
+                        onClick={() => onNewBoard(folder.id)}
+                      >
+                        <PlusIcon size={13} />
+                      </ActionIcon>
+                      <Menu shadow="md" position="bottom-end" withinPortal>
+                        <Menu.Target>
+                          <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t("shell.folderMenu", { name: folder.name })}>
+                            <DotsIcon size={14} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Item onClick={() => onFolderDialog({ mode: "rename", folder })}>{t("shell.renameFolder")}</Menu.Item>
+                          <Menu.Item color="red" onClick={() => onFolderDialog({ mode: "delete", folder })}>
+                            {t("shell.deleteFolder")}
+                          </Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    </div>
                   </div>
-                </div>
-                {open ? (
-                  <div className="ml-3 flex flex-col gap-0.5 pt-0.5">
-                    {inside.map(renderBoard)}
-                    {!inside.length ? (
-                      <Text size="xs" c="dimmed" px="xs" py={3}>
-                        {t("shell.emptyFolder")}
-                      </Text>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-          {ungrouped.map(renderBoard)}
-          {!boards.length && !folders.length ? (
-            <Text size="xs" c="dimmed" px="xs">
-              {t("shell.noBoards")}
-            </Text>
-          ) : null}
-        </div>
+                  {open ? (
+                    <div className="ml-3 flex flex-col gap-0.5 pt-0.5">
+                      {inside.map(renderBoard)}
+                      {!inside.length ? (
+                        <Text size="xs" c="dimmed" px="xs" py={3}>
+                          {t("shell.emptyFolder")}
+                        </Text>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </FolderDropZone>
+              );
+            })}
+            <FolderDropZone folderId={null} name={t("shell.noFolder")} valid={isValidTarget(null)}>
+              {ungrouped.map(renderBoard)}
+              {dragSource?.folderId ? (
+                <Text
+                  size="xs"
+                  c="dimmed"
+                  px="xs"
+                  py={6}
+                  className="rounded-lg border border-dashed border-[var(--app-border)] text-center"
+                >
+                  {t("shell.dropUngrouped")}
+                </Text>
+              ) : null}
+            </FolderDropZone>
+            {!boards.length && !folders.length ? (
+              <Text size="xs" c="dimmed" px="xs">
+                {t("shell.noBoards")}
+              </Text>
+            ) : null}
+          </div>
+        </DragDropProvider>
       </ScrollArea.Autosize>
+    </div>
+  );
+}
+
+/** A sidebar board row that can be dragged onto a folder; `children` gets the ref for the board link. */
+function DraggableBoard({
+  boardId,
+  folderId,
+  disabled,
+  children,
+}: {
+  boardId: string;
+  folderId: string | null;
+  disabled: boolean;
+  children: (ref: (element: Element | null) => void) => ReactNode;
+}) {
+  const data = useMemo<BoardDragData>(() => ({ boardId, folderId }), [boardId, folderId]);
+  const { ref, isDragging } = useDraggable({ id: `sidebar-board:${boardId}`, type: SIDEBAR_BOARD_DRAG_TYPE, data, disabled });
+  return (
+    <div
+      data-board-draggable={disabled ? undefined : "true"}
+      className={`group/board relative flex items-center ${isDragging ? "opacity-70" : ""}`}
+    >
+      {children(ref)}
+    </div>
+  );
+}
+
+/** A folder, or with `folderId` null the ungrouped area, that sidebar boards can be dropped onto. */
+function FolderDropZone({
+  folderId,
+  name,
+  valid,
+  children,
+}: {
+  folderId: string | null;
+  name: string;
+  valid: boolean;
+  children: ReactNode;
+}) {
+  const data = useMemo<FolderDropData>(() => ({ folderId }), [folderId]);
+  const { ref, isDropTarget } = useDroppable({
+    id: folderDropId(folderId),
+    type: "board-folder",
+    accept: SIDEBAR_BOARD_DRAG_TYPE,
+    data,
+  });
+  const highlighted = valid && isDropTarget;
+  return (
+    <div
+      ref={ref}
+      data-folder-drop={folderId ?? "none"}
+      data-drop-target={highlighted ? "true" : undefined}
+      title={highlighted ? t("shell.dropOnFolder", { name }) : undefined}
+      className={`flex flex-col gap-0.5 rounded-lg transition-colors ${
+        highlighted ? "bg-[var(--app-primary-soft)] outline outline-2 outline-[var(--app-primary)]" : ""
+      }`}
+    >
+      {children}
     </div>
   );
 }

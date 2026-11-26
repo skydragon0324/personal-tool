@@ -13,11 +13,13 @@ export interface CategoryDetail extends Category {
 }
 
 export interface BoardFilters {
-  priority: Priority | "";
+  /** Tasks matching any of these priorities are shown; empty shows every priority. */
+  priorities: Priority[];
   query: string;
-  categoryId: string;
-  /** "" = everyone, "unassigned", or a user id. */
-  assigneeId?: string;
+  /** Tasks in any of these categories are shown; empty shows every category. */
+  categoryIds: string[];
+  /** Tasks matching any selected user or "unassigned" are shown; empty shows everyone. */
+  assigneeIds: string[];
 }
 
 export type TiptapJSON = Record<string, unknown>;
@@ -35,35 +37,6 @@ export interface TaskLinkInput {
   label: string;
   url: string;
   position: number;
-}
-
-export type RecurrenceFreq = "daily" | "weekly" | "monthly" | "yearly";
-export type RecurrenceStatus = "active" | "stopped" | "archived";
-export type EditScope = "this" | "this_and_future" | "series";
-export type DeleteScope = "this" | "this_and_future" | "series";
-
-export interface RecurrenceInput {
-  freq: RecurrenceFreq;
-  interval?: number;
-  weekdays?: number[];
-  month_day?: number | null;
-  until_date?: string | null;
-  occurrence_limit?: number | null;
-}
-
-export interface RecurrenceRead {
-  series_id: string;
-  status: RecurrenceStatus;
-  freq: RecurrenceFreq;
-  interval: number;
-  weekdays: number[];
-  month_day: number | null;
-  until_date: string | null;
-  occurrence_limit: number | null;
-  occurrence_date: string | null;
-  original_occurrence_date: string | null;
-  is_detached: boolean;
-  occurrence_index: number | null;
 }
 
 export interface TaskAttachment {
@@ -104,7 +77,6 @@ export interface TaskSummary {
   subtask_total: number;
   subtask_completed: number;
   category: Category;
-  recurrence?: RecurrenceRead | null;
   /** Everyone the task is assigned to (can be several). */
   assignees?: TaskAssignee[];
 }
@@ -153,7 +125,6 @@ export interface TaskDetail {
   /** Set when this task is a sub-task. */
   parent?: { id: string; title: string } | null;
   category: Category;
-  recurrence?: RecurrenceRead | null;
   /** Everyone the task is assigned to (can be several). */
   assignees?: TaskAssignee[];
 }
@@ -266,8 +237,6 @@ export interface TaskCreate {
   due_date: string;
   priority?: Priority;
   links?: TaskLinkInput[];
-  recurrence?: RecurrenceInput | null;
-  edit_scope?: EditScope;
   /** ISO timestamp with offset; null clears the reminder. */
   remind_at?: string | null;
   /** Everyone to assign; an empty list leaves the task unassigned. */
@@ -283,8 +252,6 @@ export interface TaskUpdate {
   priority?: Priority;
   category_id?: string;
   links?: TaskLinkInput[];
-  edit_scope?: EditScope;
-  recurrence?: RecurrenceInput | null;
   remind_at?: string | null;
   assignee_ids?: string[];
 }

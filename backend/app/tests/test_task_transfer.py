@@ -74,7 +74,7 @@ def test_duplicate_copies_everything_but_the_assignee(client: TestClient, db: Se
     assert [link["url"] for link in copy["links"]] == ["https://example.com/spec"]
     assert [item["title"] for item in copy["subtasks"]] == ["Draft", "Review"]
     assert copy["assignees"] == []
-    assert copy["recurrence"] is None
+    assert "recurrence" not in copy
 
     # Files are real copies: the duplicate's file downloads on its own.
     assert len(copy["attachments"]) == 1
@@ -196,26 +196,3 @@ def test_cannot_move_to_a_board_you_cannot_access(client: TestClient, db: Sessio
     response = client.post(f"/api/v1/tasks/{task['id']}/move-to-board", json={"board_id": foreign})
     assert response.status_code == 404
     app.dependency_overrides.clear()
-
-
-def test_moving_a_repeating_occurrence_detaches_it(client: TestClient) -> None:
-    board_id, columns, categories = _board_ids(client)
-    created = client.post(
-        "/api/v1/tasks",
-        json={
-            "column_id": columns[0]["id"],
-            "category_id": categories[0]["id"],
-            "title": "Weekly sync",
-            "start_date": DAY,
-            "due_date": DAY,
-            "recurrence": {"freq": "weekly", "weekdays": [2]},
-        },
-    ).json()
-    target = _new_board(client, "Meetings")
-    moved = client.post(f"/api/v1/tasks/{created['id']}/move-to-board", json={"board_id": target}).json()
-    assert moved["recurrence"] is None
-
-    # The series does not recreate that date on the original board.
-    view = client.get(f"/api/v1/boards/{board_id}/view", params={"date": DAY}).json()
-    titles = [task["title"] for column in view["columns"] for task in column["tasks"]]
-    assert "Weekly sync" not in titles

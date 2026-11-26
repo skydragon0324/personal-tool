@@ -97,6 +97,8 @@ The backend always reads `backend/.env`, whichever folder it is started from; re
 | `PATCH` / `DELETE` | `/plan-days/{day_id}` | Change a day's date or label / delete it |
 | `POST` | `/plan-days/{day_id}/items` | Add a checkbox item |
 | `PATCH` / `DELETE` | `/plan-items/{item_id}` | Rename, check or uncheck / delete an item |
+| `GET` | `/calendar/tasks?start_date=&end_date=` | Tasks due in a date range across accessible boards (see below) |
+| `GET` | `/search?q=` | Search tasks, boards, notes and plans (see below) |
 | `GET` | `/notifications` | Generate due notifications and return the feed |
 | `GET` / `PATCH` | `/notifications/preferences` | Digest, schedule, reminder and quiet-hour settings |
 
@@ -114,6 +116,75 @@ Move body:
 ```
 
 Returns `409` when `expected_version` is stale.
+
+### Calendar: `GET /calendar/tasks`
+
+Top-level tasks whose `due_date` is within the range (both ends inclusive), on active boards you own or are a member of. Archived boards, archived statuses and sub-tasks are left out. The date filter runs in PostgreSQL.
+
+| Query parameter | Required | Notes |
+|-----------------|----------|-------|
+| `start_date` | yes | `YYYY-MM-DD`, first day shown |
+| `end_date` | yes | `YYYY-MM-DD`, last day shown. At most 62 days after `start_date` counted inclusively (`422 date_range_too_long`); before `start_date` is `422 end_before_start` |
+| `board_id` | no | Only this board; `404` if you can't access it |
+| `limit` | no | Default 500, 1–1000 |
+
+```json
+{
+  "start_date": "2026-07-27",
+  "end_date": "2026-09-06",
+  "items": [
+    {
+      "id": "uuid", "title": "Write report", "start_date": "2026-08-18", "due_date": "2026-08-20",
+      "is_done": false, "priority": "high",
+      "board_id": "uuid", "board_name": "Work", "board_color": "blue",
+      "status_id": "uuid", "status_name": "Todo"
+    }
+  ],
+  "truncated": false,
+  "limit": 500
+}
+```
+
+`truncated` is `true` when the range holds more than `limit` tasks; the soonest are returned (by due date, then priority and title). The calendar reschedules through `PATCH /tasks/{id}`.
+
+### Search: `GET /search`
+
+Case-insensitive substring search (`ILIKE`, with `%` and `_` in the query matched literally), run in the database.
+
+| Query parameter | Notes |
+|-----------------|-------|
+| `q` | Text to find. Empty or blank returns `{"query": "", "groups": []}`. Max 200 characters (the first 100 are used). |
+| `type` | Optional: `task`, `board`, `note` or `plan` |
+| `limit` | Results per type, default 5, 1–20 |
+
+What is searched, and who can see it:
+
+- **Tasks:** title, description text and the plain text of the rich-text content. Top-level tasks on active boards and statuses you own or share.
+- **Boards:** name. Active boards you own or share.
+- **Notes:** title and body. Your own notes only.
+- **Plans:** name and description. Your own plans only.
+
+```json
+{
+  "query": "report",
+  "groups": [
+    {
+      "type": "task",
+      "has_more": false,
+      "items": [
+        {
+          "type": "task", "id": "uuid", "label": "Write report",
+          "secondary": "…a short snippet around the match (at most 120 characters)…",
+          "board_id": "uuid", "board_name": "Work", "board_color": "blue",
+          "due_date": "2026-08-20", "is_done": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+Every result has the same shape. Only `type`, `id` and `label` are always set: `board_*`, `due_date` and `is_done` are for tasks (`board_*` also for boards), and `secondary` is a snippet or description. Full rich-text documents are never returned. Groups with no matches are omitted, and `has_more` says more matches exist than `limit`.
 
 ## Tests
 

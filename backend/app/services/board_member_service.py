@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -19,7 +19,6 @@ from app.models import (
     BoardMember,
     Task,
     TaskAssignee,
-    TaskRecurrenceSeries,
     User,
 )
 from app.schemas.board_member import (
@@ -108,14 +107,6 @@ def _unassign(db: Session, board_id: uuid.UUID, user_id: uuid.UUID) -> None:
     )
     db.execute(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id, TaskAssignee.task_id.in_(task_ids))
-    )
-    db.execute(
-        update(TaskRecurrenceSeries)
-        .where(
-            TaskRecurrenceSeries.board_id == board_id,
-            TaskRecurrenceSeries.assignee_ids.any(user_id),
-        )
-        .values(assignee_ids=func.array_remove(TaskRecurrenceSeries.assignee_ids, user_id))
     )
     db.expire_all()
 

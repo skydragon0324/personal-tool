@@ -209,58 +209,10 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
 
-  deleteTask: (
-    taskId: string,
-    options?: { deleteScope?: string; confirmCompleted?: boolean },
-  ) => {
-    const params = new URLSearchParams();
-    if (options?.deleteScope) params.set("delete_scope", options.deleteScope);
-    if (options?.confirmCompleted) params.set("confirm_completed", "true");
-    const query = params.toString();
-    return request<void>(`/api/v1/tasks/${taskId}${query ? `?${query}` : ""}`, {
+  deleteTask: (taskId: string) =>
+    request<void>(`/api/v1/tasks/${taskId}`, {
       method: "DELETE",
-    });
-  },
-
-  getRecurrenceSeries: (seriesId: string) =>
-    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
-      `/api/v1/task-recurrence/${seriesId}`,
-    ),
-
-  listRecurrenceSeries: (
-    params: import("@/features/recurrence/types").RecurrenceSeriesListParams = {},
-  ) => {
-    const search = new URLSearchParams();
-    if (params.board_id) search.set("board_id", params.board_id);
-    if (params.status) search.set("status", params.status);
-    if (params.offset !== undefined) search.set("offset", String(params.offset));
-    if (params.limit !== undefined) search.set("limit", String(params.limit));
-    const query = search.toString();
-    return request<import("@/features/recurrence/types").RecurrenceSeriesListResponse>(
-      `/api/v1/task-recurrence${query ? `?${query}` : ""}`,
-    );
-  },
-
-  stopRecurrence: (seriesId: string) =>
-    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
-      `/api/v1/task-recurrence/${seriesId}/stop`,
-      { method: "POST" },
-    ),
-
-  resumeRecurrence: (seriesId: string) =>
-    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
-      `/api/v1/task-recurrence/${seriesId}/resume`,
-      { method: "POST" },
-    ),
-
-  updateRecurrenceSeries: (
-    seriesId: string,
-    payload: import("@/features/recurrence/types").RecurrenceSeriesUpdatePayload,
-  ) =>
-    request<import("@/features/recurrence/types").RecurrenceSeriesRead>(
-      `/api/v1/task-recurrence/${seriesId}`,
-      { method: "PATCH", body: JSON.stringify(payload) },
-    ),
+    }),
 
   uploadAttachment: (taskId: string, file: File) => {
     const body = new FormData();
@@ -436,6 +388,36 @@ export const apiClient = {
     return request<import("@/features/dashboard/types").DashboardTaskList>(
       `/api/v1/dashboard/tasks${query ? `?${query}` : ""}`,
     );
+  },
+
+  /** Tasks due in the visible calendar range (inclusive), across every board you can open. */
+  getCalendarTasks: (
+    params: { startDate: string; endDate: string; boardId?: string | null; limit?: number },
+    signal?: AbortSignal,
+  ) => {
+    const search = new URLSearchParams();
+    search.set("start_date", params.startDate);
+    search.set("end_date", params.endDate);
+    if (params.boardId) search.set("board_id", params.boardId);
+    if (params.limit) search.set("limit", String(params.limit));
+    return request<import("@/features/calendar/types").CalendarTaskList>(
+      `/api/v1/calendar/tasks?${search.toString()}`,
+      { signal },
+    );
+  },
+
+  /** Tasks, boards, notes and plans whose names or text contain `query`. */
+  search: (
+    params: { query: string; type?: import("@/features/search/types").SearchType; limit?: number },
+    signal?: AbortSignal,
+  ) => {
+    const search = new URLSearchParams();
+    search.set("q", params.query);
+    if (params.type) search.set("type", params.type);
+    if (params.limit) search.set("limit", String(params.limit));
+    return request<import("@/features/search/types").SearchResponse>(`/api/v1/search?${search.toString()}`, {
+      signal,
+    });
   },
 
   getPlansOverview: (today: string) =>

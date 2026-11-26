@@ -1,5 +1,5 @@
 import { expandRangeToInclude } from "./date-presets";
-import { createSaveNotice, isTaskInDateView } from "./task-visibility";
+import { createSaveNotice, isTaskHiddenByFilters, isTaskInDateView } from "./task-visibility";
 
 const task = {
   id: "1",
@@ -44,7 +44,7 @@ describe("task visibility after save", () => {
         unbounded: false,
         dateField: "due_date",
       },
-      { priority: "", query: "", categoryId: "" },
+      { priorities: [], query: "", categoryIds: [], assigneeIds: [] },
     );
     expect(notice.outOfRange).toBe(true);
     expect(notice.jumpDate).toBe("2026-08-13");
@@ -63,10 +63,31 @@ describe("task visibility after save", () => {
         unbounded: false,
         dateField: "due_date",
       },
-      { priority: "high", query: "", categoryId: "" },
+      { priorities: ["high"], query: "", categoryIds: [], assigneeIds: [] },
     );
     expect(notice.outOfRange).toBe(false);
     expect(notice.hiddenByFilters).toBe(true);
     expect(notice.message).toContain("Task saved for");
+  });
+});
+
+describe("saved task and the multi-select priority filter", () => {
+  const view = { startDate: "2026-08-01", endDate: "2026-08-31", unbounded: false, dateField: "due_date" as const };
+
+  it("does not warn when the task matches any selected priority", () => {
+    const notice = createSaveNotice(task, view, { priorities: ["high", "medium"], query: "", categoryIds: [], assigneeIds: [] });
+    expect(notice.hiddenByFilters).toBe(false);
+  });
+
+  it("warns when the task matches none of the selected priorities", () => {
+    const notice = createSaveNotice(task, view, { priorities: ["high", "low"], query: "", categoryIds: [], assigneeIds: [] });
+    expect(notice.hiddenByFilters).toBe(true);
+  });
+
+  it("still applies the other filters alongside the priorities", () => {
+    const summary = { title: task.title, content_preview: task.content_text, priority: task.priority, category: task.category, assignees: [] };
+    expect(isTaskHiddenByFilters(summary, { priorities: ["medium"], query: "", categoryIds: ["home"], assigneeIds: [] })).toBe(true);
+    expect(isTaskHiddenByFilters(summary, { priorities: ["medium"], query: "design", categoryIds: ["work"], assigneeIds: [] })).toBe(false);
+    expect(isTaskHiddenByFilters(summary, { priorities: [], query: "missing", categoryIds: [], assigneeIds: [] })).toBe(true);
   });
 });

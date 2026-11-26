@@ -11,7 +11,6 @@ export interface MovableTask {
   id: string;
   title: string;
   assignees?: TaskAssignee[];
-  repeating?: boolean;
 }
 
 export function MoveToBoardModal({
@@ -97,11 +96,6 @@ export function MoveToBoardModal({
             {dropped.length
               ? t("boards.willBeUnassigned", { names: names(dropped), count: dropped.length })
               : t("boards.everyoneStays")}
-          </Text>
-        ) : null}
-        {task?.repeating ? (
-          <Text size="sm" c="dimmed">
-            {t("boards.leavesSeries")}
           </Text>
         ) : null}
         <Group justify="flex-end" mt="xs">

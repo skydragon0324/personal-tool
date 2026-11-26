@@ -90,8 +90,8 @@ def _next_position(db: Session, column_id: uuid.UUID) -> int:
 def duplicate_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskDetailRead:
     """Copy a task with its content, links, sub-tasks and files, right below the original.
 
-    The copy is a standalone task: it is not assigned to anyone, has no reminder and does not
-    repeat, even when the original does. Copying a sub-task adds a sibling under the same parent.
+    The copy is a standalone task: it is not assigned to anyone and has no reminder. Copying a
+    sub-task adds a sibling under the same parent.
     """
     original = get_task_for_user(db, user_id, task_id, with_details=True)
     column = db.get(BoardColumn, original.column_id)
@@ -223,12 +223,10 @@ def move_to_board(
 ) -> TaskDetailRead:
     """Move a task, with everything attached to it, to another board the user can access.
 
-    Assignees stay only if they are also on the target board. A repeating task's occurrence
-    leaves its series and becomes a one-off task on the new board.
+    Assignees stay only if they are also on the target board.
     """
     from app.services.board_member_service import participant_ids
     from app.services.notification_service import dismiss_task_notifications
-    from app.services.recurrence_service import _add_exception
 
     task = get_task_for_user(db, user_id, task_id, with_details=True, for_update=True)
     if payload.expected_version is not None and task.version != payload.expected_version:
@@ -260,17 +258,6 @@ def move_to_board(
     # Keep only the assignees who are also on the target board.
     allowed = participant_ids(db, target_board)
     task.assignees = [user for user in task.assignees if user.id in allowed]
-
-    if task.recurrence_series_id is not None:
-        if task.original_occurrence_date is not None:
-            # Keep the series from generating this date again on the old board.
-            _add_exception(db, task.recurrence_series_id, task.original_occurrence_date)
-        task.recurrence_series_id = None
-        task.recurrence_series = None
-        task.occurrence_date = None
-        task.original_occurrence_date = None
-        task.occurrence_index = None
-        task.is_detached = False
 
     old_position = task.position
     max_pos = db.scalar(

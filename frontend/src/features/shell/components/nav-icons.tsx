@@ -8,7 +8,8 @@ export type NavIconName =
   | "boards"
   | "plans"
   | "notepad"
-  | "schedule";
+  | "schedule"
+  | "sidebar";
 
 const PATHS: Record<NavIconName, JSX.Element> = {
   home: <path d="m3 11 9-8 9 8M5.500 9.500V20a1 1 0 0 0 1 1H10v-6h4v6h3.500a1 1 0 0 0 1-1V9.500" />,
@@ -50,6 +51,12 @@ const PATHS: Record<NavIconName, JSX.Element> = {
     </>
   ),
   notepad: <path d="M8 4h8a2 2 0 0 1 2 2v14l-6-3-6 3V6a2 2 0 0 1 2-2Z" />,
+  sidebar: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.500" />
+      <path d="M9 4v16" />
+    </>
+  ),
   schedule: (
     <>
       <circle cx="12" cy="12" r="8" />
