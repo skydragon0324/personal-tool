@@ -46,6 +46,8 @@ import {
 } from "../utils/pending-images";
 import { type EditorImage, TaskRichTextEditor } from "./task-rich-text-editor";
 import { ImageAnnotator } from "./image-annotator";
+import { ImageGallery } from "./image-gallery";
+import { galleryIndexOf, taskGalleryImages } from "../utils/gallery-images";
 import { ScreenshotButton } from "./screenshot-button";
 import { fetchImageBlob } from "../utils/screen-capture";
 import { t } from "@/i18n";
@@ -217,6 +219,10 @@ export function TaskForm({
     () => (initial?.attachments ?? []).filter((a) => a.attachment_kind === "image"),
     [initial],
   );
+  // The gallery thumbnails open a viewer that steps through these same images.
+  const galleryImages = useMemo(() => taskGalleryImages(null, imageAttachments), [imageAttachments]);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+  const closeGallery = useCallback(() => setGalleryIndex(null), []);
 
   function insertLocalImage(file: File, alt: string) {
     const pendingId = createPendingImageId();
@@ -818,17 +824,24 @@ export function TaskForm({
               <SimpleGrid cols={{ base: 2, sm: 3 }}>
                 {imageAttachments.map((image) =>
                   image.download_url ? (
-                    <Image
+                    <button
                       key={image.id}
-                      src={image.download_url}
-                      alt={image.original_name}
-                      radius="md"
-                      h={100}
-                      fit="cover"
-                    />
+                      type="button"
+                      onClick={() => setGalleryIndex(galleryIndexOf(galleryImages, image.download_url))}
+                      aria-label={t("tasks.viewImage", { name: image.original_name })}
+                      className="block cursor-zoom-in rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--app-primary)]"
+                    >
+                      <Image src={image.download_url} alt={image.original_name} radius="md" h={100} fit="cover" />
+                    </button>
                   ) : null,
                 )}
               </SimpleGrid>
+              <ImageGallery
+                images={galleryImages}
+                index={galleryIndex}
+                onIndexChange={setGalleryIndex}
+                onClose={closeGallery}
+              />
             </div>
           ) : null}
         </section>

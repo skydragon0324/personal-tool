@@ -1,6 +1,6 @@
 import { Alert, Button, Group, Loader, Menu, Modal, Text } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { DiscardChangesModal } from "@/components/discard-changes-modal";
 import type {
@@ -18,7 +18,9 @@ import { t } from "@/i18n";
 import { formatDateTime, formatTaskPeriod } from "@/lib/dates";
 import { screenHeight } from "@/lib/viewport";
 import { subtaskProgressLabel } from "../hooks/use-subtasks";
+import { galleryIndexOf, taskGalleryImages } from "../utils/gallery-images";
 import { CategoryBadge } from "./category-badge";
+import { ImageGallery } from "./image-gallery";
 import { PriorityBadge } from "./priority-badge";
 import { SubtaskList } from "./subtask-list";
 import { TaskContentViewer } from "./task-content-viewer";
@@ -79,6 +81,13 @@ export function TaskDetailModal({
   }, [detailUpdatedAt, queryClient, taskId]);
   const [localMode, setLocalMode] = useState(mode);
   const [editDirty, setEditDirty] = useState(false);
+  // Image files in the Files list open in the same image viewer as the images in the details.
+  const galleryImages = useMemo(
+    () => (task ? taskGalleryImages(task.content, task.attachments) : []),
+    [task],
+  );
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+  useEffect(() => setGalleryIndex(null), [taskId]);
   // Where to go once the user confirms throwing away unsaved edits.
   const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
 
@@ -204,7 +213,7 @@ export function TaskDetailModal({
                     {hasContent(task) ? (
                       // Long details scroll inside this box instead of stretching the modal.
                       <div className="h-[22rem] overflow-y-auto rounded-lg">
-                        <TaskContentViewer value={task.content} />
+                        <TaskContentViewer value={task.content} attachments={task.attachments} />
                       </div>
                     ) : (
                       <Text size="sm" c="dimmed">
@@ -320,7 +329,18 @@ export function TaskDetailModal({
                       <ul className="space-y-1.5 text-sm">
                         {task.attachments.map((attachment) => (
                           <li key={attachment.id} className="truncate">
-                            {attachment.download_url ? (
+                            {attachment.download_url && attachment.attachment_kind === "image" ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setGalleryIndex(galleryIndexOf(galleryImages, attachment.download_url))
+                                }
+                                aria-label={t("tasks.viewImage", { name: attachment.original_name })}
+                                className="max-w-full truncate text-left text-[var(--app-primary)] hover:underline"
+                              >
+                                {attachment.original_name}
+                              </button>
+                            ) : attachment.download_url ? (
                               <a
                                 href={attachment.download_url}
                                 target="_blank"
@@ -396,6 +416,12 @@ export function TaskDetailModal({
           setEditDirty(false);
           leave?.();
         }}
+      />
+      <ImageGallery
+        images={galleryImages}
+        index={galleryIndex}
+        onIndexChange={setGalleryIndex}
+        onClose={() => setGalleryIndex(null)}
       />
     </>
   );

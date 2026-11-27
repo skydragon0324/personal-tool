@@ -635,6 +635,10 @@ export const zh: Messages = {
   tasks: {
     imagePreview: "图片",
     viewImage: "查看原图：{name}",
+    previousImage: "上一张",
+    nextImage: "下一张",
+    imagePosition: "第 {current} 张，共 {total} 张",
+    imageLoadFailed: "无法加载“{name}”。",
     editTitle: "编辑{noun}",
     nounTask: "任务",
     nounSubtask: "子任务",

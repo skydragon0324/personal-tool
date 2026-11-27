@@ -235,6 +235,89 @@ body {
   outline: none;
 }
 
+/*
+ * Image viewer (image-gallery.tsx). The modal and its dark stage have a fixed size that depends
+ * only on the browser window, never on the image, so nothing moves when the next image is shown.
+ * About 70% of the window on desktop, nearly all of it on tablets and phones. The image inside is
+ * only ever scaled down (max 100% of the stage, auto size, contain): small images keep their
+ * natural size and the dark stage letterboxes them.
+ *
+ * `--image-gallery-vh` is 1% of the screen height in the best unit the browser supports
+ * (screenHeight(1), set by the component). The component also sets the modal's 1rem spacing
+ * above and below and its matching max height, which the theme otherwise sets inline.
+ */
+.image-gallery-inner {
+  --modal-inner-x-offset: 2.5vw;
+}
+
+.image-gallery-content {
+  --modal-content-flex: 0 0 min(95vw, 100rem);
+}
+
+.image-gallery-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-gallery-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  /* Room left for the title bar, the controls and the spacing around the modal. */
+  height: max(12rem, min(calc(80 * var(--image-gallery-vh, 1vh)), 64rem, calc(100 * var(--image-gallery-vh, 1vh) - 11rem)));
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: #0b0b0c;
+}
+
+.image-gallery-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  transition: opacity 120ms ease;
+}
+
+.image-gallery-image[data-loading] {
+  opacity: 0;
+}
+
+/* Loading spinner and load error sit over the middle of the stage. */
+.image-gallery-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.image-gallery-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+@media (min-width: 64em) {
+  .image-gallery-content {
+    --modal-content-flex: 0 0 min(70vw, 100rem);
+  }
+
+  .image-gallery-stage {
+    height: max(12rem, min(calc(70 * var(--image-gallery-vh, 1vh)), 64rem, calc(100 * var(--image-gallery-vh, 1vh) - 11rem)));
+  }
+}
+
 /* Task edit form: images in the text show as thumbnails too; a selected image gets an outline. */
 .task-content-editor .ProseMirror img {
   display: block;

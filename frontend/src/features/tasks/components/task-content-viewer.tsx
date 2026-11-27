@@ -1,28 +1,38 @@
-import { Modal } from "@mantine/core";
 import { RichTextEditor } from "@mantine/tiptap";
 import { useEditor, type Editor } from "@tiptap/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { TiptapJSON } from "@/features/board/types";
+import type { TaskAttachment, TiptapJSON } from "@/features/board/types";
 import { t } from "@/i18n";
 import { editorLabels } from "@/i18n/editor-labels";
-import { screenHeight } from "@/lib/viewport";
+import { galleryIndexOf, taskGalleryImages, type GalleryImage } from "../utils/gallery-images";
 import { createTaskEditorExtensions } from "../utils/task-editor-extensions";
+import { ImageGallery } from "./image-gallery";
 
 const EMPTY: TiptapJSON = { type: "doc", content: [{ type: "paragraph" }] };
 
-interface OpenImage {
-  src: string;
-  alt: string;
-}
-
 /**
  * The task's details, read-only. Images show as small thumbnails; clicking one (or pressing Enter
- * on it) opens it at full size in a modal.
+ * on it) opens it at full size in a viewer that also steps through the task's other images (those
+ * in the text, then the image attachments).
  */
-export function TaskContentViewer({ value }: { value: TiptapJSON | null }) {
+export function TaskContentViewer({
+  value,
+  attachments,
+}: {
+  value: TiptapJSON | null;
+  /** The task's attachments; image ones follow the images in the text in the viewer. */
+  attachments?: TaskAttachment[];
+}) {
   const extensions = useMemo(() => createTaskEditorExtensions(), []);
-  const [openImage, setOpenImage] = useState<OpenImage | null>(null);
+  const images = useMemo(() => taskGalleryImages(value, attachments), [value, attachments]);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // An image missing from the list (not expected) still opens, on its own.
+  const [strayImage, setStrayImage] = useState<GalleryImage | null>(null);
+  const closeGallery = useCallback(() => {
+    setOpenIndex(null);
+    setStrayImage(null);
+  }, []);
   const editor = useEditor({
     extensions,
     content: value ?? EMPTY,
@@ -40,9 +50,15 @@ export function TaskContentViewer({ value }: { value: TiptapJSON | null }) {
 
   const wrapper = useRef<HTMLDivElement>(null);
 
-  function imageFrom(target: EventTarget | null): OpenImage | null {
+  function imageFrom(target: EventTarget | null): HTMLImageElement | null {
     if (!(target instanceof HTMLImageElement) || !wrapper.current?.contains(target)) return null;
-    return { src: target.currentSrc || target.src, alt: target.alt };
+    return target;
+  }
+
+  function openImage(image: HTMLImageElement) {
+    const index = galleryIndexOf(images, image.getAttribute("src"));
+    setStrayImage(index >= 0 ? null : { src: image.currentSrc || image.src, alt: image.alt });
+    setOpenIndex(Math.max(index, 0));
   }
 
   if (!editor || editor.isDestroyed) {
@@ -58,38 +74,26 @@ export function TaskContentViewer({ value }: { value: TiptapJSON | null }) {
         className="task-content-viewer"
         onClick={(event) => {
           const image = imageFrom(event.target);
-          if (image) setOpenImage(image);
+          if (image) openImage(image);
         }}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           const image = imageFrom(event.target);
           if (!image) return;
           event.preventDefault();
-          setOpenImage(image);
+          openImage(image);
         }}
       >
         <RichTextEditor editor={editor} className="pointer-events-auto" labels={editorLabels()}>
           <RichTextEditor.Content mih={120} />
         </RichTextEditor>
       </div>
-      <Modal
-        opened={openImage !== null}
-        onClose={() => setOpenImage(null)}
-        title={openImage?.alt || t("tasks.imagePreview")}
-        size="auto"
-        centered
-        radius="lg"
-        zIndex={400}
-      >
-        {openImage ? (
-          <img
-            src={openImage.src}
-            alt={openImage.alt}
-            className="mx-auto block h-auto w-auto max-w-full object-contain"
-            style={{ maxHeight: `calc(${screenHeight(90)} - 8rem)` }}
-          />
-        ) : null}
-      </Modal>
+      <ImageGallery
+        images={strayImage ? [strayImage] : images}
+        index={openIndex}
+        onIndexChange={setOpenIndex}
+        onClose={closeGallery}
+      />
     </>
   );
 }

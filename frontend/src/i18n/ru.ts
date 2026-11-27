@@ -650,6 +650,10 @@ export const ru: Messages = {
   tasks: {
     imagePreview: "Изображение",
     viewImage: "Открыть изображение целиком: {name}",
+    previousImage: "Предыдущее изображение",
+    nextImage: "Следующее изображение",
+    imagePosition: "{current} из {total}",
+    imageLoadFailed: "Не удалось загрузить «{name}».",
     editTitle: "Изменить {noun}",
     nounTask: "задачу",
     nounSubtask: "подзадачу",

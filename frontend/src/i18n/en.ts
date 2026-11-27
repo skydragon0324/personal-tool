@@ -636,6 +636,10 @@ export const en = {
   tasks: {
     imagePreview: "Image",
     viewImage: "Open full image: {name}",
+    previousImage: "Previous image",
+    nextImage: "Next image",
+    imagePosition: "{current} of {total}",
+    imageLoadFailed: "Could not load “{name}”.",
     editTitle: "Edit {noun}",
     nounTask: "task",
     nounSubtask: "subtask",

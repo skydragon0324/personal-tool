@@ -18,7 +18,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("UPDATE board_columns SET name = 'Review' WHERE name = '리뷰'")
+    op.execute("UPDATE board_columns SET name = 'Review' WHERE name = 'Review'")
 
     op.drop_constraint("uq_tasks_column_due_position", "tasks", type_="unique")
     op.drop_index("ix_tasks_column_due_position", table_name="tasks")
@@ -101,4 +101,4 @@ def downgrade() -> None:
         "tasks",
         ["column_id", "due_date", "position"],
     )
-    op.execute("UPDATE board_columns SET name = '리뷰' WHERE name = 'Review'")
+    op.execute("UPDATE board_columns SET name = 'Review' WHERE name = 'Review'")

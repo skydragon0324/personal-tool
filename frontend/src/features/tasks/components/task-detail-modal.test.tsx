@@ -1,6 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 
@@ -123,6 +123,40 @@ describe("TaskDetailModal", () => {
 
     expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
     expect(onModeChange).toHaveBeenCalledWith("view");
+    expect(screen.getByRole("heading", { name: "Design the database" })).toBeInTheDocument();
+  });
+
+  it("opens image files in the image viewer and keeps other files as links", async () => {
+    const file = (id: string, kind: string, name: string) => ({
+      id,
+      original_name: name,
+      content_type: kind === "image" ? "image/png" : "application/pdf",
+      size_bytes: 1,
+      attachment_kind: kind,
+      created_at: "2026-11-01T00:00:00Z",
+      download_url: `/files/${id}`,
+    });
+    current = {
+      ...TASK,
+      attachments: [file("a", "image", "one.png"), file("spec", "file", "spec.pdf"), file("b", "image", "two.png")],
+    };
+    const onClose = jest.fn();
+    const user = userEvent.setup();
+    renderModal({ mode: "view", onClose });
+
+    expect(screen.getByRole("link", { name: "spec.pdf" })).toHaveAttribute("href", "/files/spec");
+    expect(screen.queryByRole("link", { name: "one.png" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open full image: two.png" }));
+    const viewer = await screen.findByRole("dialog", { name: "two.png" });
+    expect(viewer.querySelector("img")?.getAttribute("src")).toBe("/files/b");
+    expect(viewer).toHaveTextContent("2 of 2");
+
+    // Escape closes only the image viewer, not the task behind it.
+    await waitFor(() => expect(viewer).toContainElement(document.activeElement as HTMLElement));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "two.png" })).not.toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Design the database" })).toBeInTheDocument();
   });
 
